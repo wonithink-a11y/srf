@@ -1,4 +1,4 @@
-const CACHE = 'srf-v2';
+const CACHE = 'srf-v3';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
