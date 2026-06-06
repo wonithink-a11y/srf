@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SRF 동기화 브릿지</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans KR', sans-serif; background: #0d1117; color: #e6edf3; padding: 24px; min-height: 100vh; }
+  h1 { font-size: 20px; margin-bottom: 6px; }
+  .sub { font-size: 13px; color: #8b949e; margin-bottom: 24px; }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .card h2 { font-size: 14px; font-weight: 700; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 14px; }
+  .btn { display: block; width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 10px; transition: opacity 0.15s; }
+  .btn:active { opacity: 0.8; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-blue { background: #58a6ff; color: #0d1117; }
+  .btn-green { background: #3fb950; color: #0d1117; }
+  .btn-gray { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
+  .status { padding: 12px; border-radius: 8px; font-size: 13px; margin-top: 10px; line-height: 1.6; }
+  .status.ok { background: rgba(63,185,80,0.12); border: 1px solid rgba(63,185,80,0.3); color: #3fb950; }
+  .status.err { background: rgba(248,81,73,0.12); border: 1px solid rgba(248,81,73,0.3); color: #f85149; }
+  .status.info { background: rgba(88,166,255,0.08); border: 1px solid rgba(88,166,255,0.25); color: #58a6ff; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 12px; font-weight: 700; }
+  #fb-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#8b949e; margin-right:6px; }
+  code { background: #21262d; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #58a6ff; }
+  .guide-step { font-size: 12px; color: #8b949e; line-height: 1.8; margin-bottom: 12px; }
+  .guide-step b { color: #e6edf3; }
+</style>
+</head>
+<body>
+
+<h1>⚡ SRF 동기화 브릿지</h1>
+<p class="sub">PC 앱(FU7F40_1.HTM) ↔ Firebase ↔ 모바일 앱 데이터 동기화</p>
+
+<!-- 연결 상태 -->
+<div class="card">
+  <h2>🔌 Firebase 연결 상태</h2>
+  <div style="display:flex;align-items:center;gap:8px;font-size:14px;">
+    <span id="fb-dot"></span>
+    <span id="fb-status-text">초기화 중...</span>
+  </div>
+  <div id="fb-status-detail" style="font-size:12px;color:#8b949e;margin-top:6px;"></div>
+</div>
+
+<!-- PC → Firebase 업로드 -->
+<div class="card">
+  <h2>📤 PC → Firebase 업로드</h2>
+  <div class="guide-step">
+    <b>사용법:</b> PC에서 <code>FU7F40_1.HTM</code>을 열고<br>
+    아래 버튼을 클릭하면 PC의 localStorage 데이터를<br>
+    Firebase에 업로드합니다.
+  </div>
+  <div class="guide-step" style="color:#e3b341;">
+    ⚠️ 이 페이지는 <code>FU7F40_1.HTM</code>과 <b>같은 브라우저</b>에서 열어야 합니다.<br>
+    (같은 브라우저 = 같은 localStorage 공유)
+  </div>
+  <button class="btn btn-blue" onclick="pcToFirebase()" id="btn-upload">
+    ☁️ PC 데이터 → Firebase 업로드
+  </button>
+  <div id="upload-result"></div>
+</div>
+
+<!-- Firebase → PC 다운로드 -->
+<div class="card">
+  <h2>📥 Firebase → PC 가져오기</h2>
+  <div class="guide-step">
+    모바일에서 입력한 데이터를 PC로 가져옵니다.<br>
+    가져온 후 <code>FU7F40_1.HTM</code>을 새로고침하면 반영됩니다.
+  </div>
+  <button class="btn btn-green" onclick="firebaseToPC()" id="btn-download">
+    📥 Firebase → PC 데이터 가져오기
+  </button>
+  <div id="download-result"></div>
+</div>
+
+<!-- 현황 -->
+<div class="card">
+  <h2>📊 PC localStorage 현황</h2>
+  <div id="local-stats" style="font-size:13px;line-height:2;color:#8b949e;">확인 중...</div>
+  <button class="btn btn-gray" onclick="checkLocalStats()" style="margin-top:10px;">🔍 현황 새로고침</button>
+</div>
+
+<script>
+const FB_CONFIG = {
+  apiKey: "AIzaSyDU5MJI2w8AYazPxyzukE1lWAzLXOFfr7o",
+  authDomain: "rosegarden-4937c.firebaseapp.com",
+  projectId: "rosegarden-4937c",
+  storageBucket: "rosegarden-4937c.firebasestorage.app",
+  messagingSenderId: "109165303238",
+  appId: "1:109165303238:web:db2401090c9e79a5be8ec7"
+};
+const FB_COL = 'srf_data';
+let db = null;
+
+// Firebase 초기화
+function initFB() {
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+    db = firebase.firestore();
+    setStatus('연결됨', '#3fb950', 'Firebase 정상 연결');
+    checkLocalStats();
+  } catch(e) {
+    setStatus('연결 실패', '#f85149', e.message);
+  }
+}
+
+function setStatus(text, color, detail) {
+  document.getElementById('fb-dot').style.background = color;
+  document.getElementById('fb-status-text').textContent = text;
+  document.getElementById('fb-status-text').style.color = color;
+  if (detail) document.getElementById('fb-status-detail').textContent = detail;
+}
+
+// PC localStorage 현황 확인
+function checkLocalStats() {
+  const rawdbKeys = Object.keys(localStorage).filter(k => /^_rawdb_/.test(k)).sort();
+  const stock = (() => { try { return JSON.parse(localStorage.getItem('_siloStock_v5')||'{}'); } catch(e){ return {}; } })();
+  const usage = (() => { try { return JSON.parse(localStorage.getItem('_usageData_v5')||'{}'); } catch(e){ return {}; } })();
+
+  let html = '';
+  if (rawdbKeys.length === 0) {
+    html = '<span style="color:#f85149;">⚠️ SRF 데이터 없음 — FU7F40_1.HTM과 같은 브라우저인지 확인하세요</span>';
+  } else {
+    rawdbKeys.forEach(k => {
+      const year = k.replace('_rawdb_','');
+      const cnt = (() => { try { return JSON.parse(localStorage.getItem(k)).length; } catch(e){ return 0; } })();
+      const kb = Math.round((localStorage.getItem(k)||'').length/1024);
+      html += `<div>📦 ${year}년 입고: <b style="color:#e6edf3">${cnt}건</b> (~${kb}KB)</div>`;
+    });
+    const totalStock = (stock.S1||0)+(stock.S2||0)+(stock.S4||0)+(stock.S3||0);
+    html += `<div>🏭 현재 재고: <b style="color:#58a6ff">${Math.round(totalStock)}톤</b></div>`;
+    html += `<div>🔥 사용량 기록: <b style="color:#e6edf3">${Object.keys(usage).length}일치</b></div>`;
+  }
+  document.getElementById('local-stats').innerHTML = html;
+}
+
+// PC → Firebase
+async function pcToFirebase() {
+  if (!db) { alert('Firebase 연결 안됨'); return; }
+  const btn = document.getElementById('btn-upload');
+  const resultEl = document.getElementById('upload-result');
+  btn.disabled = true; btn.textContent = '⏳ 업로드 중...';
+
+  try {
+    const fixedKeys = ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'];
+    const rawdbKeys = Object.keys(localStorage).filter(k => /^_rawdb_\d{4}$/.test(k));
+    const monthlyKeys = Object.keys(localStorage).filter(k => /^_monthlyData_\d{4}$/.test(k));
+
+    // meta 문서
+    const meta = { updatedAt: firebase.firestore.FieldValue.serverTimestamp(), updatedBy: 'pc' };
+    fixedKeys.forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v) { try { meta[k] = JSON.parse(v); } catch(e){} }
+    });
+    await db.collection(FB_COL).doc('meta').set(meta);
+
+    // 연도별 입고
+    for (const k of rawdbKeys) {
+      const year = k.replace('_rawdb_','');
+      const v = localStorage.getItem(k);
+      if (v) {
+        const data = JSON.parse(v);
+        await db.collection(FB_COL).doc(`rawdb_${year}`).set({
+          records: data, count: data.length,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+    }
+
+    // 월별
+    for (const k of monthlyKeys) {
+      const year = k.replace('_monthlyData_','');
+      const v = localStorage.getItem(k);
+      if (v) await db.collection(FB_COL).doc(`monthly_${year}`).set({
+        data: JSON.parse(v), updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
+    const total = 1 + rawdbKeys.length + monthlyKeys.length;
+    resultEl.innerHTML = `<div class="status ok">✅ 업로드 완료 · ${total}개 문서<br>모바일 앱 동기화 탭 → Firebase 가져오기 누르면 반영됩니다</div>`;
+  } catch(e) {
+    resultEl.innerHTML = `<div class="status err">❌ 실패: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '☁️ PC 데이터 → Firebase 업로드';
+  }
+}
+
+// Firebase → PC
+async function firebaseToPC() {
+  if (!db) { alert('Firebase 연결 안됨'); return; }
+  const btn = document.getElementById('btn-download');
+  const resultEl = document.getElementById('download-result');
+  btn.disabled = true; btn.textContent = '⏳ 가져오는 중...';
+
+  try {
+    const snap = await db.collection(FB_COL).get();
+    const preview = [];
+    snap.forEach(doc => {
+      const id = doc.id, data = doc.data();
+      if (id === 'meta') {
+        ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'].forEach(k => {
+          if (data[k]) localStorage.setItem(k, JSON.stringify(data[k]));
+        });
+        preview.push('재고·사용량 복원');
+      } else if (id.startsWith('rawdb_')) {
+        const year = id.replace('rawdb_','');
+        if (data.records) {
+          localStorage.setItem(`_rawdb_${year}`, JSON.stringify(data.records));
+          preview.push(`${year}년 ${data.count||data.records.length}건`);
+        }
+      } else if (id.startsWith('monthly_')) {
+        const year = id.replace('monthly_','');
+        if (data.data) localStorage.setItem(`_monthlyData_${year}`, JSON.stringify(data.data));
+      }
+    });
+
+    resultEl.innerHTML = `<div class="status ok">✅ 가져오기 완료<br>${preview.join(' · ')}<br>
+      <b>FU7F40_1.HTM을 F5로 새로고침하세요</b></div>`;
+    checkLocalStats();
+  } catch(e) {
+    resultEl.innerHTML = `<div class="status err">❌ 실패: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '📥 Firebase → PC 데이터 가져오기';
+  }
+}
+
+window.addEventListener('load', initFB);
+</script>
+</body>
+</html>

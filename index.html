@@ -11,6 +11,8 @@
 <link rel="manifest" href="manifest.json">
 <title>SRF 수급관리</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap');
 
@@ -243,6 +245,7 @@
 <div id="header">
   <h1>⚡ SRF 수급관리</h1>
   <span class="badge" id="last-update">—</span>
+  <span id="fb-status" style="font-size:10px;padding:2px 7px;border-radius:10px;background:var(--bg3);color:var(--text2);">☁️</span>
   <button id="btn-refresh" onclick="loadAll()">🔄</button>
 </div>
 
@@ -586,6 +589,21 @@
 
   <!-- ⑤ 동기화 -->
   <div id="page-sync" class="page">
+
+    <!-- Firebase 실시간 동기화 -->
+    <div class="card">
+      <div class="card-title">🔥 Firebase 실시간 동기화</div>
+      <div id="fb-sync-status" style="font-size:12px;color:var(--text2);margin-bottom:12px;">
+        연결 안됨
+      </div>
+      <button class="btn-primary" onclick="fbPush()" id="btn-fb-push" style="margin-bottom:8px;">
+        ☁️ Firebase에 업로드 (모바일→클라우드)
+      </button>
+      <button class="btn-secondary" onclick="fbPull()" id="btn-fb-pull">
+        📥 Firebase에서 가져오기 (클라우드→모바일)
+      </button>
+      <div id="fb-result" style="margin-top:10px;"></div>
+    </div>
 
     <div class="card">
       <div class="card-title">📥 PC → 모바일 가져오기</div>
@@ -2453,6 +2471,180 @@ function removeDuplicates() {
 }
 
 // ════════════════════════════════════════
+// ── Firebase 동기화 ──
+// ════════════════════════════════════════
+
+const FB_CONFIG = {
+  apiKey: "AIzaSyDU5MJI2w8AYazPxyzukE1lWAzLXOFfr7o",
+  authDomain: "rosegarden-4937c.firebaseapp.com",
+  projectId: "rosegarden-4937c",
+  storageBucket: "rosegarden-4937c.firebasestorage.app",
+  messagingSenderId: "109165303238",
+  appId: "1:109165303238:web:db2401090c9e79a5be8ec7"
+};
+
+let _db = null;
+const FB_COL = 'srf_data'; // Firestore 컬렉션명
+
+function fbInit() {
+  try {
+    if (!firebase.apps.length) {
+      firebase.initializeApp(FB_CONFIG);
+    }
+    _db = firebase.firestore();
+    fbSetStatus('연결됨', '#3fb950');
+    return true;
+  } catch(e) {
+    fbSetStatus('초기화 실패: ' + e.message, 'var(--red)');
+    return false;
+  }
+}
+
+function fbSetStatus(msg, color) {
+  const el = document.getElementById('fb-sync-status');
+  const badge = document.getElementById('fb-status');
+  if (el) { el.textContent = msg; el.style.color = color || 'var(--text2)'; }
+  if (badge) {
+    if (color === '#3fb950') { badge.textContent = '☁️✅'; badge.style.color = '#3fb950'; }
+    else if (color === 'var(--red)') { badge.textContent = '☁️❌'; badge.style.color = 'var(--red)'; }
+    else { badge.textContent = '☁️⏳'; badge.style.color = 'var(--yellow)'; }
+  }
+}
+
+// ── Firebase 업로드 (모바일 → 클라우드) ──
+async function fbPush() {
+  if (!_db && !fbInit()) return;
+  const btn = document.getElementById('btn-fb-push');
+  const resultEl = document.getElementById('fb-result');
+  btn.textContent = '⏳ 업로드 중...'; btn.disabled = true;
+  fbSetStatus('업로드 중...', 'var(--yellow)');
+
+  try {
+    // 모든 데이터 수집
+    const fixedKeys = ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'];
+    const rawdbKeys = Object.keys(localStorage).filter(k => /^_rawdb_\d{4}$/.test(k));
+    const monthlyKeys = Object.keys(localStorage).filter(k => /^_monthlyData_\d{4}$/.test(k));
+
+    // 재고 + 설정 (단일 문서)
+    const meta = {};
+    fixedKeys.forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v) { try { meta[k] = JSON.parse(v); } catch(e) {} }
+    });
+    await _db.collection(FB_COL).doc('meta').set({
+      ...meta,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: 'mobile'
+    });
+
+    // 연도별 입고 DB (연도별 문서)
+    for (const k of rawdbKeys) {
+      const year = k.replace('_rawdb_','');
+      const v = localStorage.getItem(k);
+      if (v) {
+        try {
+          const data = JSON.parse(v);
+          // Firestore는 배열을 직접 저장 가능하나 크기 제한(1MB)이 있어 청크 분할
+          await _db.collection(FB_COL).doc(`rawdb_${year}`).set({
+            records: data,
+            count: data.length,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        } catch(e) {}
+      }
+    }
+
+    // 월별 데이터
+    for (const k of monthlyKeys) {
+      const year = k.replace('_monthlyData_','');
+      const v = localStorage.getItem(k);
+      if (v) {
+        try {
+          await _db.collection(FB_COL).doc(`monthly_${year}`).set({
+            data: JSON.parse(v),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        } catch(e) {}
+      }
+    }
+
+    const totalDocs = 1 + rawdbKeys.length + monthlyKeys.length;
+    resultEl.innerHTML = `<div style="background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--green);">
+      ✅ 업로드 완료 · ${totalDocs}개 문서</div>`;
+    fbSetStatus(`마지막 업로드: ${new Date().toLocaleTimeString('ko-KR')}`, '#3fb950');
+    showToast('✅ Firebase 업로드 완료');
+  } catch(e) {
+    resultEl.innerHTML = `<div style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--red);">
+      ❌ 업로드 실패: ${e.message}</div>`;
+    fbSetStatus('업로드 실패', 'var(--red)');
+  } finally {
+    btn.textContent = '☁️ Firebase에 업로드 (모바일→클라우드)';
+    btn.disabled = false;
+  }
+}
+
+// ── Firebase 가져오기 (클라우드 → 모바일) ──
+async function fbPull() {
+  if (!_db && !fbInit()) return;
+  const btn = document.getElementById('btn-fb-pull');
+  const resultEl = document.getElementById('fb-result');
+  btn.textContent = '⏳ 가져오는 중...'; btn.disabled = true;
+  fbSetStatus('다운로드 중...', 'var(--yellow)');
+
+  try {
+    const snap = await _db.collection(FB_COL).get();
+    let imported = 0;
+    const preview = [];
+
+    snap.forEach(doc => {
+      const id = doc.id;
+      const data = doc.data();
+
+      if (id === 'meta') {
+        // 재고·사용량 등
+        ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'].forEach(k => {
+          if (data[k] !== undefined) {
+            localStorage.setItem(k, JSON.stringify(data[k]));
+            imported++;
+          }
+        });
+        preview.push('재고·사용량 복원');
+      } else if (id.startsWith('rawdb_')) {
+        const year = id.replace('rawdb_','');
+        if (data.records) {
+          localStorage.setItem(`_rawdb_${year}`, JSON.stringify(data.records));
+          preview.push(`${year}년 입고 ${data.count||data.records.length}건`);
+          imported++;
+        }
+      } else if (id.startsWith('monthly_')) {
+        const year = id.replace('monthly_','');
+        if (data.data) {
+          localStorage.setItem(`_monthlyData_${year}`, JSON.stringify(data.data));
+          preview.push(`${year}년 월별 데이터`);
+          imported++;
+        }
+      }
+    });
+
+    resultEl.innerHTML = `<div style="background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--green);">
+      ✅ 가져오기 완료 · ${imported}개 문서<br>
+      <span style="color:var(--text2);">${preview.join(' · ')}</span>
+    </div>`;
+    fbSetStatus(`마지막 동기화: ${new Date().toLocaleTimeString('ko-KR')}`, '#3fb950');
+    showToast('✅ Firebase 가져오기 완료');
+    loadAll();
+    renderSyncStats();
+  } catch(e) {
+    resultEl.innerHTML = `<div style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--red);">
+      ❌ 가져오기 실패: ${e.message}</div>`;
+    fbSetStatus('가져오기 실패', 'var(--red)');
+  } finally {
+    btn.textContent = '📥 Firebase에서 가져오기 (클라우드→모바일)';
+    btn.disabled = false;
+  }
+}
+
+// ════════════════════════════════════════
 // ── Google Drive 연동 ──
 // ════════════════════════════════════════
 
@@ -2754,6 +2946,8 @@ initMonYearSel();
 initDates();
 initRptForm();
 loadAll();
+// Firebase 초기화
+setTimeout(fbInit, 1000);
 
 // ── PWA Service Worker 등록 ──
 if ('serviceWorker' in navigator) {
