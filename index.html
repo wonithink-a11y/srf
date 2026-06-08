@@ -1703,36 +1703,52 @@ function submitUsage() {
 }
 
 // ── 이력 조회 ──
+function normalizePcRec(r) {
+  // PC형식: ["2026-01-01 00:00","차량번호",계근톤,공차톤,"저장조"]
+  if (Array.isArray(r) && r.length <= 6 && typeof r[2] === 'number' && r[2] < 1000) {
+    const date = (r[0]||'').slice(0,10);
+    const ton  = Math.round((parseFloat(r[2]||0) - parseFloat(r[3]||0)) * 100) / 100;
+    const silo = normSilo(r[4]||'광주') || 'S1';
+    return { date, car: r[1]||'', silo, ton: Math.abs(ton), slip: '', isPc: true };
+  }
+  // 모바일형식: [date, slip, car, gross_kg, tare_kg, moist, silo, ton, ...]
+  if (Array.isArray(r)) {
+    const date = (r[0]||'').slice(0,10);
+    const ton  = parseFloat(r[7]||0) || (parseFloat(r[3]||0)-parseFloat(r[4]||0))/1000;
+    return { date, car: r[2]||'', silo: r[6]||'', ton: Math.abs(ton), slip: r[1]||'', isPc: false };
+  }
+  return { date: r.date||'', car: r.car||'', silo: r.silo||'', ton: r.ton||0, slip: r.slip||'', isPc: false };
+}
+
 function renderHistory() {
   const db = getAllDB();
   const siloFilter  = document.getElementById('hist-silo').value;
   const monthFilter = document.getElementById('hist-month').value;
 
-  let recs = db.map((r, globalIdx) => {
-    const arr = Array.isArray(r) ? r : [r.date,'',r.car||'',r.gross,r.tare,'',r.silo,r.ton,'',0];
-    return { arr, date: arr[0], year: arr[0]?.slice(0,4) };
+  let recs = db.map(r => normalizePcRec(r));
+
+  if (siloFilter)  recs = recs.filter(r => {
+    const sk = normSilo(r.silo) || r.silo;
+    return sk === siloFilter || r.silo === siloFilter;
   });
-  if (siloFilter)  recs = recs.filter(r => r.arr[6] === siloFilter);
   if (monthFilter) recs = recs.filter(r => r.date && r.date.slice(0,7) === monthFilter);
   recs = recs.slice().reverse().slice(0, 80);
 
   const el = document.getElementById('hist-list');
   if (!recs.length) { el.innerHTML = '<div class="empty-msg">조건에 맞는 이력이 없습니다</div>'; return; }
 
-  el.innerHTML = recs.map(({arr: r}) => {
-    const silo   = r[6];
-    const info   = SILO_INFO[silo]||{name:silo||'?',color:'var(--text2)'};
-    const tonRaw = r[7] || ((r[3]||0)-(r[4]||0))/1000;
-    // 삭제 키: 날짜|차량|저장조|실중량소수2자리
-    const delKey = encodeURIComponent(`${r[0]}|${r[2]}|${r[6]}|${parseFloat(r[7]||0).toFixed(2)}`);
+  el.innerHTML = recs.map(r => {
+    const siloKey = normSilo(r.silo) || r.silo;
+    const info    = SILO_INFO[siloKey] || { name: r.silo||'?', color:'var(--text2)' };
+    const delKey  = encodeURIComponent(`${r.date}|${r.car}|${siloKey}|${parseFloat(r.ton||0).toFixed(2)}`);
     return `<div class="rec-item">
       <div class="rec-dot" style="background:${info.color};"></div>
       <div class="rec-main">
-        <div><span style="color:${info.color};font-weight:600;">${info.name}</span> · ${r[2]||''}</div>
-        <div class="rec-date">${r[0]||''} ${r[1]?'#'+r[1]:''}</div>
+        <div><span style="color:${info.color};font-weight:600;">${info.name}</span> · ${r.car||''}</div>
+        <div class="rec-date">${r.date||''} ${r.slip?'#'+r.slip:''}</div>
       </div>
-      <span class="rec-ton" style="color:${info.color};">${parseFloat(Math.abs(tonRaw)).toFixed(2)}톤</span>
-      <button onclick="confirmDeleteInbound('${delKey}', '${r[0]}', '${r[2]}', '${parseFloat(r[7]||0).toFixed(2)}')"
+      <span class="rec-ton" style="color:${info.color};">${parseFloat(r.ton||0).toFixed(2)}톤</span>
+      <button onclick="confirmDeleteInbound('${delKey}', '${r.date}', '${r.car}', '${parseFloat(r.ton||0).toFixed(2)}')"
         style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:0 4px;margin-left:4px;flex-shrink:0;">×</button>
     </div>`;
   }).join('');
