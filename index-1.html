@@ -1,0 +1,3092 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SRF수급관리">
+<meta name="theme-color" content="#0d1117">
+<meta name="description" content="SRF 고형연료 수급관리 앱">
+<link rel="manifest" href="manifest.json">
+<title>SRF 수급관리</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap');
+
+  :root {
+    --bg: #0d1117;
+    --bg2: #161b22;
+    --bg3: #21262d;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text2: #8b949e;
+    --s1: #38bdf8;   /* 광주 */
+    --s2: #22c55e;   /* 전남 */
+    --s4: #a78bfa;   /* 나주 */
+    --s3: #f59e0b;   /* 순천 */
+    --red: #f85149;
+    --green: #3fb950;
+    --accent: #58a6ff;
+    --yellow: #e3b341;
+    --tab-h: 56px;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Noto Sans KR', sans-serif; overflow: hidden; }
+
+  /* ── 헤더 ── */
+  #header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    height: 52px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 16px;
+    gap: 10px;
+  }
+  #header h1 { font-size: 15px; font-weight: 700; flex: 1; letter-spacing: -0.3px; }
+  #header .badge { font-size: 10px; background: var(--bg3); color: var(--text2); padding: 2px 7px; border-radius: 10px; font-family: 'IBM Plex Mono', monospace; }
+  #btn-refresh { background: none; border: 1px solid var(--border); border-radius: 7px; color: var(--text2); padding: 5px 10px; font-size: 12px; cursor: pointer; }
+  #btn-refresh:active { background: var(--bg3); }
+
+  /* ── 콘텐츠 영역 ── */
+  #content {
+    position: fixed;
+    top: 52px; bottom: calc(var(--tab-h) + var(--safe-bottom));
+    left: 0; right: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── 하단 탭 ── */
+  #tabs {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    height: calc(var(--tab-h) + var(--safe-bottom));
+    padding-bottom: var(--safe-bottom);
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    display: flex;
+  }
+  .tab-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; border: none; background: none; color: var(--text2);
+    font-size: 9px; font-family: 'Noto Sans KR', sans-serif; cursor: pointer;
+    transition: color 0.15s;
+  }
+  .tab-btn .ico { font-size: 18px; }
+  .tab-btn.active { color: var(--accent); }
+  .tab-btn:active { background: rgba(255,255,255,0.04); }
+
+  /* ── 페이지 ── */
+  .page { display: none; padding: 12px; }
+  .page.active { display: block; }
+
+  /* ── 카드 ── */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .card-title {
+    font-size: 11px; font-weight: 700; color: var(--text2);
+    text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px;
+  }
+
+  /* ── 재고 바 ── */
+  .silo-row { margin-bottom: 10px; }
+  .silo-header { display: grid; grid-template-columns: 36px 1fr 90px 58px; align-items: baseline; margin-bottom: 5px; gap: 0 0; }
+  .silo-name { font-size: 13px; font-weight: 700; }
+  .silo-ton  { font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 600; text-align: right; padding-right: 10px; }
+  .silo-cap  { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text2); text-align: right; padding-right: 6px; }
+  .silo-pct  { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text2); text-align: right; }
+  .bar-track { height: 8px; background: var(--bg3); border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+
+  /* ── 합계 카드 ── */
+  .total-row { display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; }
+  .total-label { font-size: 12px; color: var(--text2); flex: 1; }
+  .total-val { font-family: 'IBM Plex Mono', monospace; font-size: 16px; font-weight: 600; }
+  .total-unit { font-size: 11px; color: var(--text2); }
+  .total-sub { font-size: 11px; color: var(--text2); }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+
+  /* ── 알림 배지 ── */
+  .alert-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border-radius: 8px; margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .alert-item.red { background: rgba(248,81,73,0.12); border: 1px solid rgba(248,81,73,0.3); }
+  .alert-item.yellow { background: rgba(227,179,65,0.12); border: 1px solid rgba(227,179,65,0.3); }
+  .alert-item.green { background: rgba(63,185,80,0.12); border: 1px solid rgba(63,185,80,0.3); }
+  .alert-empty { font-size: 12px; color: var(--text2); text-align: center; padding: 20px 0; }
+
+  /* ── 입력 폼 ── */
+  .form-label { font-size: 12px; color: var(--text2); margin-bottom: 5px; display: block; }
+  .form-select, .form-input {
+    width: 100%; background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); padding: 10px 12px;
+    font-size: 14px; font-family: 'Noto Sans KR', sans-serif;
+    margin-bottom: 12px; outline: none;
+    -webkit-appearance: none;
+  }
+  .form-select:focus, .form-input:focus { border-color: var(--accent); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn-primary {
+    width: 100%; padding: 13px; border: none; border-radius: 10px;
+    background: var(--accent); color: #0d1117; font-size: 15px; font-weight: 700;
+    font-family: 'Noto Sans KR', sans-serif; cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn-primary:active { opacity: 0.8; }
+  .btn-secondary {
+    width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px;
+    background: none; color: var(--text2); font-size: 13px;
+    font-family: 'Noto Sans KR', sans-serif; cursor: pointer; margin-top: 8px;
+  }
+  .btn-secondary:active { background: var(--bg3); }
+
+  /* ── 입고 이력 ── */
+  .rec-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .rec-item:last-child { border-bottom: none; }
+  .rec-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .rec-main { flex: 1; }
+  .rec-date { font-size: 11px; color: var(--text2); }
+  .rec-ton { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 14px; }
+
+  /* ── 사용량 탭 ── */
+  .use-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .use-cell {
+    background: var(--bg3); border-radius: 10px; padding: 12px;
+    text-align: center;
+  }
+  .use-cell .lbl { font-size: 10px; color: var(--text2); margin-bottom: 4px; }
+  .use-cell .val { font-family: 'IBM Plex Mono', monospace; font-size: 18px; font-weight: 600; }
+  .use-cell .sub { font-size: 10px; color: var(--text2); margin-top: 2px; }
+
+  /* ── 토스트 ── */
+  #toast {
+    position: fixed; bottom: calc(var(--tab-h) + var(--safe-bottom) + 12px);
+    left: 50%; transform: translateX(-50%);
+    background: #238636; color: #fff; padding: 10px 20px;
+    border-radius: 20px; font-size: 13px; z-index: 200;
+    opacity: 0; transition: opacity 0.3s; pointer-events: none;
+    white-space: nowrap;
+  }
+  #toast.show { opacity: 1; }
+
+  /* ── 재고 수정 모달 ── */
+  #modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 300;
+    background: rgba(0,0,0,0.7); align-items: flex-end;
+  }
+  #modal-overlay.open { display: flex; }
+  #modal-box {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 16px 16px 0 0;
+    padding: 20px 16px calc(20px + var(--safe-bottom));
+    width: 100%;
+  }
+  #modal-box h2 { font-size: 15px; font-weight: 700; margin-bottom: 16px; }
+  .modal-silo-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .modal-silo-row label { font-size: 13px; font-weight: 600; width: 40px; }
+  .modal-silo-row input {
+    flex: 1; background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); padding: 9px 12px;
+    font-size: 15px; font-family: 'IBM Plex Mono', monospace;
+    outline: none; -webkit-appearance: none;
+  }
+  .modal-silo-row input:focus { border-color: var(--accent); }
+  .modal-silo-row .unit { font-size: 12px; color: var(--text2); }
+
+  /* ── 월별 그리드 ── */
+  .mon-grid { width:100%; border-collapse:collapse; font-size:12px; }
+  .mon-grid th { background:var(--bg3); color:var(--text2); padding:6px 4px; text-align:center; font-weight:600; font-size:11px; border-bottom:1px solid var(--border); }
+  .mon-grid td { padding:4px 3px; border-bottom:1px solid rgba(48,54,61,0.4); }
+  .mon-grid td:first-child { text-align:center; font-weight:700; color:var(--text2); font-size:12px; width:32px; }
+  .mon-input {
+    width:100%; background:var(--bg3); border:1px solid var(--border);
+    border-radius:6px; color:var(--text); padding:5px 6px;
+    font-size:13px; font-family:'IBM Plex Mono',monospace;
+    text-align:right; outline:none; -webkit-appearance:none;
+  }
+  .mon-input:focus { border-color:var(--accent); }
+  .mon-input.has-val { color:var(--accent); border-color:rgba(88,166,255,0.4); }
+
+  .empty-msg { text-align: center; color: var(--text2); font-size: 13px; padding: 30px 0; }
+
+  /* ── CSV 미리보기 ── */
+  .csv-table { width:100%; border-collapse:collapse; font-size:11px; margin-top:4px; }
+  .csv-table th { background:var(--bg3); color:var(--text2); padding:5px 6px; text-align:center; border-bottom:1px solid var(--border); font-weight:600; white-space:nowrap; }
+  .csv-table td { padding:5px 6px; border-bottom:1px solid rgba(48,54,61,0.5); text-align:right; white-space:nowrap; }
+  .csv-table td:first-child, .csv-table td:nth-child(2), .csv-table td:nth-child(3) { text-align:left; }
+  .csv-table tr.err td { background:rgba(248,81,73,0.08); color:var(--red); }
+  .csv-table tr.ok:last-child td { border-bottom:none; }
+  .csv-sum { display:flex; justify-content:space-between; padding:8px 4px 0; font-size:12px; color:var(--text2); }
+  .csv-sum b { color:var(--text); }
+
+  /* ── 스크롤바 숨기기 ── */
+  #content::-webkit-scrollbar { display: none; }
+</style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<div id="header">
+  <h1>⚡ SRF 수급관리</h1>
+  <span class="badge" id="last-update">—</span>
+  <span id="fb-status" style="font-size:10px;padding:2px 7px;border-radius:10px;background:var(--bg3);color:var(--text2);">☁️</span>
+  <button id="btn-refresh" onclick="loadAll()">🔄</button>
+</div>
+
+<!-- 콘텐츠 -->
+<div id="content">
+
+  <!-- ① 대시보드 -->
+  <div id="page-dash" class="page active">
+    <!-- 전체 재고 -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <span class="card-title" style="margin-bottom:0;">전체 재고</span>
+        <button id="btn-decimal-toggle" onclick="toggleDecimal()"
+          style="padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:11px;cursor:pointer;">
+          소수점 .00
+        </button>
+      </div>
+      <div id="dash-total">
+        <div class="total-row">
+          <span class="total-label">합계</span>
+          <span class="total-val" id="d-total">—</span>
+          <span class="total-unit">톤</span>
+        </div>
+        <div class="total-sub" id="d-days">잔여 가동일 계산 중...</div>
+      </div>
+      <hr class="divider">
+      <div id="silo-bars"></div>
+      <button class="btn-secondary" onclick="openStockModal()">✏️ 재고 직접 수정</button>
+    </div>
+
+    <!-- 현황 보고문 생성 -->
+    <div class="card">
+      <div class="card-title">📢 현황 보고문 생성</div>
+
+      <!-- 기준일 + 구분 -->
+      <div class="form-row">
+        <div>
+          <label class="form-label">기준일 (보고서 제목)</label>
+          <input type="date" id="rpt-date" class="form-input">
+        </div>
+        <div>
+          <label class="form-label">구분</label>
+          <select id="rpt-type" class="form-select">
+            <option value="weekly">주간</option>
+            <option value="daily">전일</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 입고 기간 선택 -->
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">📥 입고 집계 기간</div>
+      <div class="form-row" style="margin-bottom:6px;">
+        <div>
+          <label class="form-label">시작일</label>
+          <input type="date" id="rpt-from" class="form-input" onchange="autoLoadInbound()">
+        </div>
+        <div>
+          <label class="form-label">종료일</label>
+          <input type="date" id="rpt-to" class="form-input" onchange="autoLoadInbound()">
+        </div>
+      </div>
+      <button onclick="autoLoadInbound()" class="btn-secondary" style="margin-bottom:8px;">
+        🔍 기간 내 입고 데이터 자동 불러오기
+      </button>
+
+      <!-- 자동 집계 미리보기 -->
+      <div id="rpt-auto-preview" style="margin-bottom:10px;"></div>
+
+      <!-- 입고 행 (수동 추가/수정) -->
+      <div id="rpt-inbound-rows"></div>
+      <button onclick="addRptInRow()" class="btn-secondary" style="margin-bottom:12px;">+ 입고 행 수동 추가</button>
+
+      <!-- 사용량 집계 기간 -->
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">🔥 사용량</div>
+      <div id="rpt-use-auto-preview" style="margin-bottom:6px;"></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+        <input type="number" id="rpt-use-ton" class="form-input" placeholder="311 (수동입력 or 자동계산)" style="margin-bottom:0;flex:1.5;">
+        <span style="font-size:12px;color:var(--text2);white-space:nowrap;">톤</span>
+        <select id="rpt-use-silo" class="form-select" style="margin-bottom:0;flex:1;">
+          <option value="">설비 정지중</option>
+          <option value="S1">광주</option>
+          <option value="S2">전남</option>
+          <option value="S4">나주</option>
+          <option value="S3">순천</option>
+          <option value="ALL">전체</option>
+        </select>
+      </div>
+
+      <!-- 수분 -->
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">💧 수분 (선택)</div>
+      <div id="rpt-moist-rows"></div>
+      <button onclick="addRptMoistRow()" class="btn-secondary" style="margin-bottom:12px;">+ 수분 행 추가</button>
+
+      <!-- 재고 -->
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">📦 재고량 (00시 기준)</div>
+      <div class="form-row">
+        <div>
+          <label class="form-label">광주 (톤)</label>
+          <input type="number" id="rpt-s1" class="form-input" placeholder="257">
+        </div>
+        <div>
+          <label class="form-label">전남 (톤)</label>
+          <input type="number" id="rpt-s2" class="form-input" placeholder="959">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="form-label">나주 (톤)</label>
+          <input type="number" id="rpt-s4" class="form-input" placeholder="701">
+        </div>
+        <div>
+          <label class="form-label">순천 (톤)</label>
+          <input type="number" id="rpt-s3" class="form-input" placeholder="0">
+        </div>
+      </div>
+      <button onclick="loadCurrentStock(true)" class="btn-secondary" style="margin-bottom:12px;">🔄 현재 재고 불러오기</button>
+
+      <button class="btn-primary" onclick="generateReport()">📋 보고문 생성</button>
+
+      <!-- 출력 결과 -->
+      <div id="rpt-output" style="display:none;margin-top:14px;">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:6px;">📄 복사해서 사용하세요</div>
+        <pre id="rpt-text" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:'Noto Sans KR',sans-serif;font-size:13px;line-height:1.8;white-space:pre-wrap;word-break:break-all;color:var(--text);"></pre>
+        <button onclick="copyReport()" class="btn-primary" style="margin-top:8px;" id="rpt-copy-btn">📋 복사</button>
+      </div>
+    </div>
+
+    <!-- 알림 -->
+    <div class="card">
+      <div class="card-title">알림</div>
+      <div id="alert-list"></div>
+    </div>
+
+  </div>
+
+  <!-- ② 입고 등록 (CSV 일괄 등록) -->
+  <div id="page-input" class="page">
+
+    <!-- CSV 일괄 등록 -->
+    <div class="card">
+      <div class="card-title">📋 CSV 일괄 등록</div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.8;margin-bottom:10px;">
+        <b style="color:var(--text);">컬럼 순서 (헤더 자동 인식)</b><br>
+        <code style="background:var(--bg3);padding:2px 6px;border-radius:4px;font-size:10px;color:var(--accent);">순번, 입고일자, 차량번호, 총중량[기준], 공차중량[기준], 실중량[기준], 입고게이트, ...</code><br>
+        <span style="color:var(--yellow);">· 중량 단위 톤/kg 자동 감지 &nbsp;·&nbsp; 합계행 자동 분리 저장</span><br>
+        <span style="color:var(--text2);">· 게이트: 나주·S4·4 / 광주·S1·1 / 전남·S2·2 / 순천·S3·3</span>
+      </div>
+
+      <!-- 탭 전환 -->
+      <div style="display:flex;gap:6px;margin-bottom:10px;">
+        <button id="csv-tab-paste" onclick="setCsvTab('paste')"
+          style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#0d1117;font-size:12px;font-weight:700;cursor:pointer;">
+          클립보드 붙여넣기
+        </button>
+        <button id="csv-tab-file" onclick="setCsvTab('file')"
+          style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text2);font-size:12px;cursor:pointer;">
+          파일 선택
+        </button>
+      </div>
+
+      <!-- 붙여넣기 영역 -->
+      <div id="csv-paste-area">
+        <textarea id="csv-text" placeholder="여기에 CSV 내용을 붙여넣으세요&#10;2026-06-05,001,12가3456,24500,12300,12.20,S1,12.20,3500&#10;2026-06-05,002,34나5678,25000,12800,,광주,,"
+          style="width:100%;height:120px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:11px;font-family:'IBM Plex Mono',monospace;line-height:1.6;resize:vertical;outline:none;"
+          oninput="previewCSV()"></textarea>
+      </div>
+
+      <!-- 파일 선택 영역 -->
+      <div id="csv-file-area" style="display:none;">
+        <label style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:16px;border:2px dashed var(--border);border-radius:10px;cursor:pointer;color:var(--text2);font-size:13px;">
+          📁 CSV 또는 엑셀(.xlsx) 파일 선택
+          <input type="file" id="csv-file-input" accept=".csv,.txt,.xlsx,.xls" style="display:none;" onchange="loadFile(this)">
+        </label>
+        <!-- 시트 선택 (엑셀 전용) -->
+        <div id="sheet-select-wrap" style="display:none;margin-top:10px;">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">📑 시트 선택</div>
+          <div id="sheet-btn-list" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        </div>
+      </div>
+
+      <!-- 미리보기 -->
+      <div id="csv-preview" style="margin-top:10px;"></div>
+
+      <button class="btn-primary" onclick="submitCSV()" style="margin-top:10px;display:none;" id="csv-submit-btn">
+        ✅ 일괄 등록
+      </button>
+    </div>
+
+    <!-- 오늘 입고 이력 -->
+    <div class="card">
+      <div class="card-title">오늘 입고 이력</div>
+      <div id="today-recs"></div>
+    </div>
+
+  </div>
+
+  <!-- ③ 사용량/입고량 -->
+  <div id="page-usage" class="page">
+
+    <!-- 탭 전환: 일별 / 월별 -->
+    <div style="display:flex;gap:6px;padding:0 0 12px;">
+      <button id="usage-tab-daily" onclick="setUsageTab('daily')"
+        style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--accent);background:var(--accent);color:#0d1117;font-size:13px;font-weight:700;cursor:pointer;">
+        📅 일별 등록
+      </button>
+      <button id="usage-tab-monthly" onclick="setUsageTab('monthly')"
+        style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--border);background:none;color:var(--text2);font-size:13px;cursor:pointer;">
+        📆 월별 입력
+      </button>
+    </div>
+
+    <!-- 일별 등록 -->
+    <div id="usage-daily-area">
+      <div class="card">
+        <div class="card-title">일별 사용량 등록</div>
+        <label class="form-label">날짜</label>
+        <input type="date" id="use-date" class="form-input">
+
+        <label class="form-label">사용량 입력 방식</label>
+        <div style="display:flex;gap:6px;margin-bottom:12px;">
+          <button id="use-tab-total" onclick="setUseTab('total')"
+            style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#0d1117;font-size:12px;font-weight:700;cursor:pointer;">전체 합계</button>
+          <button id="use-tab-silo" onclick="setUseTab('silo')"
+            style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text2);font-size:12px;cursor:pointer;">저장조별</button>
+        </div>
+
+        <!-- 전체 합계 입력 -->
+        <div id="use-area-total">
+          <label class="form-label">일일 사용량 합계 (톤)</label>
+          <input type="number" id="use-total" class="form-input" placeholder="300">
+        </div>
+
+        <!-- 저장조별 입력 -->
+        <div id="use-area-silo" style="display:none;">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">저장조별로 입력하면 재고가 개별 차감됩니다</div>
+          <div class="form-row">
+            <div>
+              <label class="form-label" style="color:var(--s1);">광주 (톤)</label>
+              <input type="number" id="use-s1" class="form-input" placeholder="0" oninput="updateSiloUsePreview()">
+            </div>
+            <div>
+              <label class="form-label" style="color:var(--s2);">전남 (톤)</label>
+              <input type="number" id="use-s2" class="form-input" placeholder="0" oninput="updateSiloUsePreview()">
+            </div>
+          </div>
+          <div class="form-row">
+            <div>
+              <label class="form-label" style="color:var(--s4);">나주 (톤)</label>
+              <input type="number" id="use-s4" class="form-input" placeholder="0" oninput="updateSiloUsePreview()">
+            </div>
+            <div>
+              <label class="form-label" style="color:var(--s3);">순천 (톤)</label>
+              <input type="number" id="use-s3" class="form-input" placeholder="0" oninput="updateSiloUsePreview()">
+            </div>
+          </div>
+          <div id="use-silo-total-preview" style="font-size:12px;color:var(--accent);text-align:right;margin-bottom:8px;font-family:'IBM Plex Mono',monospace;"></div>
+        </div>
+
+        <!-- 공통 -->
+        <!-- 전체합계 입력용 hidden (저장조별 모드에서 합산값 저장) -->
+        <input type="hidden" id="use-total-hidden">
+        <label class="form-label">비고</label>
+        <input type="text" id="use-note" class="form-input" placeholder="정상가동 / 부분가동 등">
+        <button class="btn-primary" onclick="submitUsage()">💾 사용량 저장</button>
+      </div>
+    </div>
+
+    <!-- 월별 입력 -->
+    <div id="usage-monthly-area" style="display:none;">
+      <div class="card">
+        <div class="card-title">📆 월별 입고량·사용량 입력</div>
+        <div style="font-size:11px;color:var(--text2);line-height:1.7;margin-bottom:12px;">
+          이전 연도 데이터를 월 단위로 입력합니다.<br>
+          저장하면 <b style="color:var(--accent);">연도별 집계</b>에 자동 반영됩니다.
+        </div>
+
+        <div class="form-row">
+          <div>
+            <label class="form-label">연도</label>
+            <select id="mon-year" class="form-select" onchange="renderMonthlyGrid()"></select>
+          </div>
+          <div>
+            <label class="form-label">저장조 (입고량용)</label>
+            <select id="mon-silo" class="form-select">
+              <option value="ALL">전체합계</option>
+              <option value="S1">광주</option>
+              <option value="S2">전남</option>
+              <option value="S4">나주</option>
+              <option value="S3">순천</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 월별 입력 그리드 -->
+        <div id="monthly-grid"></div>
+
+        <button class="btn-primary" style="margin-top:12px;" onclick="saveMonthlyData()">
+          💾 월별 데이터 저장
+        </button>
+      </div>
+    </div>
+
+    <!-- 연도별 집계 -->
+    <div class="card">
+      <div class="card-title">📊 연도별 집계</div>
+      <select id="usage-year-sel" class="form-select" onchange="renderUsageStats()" style="margin-bottom:10px;"></select>
+      <div id="usage-stats"></div>
+    </div>
+
+  </div>
+
+  <!-- ④ 이력 조회 -->
+  <div id="page-history" class="page">
+    <div class="card">
+      <div class="card-title">입고 이력</div>
+      <div class="form-row" style="margin-bottom:10px;">
+        <select id="hist-silo" class="form-select" style="margin-bottom:0;">
+          <option value="">전체</option>
+          <option value="S1">광주</option>
+          <option value="S2">전남</option>
+          <option value="S4">나주</option>
+          <option value="S3">순천</option>
+        </select>
+        <select id="hist-month" class="form-select" style="margin-bottom:0;"></select>
+      </div>
+
+      <!-- 일별 삭제 -->
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+        <input type="date" id="hist-del-date" class="form-input"
+          style="flex:1;margin-bottom:0;font-size:12px;">
+        <button onclick="confirmDeleteByDate()"
+          style="padding:9px 12px;border-radius:8px;border:1px solid var(--red);background:none;color:var(--red);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">
+          🗑️ 날짜 전체 삭제
+        </button>
+      </div>
+      <div id="hist-del-result" style="margin-bottom:8px;"></div>
+
+      <div id="hist-list"></div>
+    </div>
+  </div>
+
+  <!-- ⑤ 동기화 -->
+  <div id="page-sync" class="page">
+
+    <!-- Firebase 실시간 동기화 -->
+    <div class="card">
+      <div class="card-title">🔥 Firebase 실시간 동기화</div>
+      <div id="fb-sync-status" style="font-size:12px;color:var(--text2);margin-bottom:12px;">
+        연결 안됨
+      </div>
+      <button class="btn-primary" onclick="fbPush()" id="btn-fb-push" style="margin-bottom:8px;">
+        ☁️ Firebase에 업로드 (모바일→클라우드)
+      </button>
+      <button class="btn-secondary" onclick="fbPull()" id="btn-fb-pull">
+        📥 Firebase에서 가져오기 (클라우드→모바일)
+      </button>
+      <div id="fb-result" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📥 PC → 모바일 가져오기</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.8;margin-bottom:14px;">
+        PC 앱을 열고 브라우저 콘솔(F12)에서<br>아래 코드를 실행 → <code style="background:var(--bg3);padding:1px 5px;border-radius:4px;color:var(--accent);">srf_export.json</code> 다운로드
+      </div>
+      <div style="position:relative;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:14px;">
+        <pre id="export-code" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7ee787;white-space:pre-wrap;word-break:break-all;line-height:1.6;">const fixed=['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'];
+const rawdb=Object.keys(localStorage).filter(k=>/^_rawdb_\d{4}$/.test(k));
+const out={};
+[...fixed,...rawdb].forEach(k=>{const v=localStorage.getItem(k);if(v)out[k]=JSON.parse(v);});
+const a=document.createElement('a');
+a.href='data:application/json,'+encodeURIComponent(JSON.stringify(out));
+a.download='srf_export.json';
+a.click();</pre>
+        <button onclick="copyExportCode()" style="position:absolute;top:8px;right:8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text2);padding:4px 8px;font-size:11px;cursor:pointer;" id="copy-export-btn">복사</button>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">다운로드된 JSON 파일을 여기에 선택:</div>
+      <label style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:16px;border:2px dashed var(--border);border-radius:10px;cursor:pointer;color:var(--text2);font-size:13px;">
+        📁 srf_export.json 선택
+        <input type="file" id="json-file-input" accept=".json" style="display:none;" onchange="importJSON(this)">
+      </label>
+      <div id="import-preview" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📤 모바일 → PC 내보내기</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.8;margin-bottom:14px;">
+        모바일 데이터를 JSON으로 내보내고,<br>PC 앱 콘솔에 붙여넣어 주입할 수 있습니다.
+      </div>
+      <button class="btn-primary" onclick="exportJSON()" style="margin-bottom:12px;">💾 JSON으로 내보내기</button>
+      <div id="inject-code-wrap" style="display:none;">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">PC 앱 콘솔에서 실행 (데이터 주입):</div>
+        <div style="position:relative;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+          <pre id="inject-code" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7ee787;white-space:pre-wrap;word-break:break-all;line-height:1.6;max-height:120px;overflow:hidden;"></pre>
+          <button onclick="copyInjectCode()" style="position:absolute;top:8px;right:8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text2);padding:4px 8px;font-size:11px;cursor:pointer;" id="copy-inject-btn">복사</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📊 저장된 데이터 현황</div>
+      <div id="sync-stats"></div>
+      <hr class="divider" style="margin:14px 0;">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">🧹 중복 데이터 관리</div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.7;margin-bottom:10px;">
+        같은 날짜·차량번호·실중량이 동일한 중복 건을 탐지하고 제거합니다.
+      </div>
+      <button class="btn-secondary" onclick="detectDuplicates()" id="btn-detect-dup">🔍 중복 탐지</button>
+      <button class="btn-secondary" onclick="diagnosDB()" style="margin-top:6px;">🩺 데이터 진단</button>
+      <div id="dup-preview" style="margin-top:10px;"></div>
+    </div>
+
+    <!-- Google Drive 백업 -->
+    <div class="card">
+      <div class="card-title">☁️ Google Drive 백업</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.8;margin-bottom:12px;">
+        현재 localStorage 데이터를 Drive에<br>
+        <code style="background:var(--bg3);padding:1px 5px;border-radius:4px;color:var(--accent);">srf_backup_날짜.json</code> 으로 저장합니다.
+      </div>
+      <button class="btn-primary" onclick="backupToDrive()" id="btn-drive-backup">
+        ☁️ Drive에 백업
+      </button>
+      <div id="drive-backup-result" style="margin-top:10px;"></div>
+    </div>
+
+    <!-- Google Drive 파일 불러오기 -->
+    <div class="card">
+      <div class="card-title">📂 Drive 파일 불러오기</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.8;margin-bottom:12px;">
+        Drive의 엑셀·CSV 파일 또는 백업 JSON을<br>파일 ID로 직접 불러옵니다.
+      </div>
+      <label class="form-label">Drive 파일 ID</label>
+      <input type="text" id="drive-file-id" class="form-input"
+        placeholder="URL의 /d/XXXX/edit 중 XXXX 부분">
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px;">
+        Drive에서 파일 열기 → 공유 → 링크 복사 후 ID 부분만 입력
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-primary" style="flex:1;" onclick="loadFromDrive('csv')">
+          📊 CSV/엑셀로 불러오기
+        </button>
+        <button class="btn-primary" style="flex:1;background:var(--bg3);color:var(--text2);border:1px solid var(--border);" onclick="loadFromDrive('json')">
+          🔄 백업 JSON 복원
+        </button>
+      </div>
+      <div id="drive-load-result" style="margin-top:10px;"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- 하단 탭 -->
+<div id="tabs">
+  <button class="tab-btn active" onclick="showPage('dash',this)">
+    <span class="ico">📊</span><span>대시보드</span>
+  </button>
+  <button class="tab-btn" onclick="showPage('input',this)">
+    <span class="ico">📋</span><span>입고등록</span>
+  </button>
+  <button class="tab-btn" onclick="showPage('usage',this)">
+    <span class="ico">🔥</span><span>사용량</span>
+  </button>
+  <button class="tab-btn" onclick="showPage('history',this)">
+    <span class="ico">📋</span><span>이력</span>
+  </button>
+  <button class="tab-btn" onclick="showPage('sync',this)">
+    <span class="ico">🔄</span><span>동기화</span>
+  </button>
+</div>
+
+<!-- 재고 수정 모달 -->
+<div id="modal-overlay" onclick="e => { if(e.target===this) closeModal(); }">
+  <div id="modal-box">
+    <h2>📦 저장조 재고 직접 수정</h2>
+    <div class="modal-silo-row">
+      <label style="color:var(--s1);">광주</label>
+      <input type="number" id="m-s1" placeholder="0">
+      <span class="unit">톤</span>
+    </div>
+    <div class="modal-silo-row">
+      <label style="color:var(--s2);">전남</label>
+      <input type="number" id="m-s2" placeholder="0">
+      <span class="unit">톤</span>
+    </div>
+    <div class="modal-silo-row">
+      <label style="color:var(--s4);">나주</label>
+      <input type="number" id="m-s4" placeholder="0">
+      <span class="unit">톤</span>
+    </div>
+    <div class="modal-silo-row">
+      <label style="color:var(--s3);">순천</label>
+      <input type="number" id="m-s3" placeholder="0">
+      <span class="unit">톤</span>
+    </div>
+    <button class="btn-primary" onclick="saveStock()">저장</button>
+    <button class="btn-secondary" onclick="recalcStock();closeModal();renderDash();showToast('✅ DB 기준 재고 재계산 완료');">🔄 DB 기준으로 재계산</button>
+    <button class="btn-secondary" onclick="closeModal()">취소</button>
+  </div>
+</div>
+
+<!-- 삭제 확인 모달 -->
+<div id="del-confirm-overlay" style="display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.7);align-items:flex-end;">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:20px 16px calc(20px + var(--safe-bottom));width:100%;">
+    <div style="font-size:15px;font-weight:700;margin-bottom:8px;">🗑️ 입고 데이터 삭제</div>
+    <div id="del-confirm-msg" style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:16px;"></div>
+    <button onclick="doDeleteInbound()" style="width:100%;padding:13px;border:none;border-radius:10px;background:var(--red);color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">삭제</button>
+    <button onclick="closeDelConfirm()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:none;color:var(--text2);font-size:13px;cursor:pointer;">취소</button>
+  </div>
+</div>
+
+<!-- 토스트 -->
+<div id="toast"></div>
+
+<script>
+// ── 상수 ──
+const SILO_INFO = {
+  S1: { name: '광주', color: 'var(--s1)', cap: 4000 },
+  S2: { name: '전남', color: 'var(--s2)', cap: 2000 },
+  S4: { name: '나주', color: 'var(--s4)', cap:  500 },
+  S3: { name: '순천', color: 'var(--s3)', cap: 1000 },
+};
+const SILO_ORDER = ['S1','S2','S4','S3'];
+const DAILY_USE = 300;
+
+// ── 소수점 표시 토글 ──
+let _showDecimal = false; // false=정수, true=소수점 2자리
+
+function toggleDecimal() {
+  _showDecimal = !_showDecimal;
+  const btn = document.getElementById('btn-decimal-toggle');
+  if (btn) {
+    btn.textContent  = _showDecimal ? '소수점 없애기' : '소수점 .00';
+    btn.style.color  = _showDecimal ? 'var(--accent)' : 'var(--text2)';
+    btn.style.borderColor = _showDecimal ? 'var(--accent)' : 'var(--border)';
+  }
+  renderDash();
+}
+
+// 재고 표시용 포맷 (토글 상태에 따라)
+function fmtTon(n) {
+  if (n == null || isNaN(n)) return '—';
+  if (_showDecimal) return parseFloat(n).toFixed(2);
+  return Math.round(n).toLocaleString('ko-KR');
+}
+
+const KEY_STOCK     = '_siloStock_v5';
+const KEY_USAGE     = '_usageData_v5';
+const KEY_USAGESILO = '_usageDataBySilo_v5';
+
+// ── 연도별 키 분리 ──
+function rawdbKey(year) {
+  return `_rawdb_${year || new Date().getFullYear()}`;
+}
+// 현재 연도 키 (편의용)
+function KEY_RAWDB() { return rawdbKey(new Date().getFullYear()); }
+
+function getDB(year) {
+  // year 없으면 현재 연도
+  const key = rawdbKey(year || new Date().getFullYear());
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : [];
+  } catch(e) { return []; }
+}
+
+function saveDB(records, year) {
+  const key = rawdbKey(year || new Date().getFullYear());
+  localStorage.setItem(key, JSON.stringify(records));
+}
+
+// 전체 연도 DB 합치기 (이력 조회용)
+function getAllDB() {
+  const allKeys = Object.keys(localStorage).filter(k => /^_rawdb_\d{4}$/.test(k));
+  let all = [];
+  allKeys.sort().forEach(k => {
+    try { all = all.concat(JSON.parse(localStorage.getItem(k)) || []); } catch(e){}
+  });
+  return all;
+}
+
+// ── 유틸 ──
+function fmt(n) {
+  if (n == null || isNaN(n)) return '—';
+  return Math.round(n).toLocaleString('ko-KR');
+}
+function today() {
+  return new Date().toISOString().slice(0,10);
+}
+function showToast(msg, color='#238636') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = color;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ── 탭 전환 ──
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  btn.classList.add('active');
+  document.getElementById('content').scrollTop = 0;
+  if (id === 'history') {
+    const d = document.getElementById('hist-del-date');
+    if (d && !d.value) d.value = today();
+    renderHistory();
+  }
+  if (id === 'usage') renderUsageStats();
+  if (id === 'sync') renderSyncStats();
+}
+
+// ── 데이터 로드 ──
+function getStock() {
+  try {
+    const raw = localStorage.getItem(KEY_STOCK);
+    return raw ? JSON.parse(raw) : { S1:0, S2:0, S3:0, S4:0 };
+  } catch(e) { return { S1:0, S2:0, S3:0, S4:0 }; }
+}
+function getUsage() {
+  try {
+    const raw = localStorage.getItem(KEY_USAGE);
+    return raw ? JSON.parse(raw) : {};
+  } catch(e) { return {}; }
+}
+
+// ── 대시보드 렌더 ──
+function renderDash() {
+  const stock = getStock();
+  let total = 0;
+  SILO_ORDER.forEach(k => { total += (stock[k]||0); });
+
+  // 전체 합계 (마이너스 포함)
+  document.getElementById('d-total').textContent = fmtTon(total);
+  const days = DAILY_USE > 0 ? Math.floor(total / DAILY_USE) : '—';
+  document.getElementById('d-days').textContent = `잔여 약 ${days}일 (일 ${DAILY_USE}톤 기준)`;
+
+  // 저장조 바
+  const barsEl = document.getElementById('silo-bars');
+  barsEl.innerHTML = '';
+  SILO_ORDER.forEach(k => {
+    const info    = SILO_INFO[k];
+    const ton     = stock[k] || 0;
+    const pctReal = Math.round(ton / info.cap * 100);
+    const pctBar  = Math.min(100, Math.max(0, pctReal));
+    const pctStr  = String(pctReal).padStart(3);
+    const isNeg   = ton < 0;
+    const tonColor = isNeg ? 'var(--red)' : info.color;
+    barsEl.innerHTML += `
+      <div class="silo-row">
+        <div class="silo-header">
+          <span class="silo-name" style="color:${info.color}">${info.name}</span>
+          <span class="silo-ton" style="color:${tonColor}">${fmtTon(ton)}</span>
+          <span class="silo-cap">/ ${fmt(info.cap)}톤</span>
+          <span class="silo-pct" style="color:${isNeg?'var(--red)':''}">(${pctStr}%)</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${pctBar}%;background:${isNeg?'var(--red)':info.color};"></div>
+        </div>
+      </div>
+    `;
+  });
+
+  // 알림
+  const alerts = [];
+  SILO_ORDER.forEach(k => {
+    const info = SILO_INFO[k];
+    const ton = stock[k] || 0;
+    const pct = ton / info.cap * 100;
+    if (pct < 10) alerts.push({ cls:'red', msg:`🚨 ${info.name} 재고 위험 — ${pct.toFixed(0)}% (${fmt(ton)}톤)` });
+    else if (pct > 90) alerts.push({ cls:'yellow', msg:`⚠️ ${info.name} 만재 임박 — ${pct.toFixed(0)}%` });
+    else if (pct < 20) alerts.push({ cls:'yellow', msg:`⚠️ ${info.name} 재고 주의 — ${pct.toFixed(0)}% (${fmt(ton)}톤)` });
+  });
+  if (days !== '—' && days < 5) alerts.push({ cls:'red', msg:`🚨 전체 재고 소진 ${days}일 남음` });
+
+  const alertEl = document.getElementById('alert-list');
+  if (alerts.length === 0) {
+    alertEl.innerHTML = '<div class="alert-empty">✅ 이상 없음</div>';
+  } else {
+    alertEl.innerHTML = alerts.map(a => `<div class="alert-item ${a.cls}">${a.msg}</div>`).join('');
+  }
+
+  // 마지막 업데이트
+  const now = new Date();
+  document.getElementById('last-update').textContent =
+    `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} 기준`;
+}
+
+function loadAll() {
+  renderDash();
+  renderTodayRecs();
+  renderUsageStats();
+}
+
+// ── 입고 등록 ──
+function renderTodayRecs() {
+  const el = document.getElementById('today-recs');
+  if (!el) return;
+  const db = getDB(); // 올해 DB
+  const td = today();
+  const recs = db.filter(r => r.date === td || r[0] === td).slice(-10).reverse();
+  if (!recs.length) { el.innerHTML = '<div class="empty-msg">오늘 등록된 입고가 없습니다</div>'; return; }
+  el.innerHTML = recs.map(r => {
+    let silo, ton, date, car;
+    if (Array.isArray(r)) {
+      date = r[0]; silo = r[6]||r[5]; ton = r[7]||((r[3]||0)-(r[4]||0));
+      car = r[2]||'';
+    } else {
+      date = r.date; silo = r.silo; ton = r.ton||(r.gross-r.tare); car = r.car||'';
+    }
+    const info = SILO_INFO[silo] || { name: silo||'?', color:'var(--text2)' };
+    const tonVal = Math.abs(ton);
+    // ton이 이미 톤 단위인지 kg인지 판단 (1000 이상이면 kg)
+    const tonDisplay = tonVal > 100 ? (tonVal / 1000).toFixed(2) : tonVal.toFixed(2);
+    return `<div class="rec-item">
+      <div class="rec-dot" style="background:${info.color};"></div>
+      <div class="rec-main">
+        <div>${info.name} ${car ? '· '+car : ''}</div>
+        <div class="rec-date">${date}</div>
+      </div>
+      <span class="rec-ton" style="color:${info.color};">${tonDisplay}톤</span>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════
+// ── 현황 보고문 생성 ──
+// ════════════════════════════════════════
+
+const DOW = ['일','월','화','수','목','금','토'];
+
+function fmtDateKo(dateStr) {
+  // "2026-06-01" → "6/1(월)"
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  return `${d.getMonth()+1}/${d.getDate()}(${DOW[d.getDay()]})`;
+}
+
+// 입고 행 추가
+let _rptInRows = 0;
+function addRptInRow(date='', ton='', silo='') {
+  _rptInRows++;
+  const id = _rptInRows;
+  const div = document.createElement('div');
+  div.id = `rpt-in-row-${id}`;
+  div.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;';
+  div.innerHTML = `
+    <input type="date" id="rpt-in-date-${id}" class="form-input" value="${date}"
+      style="flex:1.2;margin-bottom:0;font-size:12px;">
+    <input type="number" id="rpt-in-ton-${id}" class="form-input" value="${ton}"
+      placeholder="톤" style="flex:0.8;margin-bottom:0;">
+    <select id="rpt-in-silo-${id}" class="form-select" style="flex:1;margin-bottom:0;font-size:12px;">
+      <option value="">전체</option>
+      <option value="S1"${silo==='S1'?' selected':''}>광주</option>
+      <option value="S2"${silo==='S2'?' selected':''}>전남</option>
+      <option value="S4"${silo==='S4'?' selected':''}>나주</option>
+      <option value="S3"${silo==='S3'?' selected':''}>순천</option>
+    </select>
+    <button onclick="document.getElementById('rpt-in-row-${id}').remove()"
+      style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:0 4px;">×</button>`;
+  document.getElementById('rpt-inbound-rows').appendChild(div);
+}
+
+// 수분 행 추가
+let _rptMoistRows = 0;
+function addRptMoistRow(dateLabel='', pct='') {
+  _rptMoistRows++;
+  const id = _rptMoistRows;
+  const div = document.createElement('div');
+  div.id = `rpt-moist-row-${id}`;
+  div.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;';
+  div.innerHTML = `
+    <input type="text" id="rpt-moist-label-${id}" class="form-input" value="${dateLabel}"
+      placeholder="예) 5/28(목)" style="flex:1.2;margin-bottom:0;font-size:12px;">
+    <input type="number" id="rpt-moist-pct-${id}" class="form-input" value="${pct}"
+      placeholder="%" step="0.1" style="flex:0.8;margin-bottom:0;">
+    <span style="font-size:12px;color:var(--text2);white-space:nowrap;">%</span>
+    <button onclick="document.getElementById('rpt-moist-row-${id}').remove()"
+      style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:0 4px;">×</button>`;
+  document.getElementById('rpt-moist-rows').appendChild(div);
+}
+
+// 구분 변경 시 안내 텍스트 업데이트
+function renderRptInputs() {
+  // 현재는 타입별 특이사항 없음 — 확장용
+}
+
+// 현재 재고 불러오기
+function loadCurrentStock(manual = false) {
+  const stock = getStock();
+  document.getElementById('rpt-s1').value = Math.round(stock.S1||0);
+  document.getElementById('rpt-s2').value = Math.round(stock.S2||0);
+  document.getElementById('rpt-s4').value = Math.round(stock.S4||0);
+  document.getElementById('rpt-s3').value = Math.round(stock.S3||0);
+  if (manual) showToast('✅ 현재 재고 불러오기 완료');
+}
+
+// 보고문 생성
+// ── 기간 내 입고 자동 집계 ──
+function autoLoadInbound() {
+  const from = document.getElementById('rpt-from').value;
+  const to   = document.getElementById('rpt-to').value;
+  if (!from || !to) return;
+  if (from > to) { showToast('시작일이 종료일보다 늦습니다', '#f85149'); return; }
+
+  // 해당 기간 연도들의 DB 합산
+  const fromYear = parseInt(from.slice(0,4));
+  const toYear   = parseInt(to.slice(0,4));
+  let allRecs = [];
+  for (let y = fromYear; y <= toYear; y++) {
+    allRecs = allRecs.concat(getDB(y));
+  }
+
+  // 기간 필터
+  const recs = allRecs.filter(r => {
+    const d = Array.isArray(r) ? r[0] : r.date;
+    return d && d >= from && d <= to;
+  });
+
+  // 날짜별 + 저장조별 집계
+  const byDate = {};
+  recs.forEach(r => {
+    const d    = Array.isArray(r) ? r[0] : r.date;
+    const silo = Array.isArray(r) ? r[6] : r.silo;
+    const ton  = Array.isArray(r) ? Math.abs(r[7]||0) : Math.abs(r.ton||0);
+    if (!byDate[d]) byDate[d] = {};
+    byDate[d][silo] = (byDate[d][silo]||0) + ton;
+  });
+
+  const dates = Object.keys(byDate).sort();
+  const totalTon = recs.reduce((s,r) => s + Math.abs(Array.isArray(r)?r[7]||0:r.ton||0), 0);
+  const siloSum  = {};
+  recs.forEach(r => {
+    const silo = Array.isArray(r) ? r[6] : r.silo;
+    const ton  = Math.abs(Array.isArray(r) ? r[7]||0 : r.ton||0);
+    siloSum[silo] = (siloSum[silo]||0) + ton;
+  });
+
+  // 미리보기 렌더
+  const prevEl = document.getElementById('rpt-auto-preview');
+  if (!recs.length) {
+    prevEl.innerHTML = `<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--red);">
+      ⚠️ ${from} ~ ${to} 기간 입고 데이터 없음</div>`;
+    return;
+  }
+
+  const siloDetail = Object.entries(siloSum)
+    .map(([k,v]) => `<span style="color:${SILO_INFO[k]?.color||'#fff'}">${SILO_INFO[k]?.name||k} ${v.toFixed(3)}톤</span>`)
+    .join(' · ');
+
+  let rows = '';
+  dates.forEach(d => {
+    const silos = Object.entries(byDate[d]);
+    silos.forEach(([silo, ton]) => {
+      const info = SILO_INFO[silo]||{name:silo,color:'var(--text2)'};
+      rows += `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;">
+        <span>${fmtDateKo(d)} · <span style="color:${info.color};font-weight:700;">${info.name}</span></span>
+        <span style="font-family:'IBM Plex Mono',monospace;">${ton.toFixed(3)}톤</span>
+      </div>`;
+    });
+  });
+
+  prevEl.innerHTML = `
+    <div style="background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.25);border-radius:8px;padding:10px 12px;margin-bottom:6px;">
+      <div style="font-size:11px;color:var(--text2);margin-bottom:6px;">${from} ~ ${to} · ${recs.length}건</div>
+      ${rows}
+      <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;font-size:12px;font-weight:700;">
+        합계 ${totalTon.toFixed(3)}톤 &nbsp;·&nbsp; ${siloDetail}
+      </div>
+    </div>`;
+
+  // 입고 행 자동 채우기 (날짜별·저장조별)
+  document.getElementById('rpt-inbound-rows').innerHTML = '';
+  _rptInRows = 0;
+  dates.forEach(d => {
+    Object.entries(byDate[d]).forEach(([silo, ton]) => {
+      addRptInRow(d, Math.round(ton * 1000) / 1000, silo);
+    });
+  });
+
+  // 사용량 기간 집계
+  const usage = getUsage();
+  const useDailyEntries = Object.entries(usage).filter(([d]) => d >= from && d <= to);
+  const useEl = document.getElementById('rpt-use-auto-preview');
+  if (useDailyEntries.length > 0) {
+    // 날짜별 사용량 상세 (보고문용 미리보기)
+    const useLines = useDailyEntries.sort(([a],[b])=>a.localeCompare(b)).map(([d,v]) => {
+      const tot = v.total||v||0;
+      if (v.bySilo) {
+        const siloDetail = Object.entries(v.bySilo)
+          .filter(([,t]) => t>0)
+          .map(([k,t]) => `${Math.round(t)}톤:${SILO_INFO[k]?.name||k}`).join(', ');
+        return `${fmtDateKo(d)} ${Math.round(tot)}톤 (${siloDetail})`;
+      }
+      return `${fmtDateKo(d)} ${Math.round(tot)}톤`;
+    });
+    const useSum = useDailyEntries.reduce((s,[,v])=>s+(v.total||v||0),0);
+    document.getElementById('rpt-use-ton').value = Math.round(useSum);
+    useEl.innerHTML = `<div style="background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.25);border-radius:8px;padding:7px 12px;font-size:12px;color:var(--red);">
+      🔥 기간 사용량 합계 <b>${fmt(useSum)}</b>톤<br>
+      <span style="color:var(--text2);font-size:11px;">${useLines.join('<br>')}</span>
+    </div>`;
+  } else {
+    useEl.innerHTML = `<div style="font-size:11px;color:var(--text2);">기간 내 일별 사용량 데이터 없음 — 직접 입력하세요</div>`;
+  }
+
+  showToast(`✅ ${recs.length}건 집계 완료`);
+}
+
+function generateReport() {
+  // 재고 자동 불러오기
+  loadCurrentStock();
+
+  const date    = document.getElementById('rpt-date').value;
+  const type    = document.getElementById('rpt-type').value;
+  const useTon  = parseFloat(document.getElementById('rpt-use-ton').value) || 0;
+  const useSilo = document.getElementById('rpt-use-silo').value;
+  const s1 = parseFloat(document.getElementById('rpt-s1').value) || 0;
+  const s2 = parseFloat(document.getElementById('rpt-s2').value) || 0;
+  const s4 = parseFloat(document.getElementById('rpt-s4').value) || 0;
+  const s3 = parseFloat(document.getElementById('rpt-s3').value) || 0;
+
+  if (!date) { showToast('기준일을 입력하세요', '#f85149'); return; }
+
+  const typeLabel = type === 'weekly' ? '주간' : '전일기준';
+
+  // ── 입고 행 수집 ──
+  const inRows = [];
+  document.querySelectorAll('[id^="rpt-in-row-"]').forEach(row => {
+    const id   = row.id.replace('rpt-in-row-','');
+    const d    = document.getElementById(`rpt-in-date-${id}`)?.value || '';
+    const ton  = parseFloat(document.getElementById(`rpt-in-ton-${id}`)?.value) || 0;
+    const silo = document.getElementById(`rpt-in-silo-${id}`)?.value || '';
+    if (ton > 0) inRows.push({ date: d, ton, silo });
+  });
+
+  // 날짜별로 같은 날 여러 저장조 합치기
+  const byDate = {};
+  inRows.forEach(r => {
+    if (!byDate[r.date]) byDate[r.date] = {};
+    byDate[r.date][r.silo] = (byDate[r.date][r.silo]||0) + r.ton;
+  });
+
+  const totalIn = inRows.reduce((s,r) => s+r.ton, 0);
+  const siloSum = {};
+  inRows.forEach(r => { if (r.silo) siloSum[r.silo] = (siloSum[r.silo]||0) + r.ton; });
+
+  // 총입고 요약
+  const siloEntries = Object.entries(siloSum);
+  let totalInStr = '';
+  if (siloEntries.length === 1) {
+    totalInStr = `${Math.round(totalIn)}톤(${SILO_INFO[siloEntries[0][0]]?.name||siloEntries[0][0]})`;
+  } else if (siloEntries.length > 1) {
+    const detail = siloEntries.map(([k,v]) => `${Math.round(v)}톤:${SILO_INFO[k]?.name||k}`).join(', ');
+    totalInStr = `${Math.round(totalIn)}톤 (${detail})`;
+  } else {
+    totalInStr = `${Math.round(totalIn)}톤`;
+  }
+
+  // 일별 상세 (날짜별로 묶어서 출력)
+  let inDetail = '';
+  if (inRows.length > 0) {
+    const dates = Object.keys(byDate).sort();
+    inDetail = dates.map(d => {
+      const silos = Object.entries(byDate[d]);
+      if (silos.length === 1) {
+        const [silo, ton] = silos[0];
+        const nm = SILO_INFO[silo]?.name ? `(${SILO_INFO[silo].name})` : '';
+        return `${fmtDateKo(d)} : ${Math.round(ton)}톤${nm}`;
+      } else {
+        const detail = silos.map(([s,t]) => `${Math.round(t)}톤:${SILO_INFO[s]?.name||s}`).join(', ');
+        const dayTot = silos.reduce((s,[,t]) => s+t, 0);
+        return `${fmtDateKo(d)} : ${Math.round(dayTot)}톤 (${detail})`;
+      }
+    }).join('\n');
+  }
+
+  // 사용량 - 기간 내 날짜별 데이터 우선, 없으면 수동 입력값 사용
+  const usage = getUsage();
+  const from  = document.getElementById('rpt-from')?.value || '';
+  const to    = document.getElementById('rpt-to')?.value   || date;
+  const useDailyEntries = from
+    ? Object.entries(usage).filter(([d]) => d >= from && d <= to).sort(([a],[b]) => a.localeCompare(b))
+    : [];
+
+  let useStr = '';
+  if (useDailyEntries.length > 0) {
+    // 날짜별 사용량 (저장조별 내역 포함)
+    const useLines = useDailyEntries.map(([d, v]) => {
+      const tot = v.total || v || 0;
+      if (v.bySilo) {
+        const detail = Object.entries(v.bySilo)
+          .filter(([,t]) => t > 0)
+          .map(([k,t]) => `${Math.round(t)}톤:${SILO_INFO[k]?.name||k}`).join(', ');
+        return `- ${fmtDateKo(d)} ${Math.round(tot)}톤 (${detail})`;
+      }
+      return `- ${fmtDateKo(d)} ${Math.round(tot)}톤`;
+    });
+    useStr = useLines.join('\n');
+  } else if (!useSilo && useTon === 0) {
+    useStr = '- 설비 정지중';
+  } else if (useTon > 0) {
+    const nm = useSilo === 'ALL' ? '' : useSilo ? ` (${SILO_INFO[useSilo]?.name||''})` : '';
+    useStr = `- ${Math.round(useTon)}톤${nm}`;
+  } else {
+    useStr = '- 설비 정지중';
+  }
+
+  // 재고
+  const total = s1+s2+s4+s3;
+  const stockLines = [];
+  if (s1!==0) stockLines.push(`광주 : ${String(Math.round(s1)).padStart(7)}톤`);
+  if (s2!==0) stockLines.push(`전남 : ${String(Math.round(s2)).padStart(7)}톤`);
+  if (s4!==0) stockLines.push(`나주 : ${String(Math.round(s4)).padStart(7)}톤`);
+  if (s3!==0) stockLines.push(`순천 : ${String(Math.round(s3)).padStart(7)}톤`);
+  stockLines.push(`전체 : ${String(Math.round(total)).padStart(7)}톤`);
+
+  // 수분
+  const moistRows = [];
+  document.querySelectorAll('[id^="rpt-moist-row-"]').forEach(row => {
+    const id  = row.id.replace('rpt-moist-row-','');
+    const lbl = document.getElementById(`rpt-moist-label-${id}`)?.value.trim()||'';
+    const pct = parseFloat(document.getElementById(`rpt-moist-pct-${id}`)?.value)||0;
+    if (pct>0) moistRows.push({lbl,pct});
+  });
+
+  // ── 보고문 조합 ──
+  const dateKo = fmtDateKo(date);
+  let text = `-${dateKo} 연료관리현황-\n\n`;
+  text += `1. 입고량(${typeLabel})\n`;
+  if (totalIn > 0) {
+    text += `${typeLabel} 총입고 : ${totalInStr}\n`;
+    if (inDetail) text += inDetail + '\n';
+  } else {
+    text += `- 입고 없음\n`;
+  }
+  text += `\n2. 사용량\n${useStr}\n`;
+  text += `\n3. 재고량(금일 00시 기준)\n${stockLines.join('\n')}\n`;
+  if (moistRows.length > 0) {
+    text += `\n4. 수분\n`;
+    moistRows.forEach(r => { text += `- ${r.lbl} : ${r.pct}%\n`; });
+  }
+
+  document.getElementById('rpt-text').textContent = text.trim();
+  document.getElementById('rpt-output').style.display = 'block';
+  document.getElementById('rpt-output').scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function copyReport() {
+  const text = document.getElementById('rpt-text').textContent;
+  const btn  = document.getElementById('rpt-copy-btn');
+
+  // 방법1: clipboard API
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = '✅ 복사됨!';
+      setTimeout(() => btn.textContent = '📋 복사', 1800);
+    }).catch(() => fallbackCopy(text, btn));
+  } else {
+    fallbackCopy(text, btn);
+  }
+}
+
+function fallbackCopy(text, btn) {
+  // 방법2: textarea select + execCommand (모바일 파일 환경 대응)
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px;';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  ta.setSelectionRange(0, text.length); // iOS 대응
+  try {
+    const ok = document.execCommand('copy');
+    if (ok) {
+      if (btn) { btn.textContent = '✅ 복사됨!'; setTimeout(() => btn.textContent = '📋 복사', 1800); }
+      showToast('✅ 복사 완료');
+    } else {
+      showToast('복사 실패 — 텍스트를 길게 눌러 직접 복사하세요', '#f85149');
+    }
+  } catch(e) {
+    showToast('복사 실패 — 텍스트를 길게 눌러 직접 복사하세요', '#f85149');
+  }
+  document.body.removeChild(ta);
+}
+
+function initRptForm() {
+  const d = document.getElementById('rpt-date');
+  if (d) d.value = today();
+  // 기간 기본값: 이번주 월~오늘
+  const now  = new Date();
+  const mon  = new Date(now);
+  mon.setDate(now.getDate() - ((now.getDay()+6)%7));
+  const toEl   = document.getElementById('rpt-to');
+  const fromEl = document.getElementById('rpt-from');
+  if (fromEl) fromEl.value = mon.toISOString().slice(0,10);
+  if (toEl)   toEl.value   = today();
+  addRptInRow();
+  // 수분 행: 전날 날짜로 기본 1개
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const yLabel = fmtDateKo(yesterday.toISOString().slice(0,10));
+  addRptMoistRow(yLabel, '');
+  // 재고 자동 불러오기
+  loadCurrentStock();
+}
+
+// ════════════════════════════════════════
+function setUsageTab(tab) {
+  const isDaily = tab === 'daily';
+  document.getElementById('usage-daily-area').style.display   = isDaily ? 'block' : 'none';
+  document.getElementById('usage-monthly-area').style.display = isDaily ? 'none'  : 'block';
+  const bd = document.getElementById('usage-tab-daily');
+  const bm = document.getElementById('usage-tab-monthly');
+  bd.style.background  = isDaily ? 'var(--accent)' : 'none';
+  bd.style.color       = isDaily ? '#0d1117' : 'var(--text2)';
+  bd.style.borderColor = isDaily ? 'var(--accent)' : 'var(--border)';
+  bm.style.background  = isDaily ? 'none' : 'var(--accent)';
+  bm.style.color       = isDaily ? 'var(--text2)' : '#0d1117';
+  bm.style.borderColor = isDaily ? 'var(--border)' : 'var(--accent)';
+  if (!isDaily) renderMonthlyGrid();
+}
+
+// ── 월별 연도 셀렉터 초기화 ──
+function initMonYearSel() {
+  const sel = document.getElementById('mon-year');
+  if (!sel) return;
+  const cur = new Date().getFullYear();
+  sel.innerHTML = '';
+  for (let y = cur; y >= 2017; y--) {
+    sel.innerHTML += `<option value="${y}">${y}년</option>`;
+  }
+}
+
+// ── 월별 데이터 로드 ──
+// localStorage 키: _monthlyData_{year}
+// 구조: { "1":{inbound:톤, usage:톤, note:""}, "2":{...}, ... }
+function getMonthlyData(year) {
+  try {
+    const raw = localStorage.getItem(`_monthlyData_${year}`);
+    return raw ? JSON.parse(raw) : {};
+  } catch(e) { return {}; }
+}
+
+// ── 월별 그리드 렌더 ──
+function renderMonthlyGrid() {
+  const yearEl = document.getElementById('mon-year');
+  const year   = yearEl ? parseInt(yearEl.value) : new Date().getFullYear();
+  const data   = getMonthlyData(year);
+  const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+  let html = `<div style="overflow-x:auto;">
+  <table class="mon-grid">
+    <thead><tr>
+      <th>월</th>
+      <th>입고량<br><span style="font-weight:400;font-size:10px;">(톤)</span></th>
+      <th>사용량<br><span style="font-weight:400;font-size:10px;">(톤)</span></th>
+      <th>비고</th>
+    </tr></thead><tbody>`;
+
+  let totIn = 0, totUse = 0;
+  MONTHS.forEach((lbl, i) => {
+    const m      = i + 1;
+    const row    = data[m] || {};
+    const inVal  = row.inbound != null ? row.inbound  : '';
+    const useVal = row.usage   != null ? row.usage    : '';
+    const note   = row.note    || '';
+    totIn  += row.inbound || 0;
+    totUse += row.usage   || 0;
+    html += `<tr>
+      <td>${lbl}</td>
+      <td><input class="mon-input${inVal!==''?' has-val':''}" type="number" step="0.1"
+           id="mon-in-${m}" value="${inVal}" placeholder="—"
+           oninput="this.classList.toggle('has-val',this.value!=='')"></td>
+      <td><input class="mon-input${useVal!==''?' has-val':''}" type="number" step="0.1"
+           id="mon-use-${m}" value="${useVal}" placeholder="—"
+           oninput="this.classList.toggle('has-val',this.value!=='')"></td>
+      <td><input class="mon-input" type="text"
+           id="mon-note-${m}" value="${note}" placeholder=""
+           style="font-family:'Noto Sans KR',sans-serif;font-size:11px;text-align:left;min-width:50px;"></td>
+    </tr>`;
+  });
+
+  html += `<tr style="background:rgba(88,166,255,0.07);font-weight:700;border-top:1px solid var(--border);">
+    <td style="color:var(--accent);">합계</td>
+    <td style="text-align:right;color:var(--s2);font-family:'IBM Plex Mono',monospace;">${totIn ? totIn.toFixed(1) : '—'}</td>
+    <td style="text-align:right;color:var(--red);font-family:'IBM Plex Mono',monospace;">${totUse ? totUse.toFixed(1) : '—'}</td>
+    <td></td>
+  </tr></tbody></table></div>`;
+
+  document.getElementById('monthly-grid').innerHTML = html;
+}
+
+// ── 월별 데이터 저장 ──
+function saveMonthlyData() {
+  const yearEl = document.getElementById('mon-year');
+  const year   = yearEl ? parseInt(yearEl.value) : new Date().getFullYear();
+  const data   = getMonthlyData(year);
+
+  for (let m = 1; m <= 12; m++) {
+    const inEl   = document.getElementById(`mon-in-${m}`);
+    const useEl  = document.getElementById(`mon-use-${m}`);
+    const noteEl = document.getElementById(`mon-note-${m}`);
+    if (!inEl) continue;
+    const inVal  = inEl.value  !== '' ? parseFloat(inEl.value)  : null;
+    const useVal = useEl.value !== '' ? parseFloat(useEl.value) : null;
+    const note   = noteEl.value.trim();
+    if (inVal != null || useVal != null || note) {
+      if (!data[m]) data[m] = {};
+      if (inVal  != null) data[m].inbound = inVal;
+      if (useVal != null) data[m].usage   = useVal;
+      if (note)           data[m].note    = note;
+    } else {
+      delete data[m]; // 값 없으면 행 삭제
+    }
+  }
+
+  localStorage.setItem(`_monthlyData_${year}`, JSON.stringify(data));
+  showToast(`✅ ${year}년 월별 데이터 저장 완료`);
+  renderMonthlyGrid();
+  renderUsageStats();
+}
+
+// ── 사용량 ──
+function initUsageYearSel() {
+  const sel = document.getElementById('usage-year-sel');
+  if (!sel) return;
+  const curYear = new Date().getFullYear();
+  sel.innerHTML = '';
+  for (let y = curYear; y >= 2017; y--) {
+    sel.innerHTML += `<option value="${y}"${y===curYear?' selected':''}>${y}년</option>`;
+  }
+}
+
+function renderUsageStats() {
+  const sel   = document.getElementById('usage-year-sel');
+  const year  = sel ? parseInt(sel.value) : new Date().getFullYear();
+  const el    = document.getElementById('usage-stats');
+  if (!el) return;
+
+  // 일별 사용량 (기존)
+  const usage   = getUsage();
+  const daily   = Object.entries(usage).filter(([d]) => d.startsWith(year.toString()));
+  const dailyTotal = daily.reduce((s,[,v]) => s + (v.total||v||0), 0);
+
+  // 월별 데이터
+  const monthly    = getMonthlyData(year);
+  const monthlyIn  = Object.values(monthly).reduce((s,r) => s + (r.inbound||0), 0);
+  const monthlyUse = Object.values(monthly).reduce((s,r) => s + (r.usage||0), 0);
+
+  // CSV 입고기록 합산 (올해 DB에서 계산)
+  const db = getDB(year);
+  const dbTotal = db.reduce((s,r) => {
+    const ton = Array.isArray(r) ? (r[7]||0) : (r.ton||0);
+    return s + Math.abs(ton);
+  }, 0);
+
+  const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  const hasMonthly = Object.keys(monthly).length > 0;
+  const hasDaily   = daily.length > 0;
+  const hasDB      = db.length > 0;
+
+  let html = '';
+
+  // 요약 카드
+  html += `<div class="use-grid" style="grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px;">
+    <div class="use-cell">
+      <div class="lbl">입고합계</div>
+      <div class="val" style="font-size:15px;color:var(--s2);">${(monthlyIn||dbTotal).toFixed(monthlyIn?1:0)}</div>
+      <div class="sub">톤 ${monthlyIn?'(월별)':'(DB)'}</div>
+    </div>
+    <div class="use-cell">
+      <div class="lbl">사용합계</div>
+      <div class="val" style="font-size:15px;color:var(--red);">${(monthlyUse||dailyTotal).toFixed(monthlyUse?1:0)}</div>
+      <div class="sub">톤 ${monthlyUse?'(월별)':'(일별)'}</div>
+    </div>
+    <div class="use-cell">
+      <div class="lbl">CSV 건수</div>
+      <div class="val" style="font-size:15px;">${db.length}</div>
+      <div class="sub">건</div>
+    </div>
+  </div>`;
+
+  // 월별 테이블 (데이터 있을 때만)
+  if (hasMonthly) {
+    html += `<div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600;">월별 상세</div>
+    <div style="overflow-x:auto;"><table class="mon-grid">
+      <thead><tr>
+        <th>월</th><th>입고(톤)</th><th>사용(톤)</th><th>비고</th>
+      </tr></thead><tbody>`;
+    MONTHS.forEach((lbl,i) => {
+      const m   = i+1;
+      const row = monthly[m];
+      if (!row) return;
+      html += `<tr>
+        <td>${lbl}</td>
+        <td style="text-align:right;color:var(--s2);font-family:'IBM Plex Mono',monospace;">${row.inbound!=null?row.inbound.toFixed(1):'—'}</td>
+        <td style="text-align:right;color:var(--red);font-family:'IBM Plex Mono',monospace;">${row.usage!=null?row.usage.toFixed(1):'—'}</td>
+        <td style="font-size:11px;color:var(--text2);">${row.note||''}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  }
+
+  // 일별 최근 기록
+  if (hasDaily) {
+    const sorted = daily.sort(([a],[b]) => b.localeCompare(a));
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 6px;">
+      <span style="font-size:11px;color:var(--text2);font-weight:600;">일별 사용량 기록 (${sorted.length}건)</span>
+    </div>`;
+    html += sorted.slice(0,15).map(([d,v]) => {
+      const tot = v.total||v||0;
+      const bySilo = v.bySilo ? Object.entries(v.bySilo)
+        .filter(([,t])=>t>0)
+        .map(([k,t])=>`${Math.round(t)}톤:${SILO_INFO[k]?.name||k}`).join(', ') : '';
+      return `<div class="rec-item">
+        <div class="rec-dot" style="background:var(--red);"></div>
+        <div class="rec-main">
+          <div>${d}</div>
+          ${bySilo ? `<div style="font-size:10px;color:var(--text2);">${bySilo}</div>` : ''}
+        </div>
+        <span class="rec-ton" style="color:var(--red);">${fmt(tot)}톤</span>
+        <button onclick="deleteUsage('${d}')"
+          style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:0 4px;margin-left:4px;">×</button>
+      </div>`;
+    }).join('');
+    if (sorted.length > 15) {
+      html += `<div style="text-align:center;color:var(--text2);font-size:11px;padding:4px;">... 외 ${sorted.length-15}건</div>`;
+    }
+  }
+
+  if (!hasMonthly && !hasDaily && !hasDB) {
+    html = `<div class="empty-msg">${year}년 데이터가 없습니다<br><span style="font-size:11px;">월별 입력 탭에서 데이터를 입력하세요</span></div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+function deleteUsage(date) {
+  const usage = getUsage();
+  const entry = usage[date];
+  if (!entry) return;
+
+  // 재고 복원 (삭제 시 차감했던 사용량만큼 되돌림)
+  const stock = getStock();
+  const total = entry.total || entry || 0;
+
+  if (entry.bySilo) {
+    // 저장조별 복원
+    Object.entries(entry.bySilo).forEach(([k, t]) => {
+      if (t > 0) stock[k] = (stock[k]||0) + t;
+    });
+  } else {
+    // 전체 비율 복원 (정확하지 않을 수 있으므로 균등 복원)
+    const activeCount = SILO_ORDER.filter(k => (stock[k]||0) >= 0).length;
+    SILO_ORDER.forEach(k => {
+      stock[k] = (stock[k]||0) + (total / activeCount);
+    });
+  }
+
+  delete usage[date];
+  localStorage.setItem(KEY_USAGE, JSON.stringify(usage));
+  localStorage.setItem(KEY_STOCK, JSON.stringify(stock));
+
+  showToast(`✅ ${date} 사용량 삭제`);
+  renderDash();
+  renderUsageStats();
+}
+
+function setUseTab(tab) {
+  const isTotal = tab === 'total';
+  document.getElementById('use-area-total').style.display = isTotal ? 'block' : 'none';
+  document.getElementById('use-area-silo').style.display  = isTotal ? 'none'  : 'block';
+  const bt = document.getElementById('use-tab-total');
+  const bs = document.getElementById('use-tab-silo');
+  bt.style.background  = isTotal ? 'var(--accent)' : 'none';
+  bt.style.color       = isTotal ? '#0d1117' : 'var(--text2)';
+  bt.style.borderColor = isTotal ? 'var(--accent)' : 'var(--border)';
+  bs.style.background  = isTotal ? 'none' : 'var(--accent)';
+  bs.style.color       = isTotal ? 'var(--text2)' : '#0d1117';
+  bs.style.borderColor = isTotal ? 'var(--border)' : 'var(--accent)';
+  if (!isTotal) updateSiloUsePreview();
+}
+
+function updateSiloUsePreview() {
+  const s1 = parseFloat(document.getElementById('use-s1')?.value)||0;
+  const s2 = parseFloat(document.getElementById('use-s2')?.value)||0;
+  const s4 = parseFloat(document.getElementById('use-s4')?.value)||0;
+  const s3 = parseFloat(document.getElementById('use-s3')?.value)||0;
+  const tot = s1+s2+s4+s3;
+  const el = document.getElementById('use-silo-total-preview');
+  if (el) el.textContent = tot > 0 ? `합계 ${fmt(tot)}톤` : '';
+}
+
+function submitUsage() {
+  const date = document.getElementById('use-date').value;
+  const note = document.getElementById('use-note').value.trim();
+  if (!date) { showToast('날짜를 입력하세요', '#f85149'); return; }
+
+  const isSiloMode = document.getElementById('use-area-silo').style.display !== 'none';
+  const stock = getStock();
+  const usage = getUsage();
+
+  if (isSiloMode) {
+    // 저장조별 모드
+    const siloUse = {
+      S1: parseFloat(document.getElementById('use-s1')?.value)||0,
+      S2: parseFloat(document.getElementById('use-s2')?.value)||0,
+      S4: parseFloat(document.getElementById('use-s4')?.value)||0,
+      S3: parseFloat(document.getElementById('use-s3')?.value)||0,
+    };
+    const total = Object.values(siloUse).reduce((s,v)=>s+v,0);
+    if (total <= 0) { showToast('사용량을 입력하세요', '#f85149'); return; }
+
+    // 저장조별 개별 차감
+    SILO_ORDER.forEach(k => {
+      if (siloUse[k] > 0) stock[k] = (stock[k]||0) - siloUse[k];
+    });
+
+    // 저장소: 저장조별 내역 포함
+    usage[date] = { total, note, bySilo: siloUse };
+    localStorage.setItem(KEY_USAGE, JSON.stringify(usage));
+    localStorage.setItem(KEY_STOCK, JSON.stringify(stock));
+
+    showToast(`✅ ${date} ${fmt(total)}톤 (저장조별) 저장`);
+    ['use-s1','use-s2','use-s4','use-s3'].forEach(id => {
+      const el = document.getElementById(id); if(el) el.value='';
+    });
+    document.getElementById('use-silo-total-preview').textContent = '';
+
+  } else {
+    // 전체 합계 모드
+    const total = parseFloat(document.getElementById('use-total').value)||0;
+    if (total <= 0) { showToast('사용량을 입력하세요', '#f85149'); return; }
+
+    // 비율 차감
+    const totalStock = SILO_ORDER.reduce((s,k)=>s+(stock[k]||0),0);
+    if (totalStock > 0) {
+      SILO_ORDER.forEach(k => {
+        const ratio = (stock[k]||0)/totalStock;
+        stock[k] = (stock[k]||0) - total*ratio;
+      });
+      localStorage.setItem(KEY_STOCK, JSON.stringify(stock));
+    }
+
+    usage[date] = { total, note };
+    localStorage.setItem(KEY_USAGE, JSON.stringify(usage));
+    showToast(`✅ ${date} ${fmt(total)}톤 저장`);
+    document.getElementById('use-total').value = '';
+  }
+
+  document.getElementById('use-note').value = '';
+  renderDash();
+  renderUsageStats();
+}
+
+// ── 이력 조회 ──
+function renderHistory() {
+  const db = getAllDB();
+  const siloFilter  = document.getElementById('hist-silo').value;
+  const monthFilter = document.getElementById('hist-month').value;
+
+  let recs = db.map((r, globalIdx) => {
+    const arr = Array.isArray(r) ? r : [r.date,'',r.car||'',r.gross,r.tare,'',r.silo,r.ton,'',0];
+    return { arr, date: arr[0], year: arr[0]?.slice(0,4) };
+  });
+  if (siloFilter)  recs = recs.filter(r => r.arr[6] === siloFilter);
+  if (monthFilter) recs = recs.filter(r => r.date && r.date.slice(0,7) === monthFilter);
+  recs = recs.slice().reverse().slice(0, 80);
+
+  const el = document.getElementById('hist-list');
+  if (!recs.length) { el.innerHTML = '<div class="empty-msg">조건에 맞는 이력이 없습니다</div>'; return; }
+
+  el.innerHTML = recs.map(({arr: r}) => {
+    const silo   = r[6];
+    const info   = SILO_INFO[silo]||{name:silo||'?',color:'var(--text2)'};
+    const tonRaw = r[7] || ((r[3]||0)-(r[4]||0))/1000;
+    // 삭제 키: 날짜|차량|저장조|실중량소수2자리
+    const delKey = encodeURIComponent(`${r[0]}|${r[2]}|${r[6]}|${parseFloat(r[7]||0).toFixed(2)}`);
+    return `<div class="rec-item">
+      <div class="rec-dot" style="background:${info.color};"></div>
+      <div class="rec-main">
+        <div><span style="color:${info.color};font-weight:600;">${info.name}</span> · ${r[2]||''}</div>
+        <div class="rec-date">${r[0]||''} ${r[1]?'#'+r[1]:''}</div>
+      </div>
+      <span class="rec-ton" style="color:${info.color};">${parseFloat(Math.abs(tonRaw)).toFixed(2)}톤</span>
+      <button onclick="confirmDeleteInbound('${delKey}', '${r[0]}', '${r[2]}', '${parseFloat(r[7]||0).toFixed(2)}')"
+        style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:0 4px;margin-left:4px;flex-shrink:0;">×</button>
+    </div>`;
+  }).join('');
+}
+
+let _pendingDelKey = null;
+
+function confirmDeleteInbound(encodedKey, date, car, ton) {
+  _pendingDelKey = encodedKey;
+  document.getElementById('del-confirm-msg').innerHTML =
+    `날짜: <b style="color:var(--text)">${date}</b><br>
+     차량: <b style="color:var(--text)">${car}</b><br>
+     실중량: <b style="color:var(--red)">${ton}톤</b><br><br>
+     이 데이터를 삭제하면 재고에서도 차감됩니다.`;
+  const overlay = document.getElementById('del-confirm-overlay');
+  overlay.style.display = 'flex';
+}
+
+function closeDelConfirm() {
+  document.getElementById('del-confirm-overlay').style.display = 'none';
+  _pendingDelKey = null;
+}
+
+
+function confirmDeleteByDate() {
+  const date = document.getElementById('hist-del-date').value;
+  if (!date) { showToast('날짜를 선택하세요', '#f85149'); return; }
+
+  // 해당 날짜 건수 미리 확인
+  const year = date.slice(0,4);
+  let db = [];
+  try { db = JSON.parse(localStorage.getItem(rawdbKey(parseInt(year))) || '[]'); } catch(e) {}
+  const cnt = db.filter(r => (Array.isArray(r) ? r[0] : r.date) === date).length;
+
+  if (cnt === 0) {
+    document.getElementById('hist-del-result').innerHTML =
+      `<div style="color:var(--yellow);font-size:12px;">⚠️ ${date} 입고 데이터 없음</div>`;
+    return;
+  }
+
+  _pendingDelKey = '__bydate__';
+  document.getElementById('del-confirm-msg').innerHTML =
+    `날짜: <b style="color:var(--text)">${date}</b><br>
+     삭제 건수: <b style="color:var(--red)">${cnt}건</b><br><br>
+     해당 날짜의 입고 데이터 전체가 삭제되며<br>재고에서도 차감됩니다.`;
+  document.getElementById('del-confirm-overlay').style.display = 'flex';
+}
+
+function doDeleteInbound() {
+  closeDelConfirm();
+  if (_pendingDelKey === '__bydate__') {
+    deleteInboundByDate();
+  } else if (_pendingDelKey) {
+    deleteInbound(_pendingDelKey);
+  }
+}
+
+function deleteInboundByDate() {
+  const date = document.getElementById('hist-del-date').value;
+  const resultEl = document.getElementById('hist-del-result');
+  if (!date) { showToast('날짜를 선택하세요', '#f85149'); return; }
+
+  const year  = date.slice(0,4);
+  const dbKey = rawdbKey(parseInt(year));
+  let db = [];
+  try { db = JSON.parse(localStorage.getItem(dbKey)) || []; } catch(e) {}
+
+  const toDelete = db.filter(r => (Array.isArray(r) ? r[0] : r.date) === date);
+  const cleaned  = db.filter(r => (Array.isArray(r) ? r[0] : r.date) !== date);
+
+  if (!toDelete.length) {
+    resultEl.innerHTML = `<div style="color:var(--yellow);font-size:12px;">⚠️ ${date} 입고 데이터 없음</div>`;
+    return;
+  }
+
+  // 재고 차감 (입고 취소)
+  const stock = getStock();
+  toDelete.forEach(r => {
+    const silo = Array.isArray(r) ? r[6] : r.silo;
+    const ton  = parseFloat(Array.isArray(r) ? r[7] : r.ton) || 0;
+    stock[silo] = (stock[silo]||0) - ton;
+  });
+
+  localStorage.setItem(dbKey, JSON.stringify(cleaned));
+  localStorage.setItem(KEY_STOCK, JSON.stringify(stock));
+
+  resultEl.innerHTML = `
+    <div style="background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--green);">
+      ✅ ${date} · ${toDelete.length}건 삭제 완료
+    </div>`;
+
+  showToast(`✅ ${date} ${toDelete.length}건 삭제`);
+  renderHistory();
+  renderDash();
+  renderTodayRecs();
+}
+
+function deleteInbound(encodedKey) {
+  const key  = decodeURIComponent(encodedKey);
+  const [date, car, silo, tonStr] = key.split('|');
+  const year = date?.slice(0,4);
+  if (!year) return;
+
+  const dbKey = rawdbKey(parseInt(year));
+  let db = [];
+  try { db = JSON.parse(localStorage.getItem(dbKey)) || []; } catch(e) {}
+
+  let deleted = false;
+  const cleaned = db.filter(r => {
+    if (deleted) return true; // 이미 삭제했으면 나머지는 유지
+    const a = Array.isArray(r);
+    const rDate = a ? r[0] : r.date;
+    const rCar  = a ? r[2] : r.car;
+    const rSilo = a ? r[6] : r.silo;
+    const rTon  = parseFloat((a ? r[7] : r.ton)||0).toFixed(2);
+    if (rDate === date && rCar === car && rSilo === silo && rTon === tonStr) {
+      deleted = true;
+      return false; // 첫 번째 매칭 1건만 삭제
+    }
+    return true;
+  });
+
+  if (!deleted) { showToast('삭제할 데이터를 찾지 못했습니다', '#f85149'); return; }
+
+  // 재고에서 해당 톤수 차감 (입고 취소 = 재고 감소)
+  const ton   = parseFloat(tonStr);
+  const stock = getStock();
+  stock[silo] = (stock[silo]||0) - ton;
+  localStorage.setItem(dbKey, JSON.stringify(cleaned));
+  localStorage.setItem(KEY_STOCK, JSON.stringify(stock));
+
+  showToast(`✅ ${date} ${car} ${ton}톤 삭제`);
+  renderHistory();
+  renderDash();
+  renderTodayRecs();
+}
+
+// ── 재고 수정 모달 ──
+function openStockModal() {
+  const stock = getStock();
+  document.getElementById('m-s1').value = Math.round(stock.S1||0);
+  document.getElementById('m-s2').value = Math.round(stock.S2||0);
+  document.getElementById('m-s4').value = Math.round(stock.S4||0);
+  document.getElementById('m-s3').value = Math.round(stock.S3||0);
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+function saveStock() {
+  const stock = {
+    S1: parseFloat(document.getElementById('m-s1').value)||0,
+    S2: parseFloat(document.getElementById('m-s2').value)||0,
+    S4: parseFloat(document.getElementById('m-s4').value)||0,
+    S3: parseFloat(document.getElementById('m-s3').value)||0,
+  };
+  localStorage.setItem(KEY_STOCK, JSON.stringify(stock));
+  closeModal();
+  renderDash();
+  showToast('✅ 재고 저장 완료');
+}
+
+// ── 모달 오버레이 클릭 닫기 ──
+document.getElementById('modal-overlay').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// ── 이력 필터 이벤트 ──
+document.getElementById('del-confirm-overlay').addEventListener('click', function(e) {
+  if (e.target === this) closeDelConfirm();
+});
+
+document.getElementById('hist-silo').addEventListener('change', renderHistory);
+document.getElementById('hist-month').addEventListener('change', renderHistory);
+
+// ── 월 필터 초기화 ──
+function initMonthFilter() {
+  const sel = document.getElementById('hist-month');
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth(); // 0-based
+  const startYear = 2017;
+
+  sel.innerHTML = '<option value="">전체 월</option>';
+
+  // 최신 월부터 역순으로 생성
+  for (let y = curYear; y >= startYear; y--) {
+    const endM = (y === curYear) ? curMonth : 11;
+    for (let m = endM; m >= 0; m--) {
+      const val = `${y}-${String(m+1).padStart(2,'0')}`;
+      const lbl = `${y}년 ${m+1}월`;
+      sel.innerHTML += `<option value="${val}">${lbl}</option>`;
+    }
+  }
+}
+
+// ── 날짜 기본값 ──
+function initDates() {
+  const t = today();
+  const ud = document.getElementById('use-date');
+  if (ud) ud.value = t;
+}
+
+// ── CSV 일괄 등록 ──
+let _csvRows = [];
+let _csvSummary = null; // 합계행
+
+const SILO_MAP = {
+  's1':'S1','광주':'S1','1':'S1',
+  's2':'S2','전남':'S2','2':'S2',
+  's3':'S3','순천':'S3','3':'S3',
+  's4':'S4','나주':'S4','4':'S4',
+};
+
+function normSilo(v) {
+  return SILO_MAP[(v||'').toString().trim().toLowerCase()] || null;
+}
+
+function setCsvTab(tab) {
+  const isPaste = tab === 'paste';
+  document.getElementById('csv-paste-area').style.display = isPaste ? 'block' : 'none';
+  document.getElementById('csv-file-area').style.display  = isPaste ? 'none'  : 'block';
+  const btnPaste = document.getElementById('csv-tab-paste');
+  const btnFile  = document.getElementById('csv-tab-file');
+  btnPaste.style.background  = isPaste ? 'var(--accent)' : 'none';
+  btnPaste.style.color       = isPaste ? '#0d1117' : 'var(--text2)';
+  btnPaste.style.borderColor = isPaste ? 'var(--accent)' : 'var(--border)';
+  btnFile.style.background   = isPaste ? 'none' : 'var(--accent)';
+  btnFile.style.color        = isPaste ? 'var(--text2)' : '#0d1117';
+  btnFile.style.borderColor  = isPaste ? 'var(--border)' : 'var(--accent)';
+  if (!isPaste) {
+    document.getElementById('csv-preview').innerHTML = '';
+    _csvRows = []; _csvSummary = null;
+    document.getElementById('csv-submit-btn').style.display = 'none';
+  }
+}
+
+let _xlsxWorkbook = null; // 엑셀 워크북 캐시
+
+// ── 파일 로드 (CSV + 엑셀 통합) ──
+function loadFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  if (ext === 'xlsx' || ext === 'xls') {
+    loadExcelFile(file);
+  } else {
+    // CSV / TXT
+    const reader = new FileReader();
+    reader.onload = e => parseAndPreviewCSV(e.target.result);
+    reader.readAsText(file, 'UTF-8');
+  }
+  input.value = '';
+}
+
+function loadCSVFile(input) { loadFile(input); } // 하위 호환
+
+function loadExcelFile(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      _xlsxWorkbook = XLSX.read(data, { type: 'array' });
+      const sheetNames = _xlsxWorkbook.SheetNames;
+
+      // 시트 버튼 렌더
+      const wrap = document.getElementById('sheet-select-wrap');
+      const btnList = document.getElementById('sheet-btn-list');
+      btnList.innerHTML = '';
+      sheetNames.forEach((name, idx) => {
+        const btn = document.createElement('button');
+        btn.textContent = name;
+        btn.style.cssText = `padding:7px 12px;border-radius:8px;border:1px solid var(--border);
+          background:${idx===0?'var(--accent)':'var(--bg3)'};
+          color:${idx===0?'#0d1117':'var(--text2)'};
+          font-size:12px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;`;
+        btn.onclick = () => {
+          // 선택 표시
+          btnList.querySelectorAll('button').forEach(b => {
+            b.style.background = 'var(--bg3)'; b.style.color = 'var(--text2)';
+          });
+          btn.style.background = 'var(--accent)'; btn.style.color = '#0d1117';
+          loadSheetData(name);
+        };
+        btnList.appendChild(btn);
+      });
+      wrap.style.display = 'block';
+
+      // 첫 번째 시트 자동 로드
+      if (sheetNames.length > 0) loadSheetData(sheetNames[0]);
+
+    } catch(err) {
+      document.getElementById('csv-preview').innerHTML =
+        `<div style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--red);">
+          ❌ 엑셀 파일 읽기 오류: ${err.message}
+        </div>`;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function loadSheetData(sheetName) {
+  if (!_xlsxWorkbook) return;
+  const sheet = _xlsxWorkbook.Sheets[sheetName];
+  // CSV 문자열로 변환 후 기존 파서 재사용
+  const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
+  parseAndPreviewCSV(csv);
+}
+
+function previewCSV() {
+  const text = document.getElementById('csv-text').value;
+  if (!text.trim()) {
+    document.getElementById('csv-preview').innerHTML = '';
+    document.getElementById('csv-submit-btn').style.display = 'none';
+    _csvRows = []; _csvSummary = null;
+    return;
+  }
+  parseAndPreviewCSV(text);
+}
+
+// 헤더 자동 감지: 컬럼명 → 인덱스 매핑
+function detectColumns(headerLine) {
+  const cols = headerLine.split(',').map(c => c.trim().replace(/^"|"$/g,'').toLowerCase());
+  const find = (...keys) => {
+    for (const k of keys) {
+      const i = cols.findIndex(c => c.includes(k));
+      if (i >= 0) return i;
+    }
+    return -1;
+  };
+  return {
+    seq:    find('순번','no','번호'),
+    date:   find('입고일자','일자','날짜','date'),
+    car:    find('차량'),
+    gross:  find('총중량[기준]','총중량','계근','gross'),
+    tare:   find('공차중량[기준]','공차중량','공차','tare'),
+    net:    find('실중량[기준]','실중량','순중','net'),
+    gate:   find('입고게이트','게이트','gate','저장조','silo'),
+    gross2: find('총중량[비교]'),
+    tare2:  find('공차중량[비교]'),
+    net2:   find('실중량[비교]'),
+    diff:   find('실중량차이','차이비교'),
+    moist:  find('수분'),
+    cal:    find('발열량','kcal'),
+    slip:   find('전표','slip'),
+    sum1:   find('광주환경'),
+    sum2:   find('srf열병합','열병합'),
+  };
+}
+
+function parseAndPreviewCSV(text) {
+  const lines = text.trim().split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return;
+
+  // 헤더 행 찾기 (숫자로 시작하지 않는 첫 번째 행)
+  let headerIdx = -1;
+  let colMap = null;
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    const first = lines[i].split(',')[0].trim().toLowerCase();
+    if (!/^\d+$/.test(first) && first !== '합계') {
+      const cm = detectColumns(lines[i]);
+      // 날짜·차량·게이트 중 2개 이상 감지되면 헤더로 인정
+      const detected = [cm.date, cm.car, cm.gate].filter(v => v >= 0).length;
+      if (detected >= 2) { headerIdx = i; colMap = cm; break; }
+    }
+  }
+
+  // 헤더 없으면 기본 순서 사용:
+  // 순번(0), 날짜(1), 차량(2), 총중량기준(3), 공차기준(4), 실중량기준(5), 게이트(6), ...
+  if (!colMap) {
+    colMap = { seq:0, date:1, car:2, gross:3, tare:4, net:5, gate:6, moist:-1, cal:-1, slip:-1, sum1:11, sum2:12 };
+  }
+
+  const rows = [];
+  _csvSummary = null;
+
+  const dataLines = lines.slice(headerIdx + 1);
+  dataLines.forEach((line, idx) => {
+    const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g,''));
+    const seqRaw = colMap.seq >= 0 ? (cols[colMap.seq]||'') : (idx+1).toString();
+
+    // 합계행 감지
+    if (seqRaw.toLowerCase() === '합계' || seqRaw === '') {
+      const s1 = colMap.sum1 >= 0 ? parseFloat(cols[colMap.sum1]) : null;
+      const s2 = colMap.sum2 >= 0 ? parseFloat(cols[colMap.sum2]) : null;
+      if (s1 != null || s2 != null) {
+        _csvSummary = { gwangju: s1||0, srf: s2||0, raw: cols };
+      }
+      return;
+    }
+
+    const g = (idx) => idx >= 0 && idx < cols.length ? cols[idx] : '';
+
+    const date  = g(colMap.date);
+    const car   = g(colMap.car);
+    const siloRaw = g(colMap.gate);
+    const silo  = normSilo(siloRaw);
+    const slip  = colMap.slip >= 0 ? g(colMap.slip) : seqRaw.padStart(2,'0');
+
+    // 중량: 톤 단위 (소수점 있으면 톤, 1000 이상이면 kg)
+    let grossRaw = parseFloat(g(colMap.gross)) || 0;
+    let tareRaw  = parseFloat(g(colMap.tare))  || 0;
+    let netRaw   = colMap.net >= 0 ? parseFloat(g(colMap.net)) : 0;
+
+    // kg → 톤 자동 변환 (값이 100 이상이면 kg으로 판단)
+    if (grossRaw > 100) grossRaw /= 1000;
+    if (tareRaw  > 100) tareRaw  /= 1000;
+    if (netRaw   > 100) netRaw   /= 1000;
+
+    // 순중량: 명시값 우선, 없으면 계산
+    const ton = netRaw > 0 ? netRaw : (grossRaw - tareRaw);
+
+    // 비교 컬럼
+    let gross2 = colMap.gross2 >= 0 ? (parseFloat(g(colMap.gross2)) || null) : null;
+    let tare2  = colMap.tare2  >= 0 ? (parseFloat(g(colMap.tare2))  || null) : null;
+    let ton2   = colMap.net2   >= 0 ? (parseFloat(g(colMap.net2))   || null) : null;
+    let diff   = colMap.diff   >= 0 ? (parseFloat(g(colMap.diff))   || 0)    : null;
+    if (gross2 != null && gross2 > 100) gross2 /= 1000;
+    if (tare2  != null && tare2  > 100) tare2  /= 1000;
+    if (ton2   != null && ton2   > 100) ton2   /= 1000;
+
+    const moist = colMap.moist >= 0 ? (parseFloat(g(colMap.moist)) || null) : null;
+    const cal   = colMap.cal   >= 0 ? (parseFloat(g(colMap.cal))   || null) : null;
+
+    const errs = [];
+    if (!date || !/^\d{4}[-./]\d{1,2}[-./]\d{1,2}$/.test(date)) errs.push('날짜');
+    if (!car) errs.push('차량번호');
+    if (!silo) errs.push(`게이트(${siloRaw})`);
+    if (ton <= 0) errs.push('순중량=0');
+
+    // 날짜 정규화 (2026.05.26 → 2026-05-26)
+    const dateNorm = date.replace(/[./]/g, '-').replace(/(\d{4})-(\d{1})-/, '$1-0$2-').replace(/-(\d{1})$/, '-0$1');
+
+    rows.push({ date: dateNorm, slip, car, gross: grossRaw, tare: tareRaw, ton,
+                gross2, tare2, ton2, diff, moist, cal, silo, errs, seq: seqRaw });
+  });
+
+  _csvRows = rows;
+  renderCSVPreview(rows);
+}
+
+function renderCSVPreview(rows) {
+  const ok  = rows.filter(r => r.errs.length === 0);
+  const bad = rows.filter(r => r.errs.length > 0);
+
+  // 저장조별 합계
+  const siloSum = {};
+  ok.forEach(r => { siloSum[r.silo] = (siloSum[r.silo]||0) + r.ton; });
+  const sumStr = Object.entries(siloSum).map(([k,v]) =>
+    `<span style="color:${SILO_INFO[k]?.color||'#fff'}">${SILO_INFO[k]?.name||k} ${v.toFixed(3)}톤</span>`
+  ).join(' · ');
+
+  let html = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;"><table class="csv-table">
+    <thead><tr>
+      <th>순번</th><th>입고일자</th><th>차량번호</th>
+      <th>총중량[기준]</th><th>공차중량[기준]</th><th>실중량[기준]</th>
+      <th>입고게이트</th>
+      <th>총중량[비교]</th><th>공차중량[비교]</th><th>실중량[비교]</th><th>실중량차이</th>
+      <th>상태</th>
+    </tr></thead><tbody>`;
+
+  rows.slice(0, 60).forEach(r => {
+    const cls = r.errs.length ? 'err' : 'ok';
+    const si = SILO_INFO[r.silo] || { name: r.silo||'?', color:'var(--text2)' };
+    html += `<tr class="${cls}">
+      <td style="color:var(--text2);">${r.seq}</td>
+      <td>${r.date}</td>
+      <td>${r.car}</td>
+      <td>${r.gross.toFixed(3)}</td>
+      <td>${r.tare.toFixed(3)}</td>
+      <td style="font-weight:700;">${r.ton.toFixed(3)}</td>
+      <td style="color:${si.color};font-weight:700;">${si.name}</td>
+      <td style="color:var(--text2);">${r.gross2 != null ? r.gross2.toFixed(3) : '—'}</td>
+      <td style="color:var(--text2);">${r.tare2  != null ? r.tare2.toFixed(3)  : '—'}</td>
+      <td style="color:var(--text2);">${r.ton2   != null ? r.ton2.toFixed(3)   : '—'}</td>
+      <td style="color:${r.diff > 0 ? 'var(--yellow)' : 'var(--text2)'};">${r.diff != null ? r.diff.toFixed(3) : '—'}</td>
+      <td>${r.errs.length ? '❌ '+r.errs.join(',') : '✅'}</td>
+    </tr>`;
+  });
+  if (rows.length > 60) {
+    html += `<tr><td colspan="8" style="text-align:center;color:var(--text2);padding:6px;">... 외 ${rows.length-60}건</td></tr>`;
+  }
+  html += `</tbody></table></div>`;
+
+  // 합계행 표시
+  if (_csvSummary) {
+    html += `<div style="margin-top:8px;background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.25);border-radius:8px;padding:8px 12px;font-size:12px;">
+      📊 <b style="color:var(--accent);">합계행</b> &nbsp;
+      광주환경공단: <b style="color:var(--s1);">${_csvSummary.gwangju.toFixed(3)}톤</b> &nbsp;
+      SRF열병합: <b style="color:var(--accent);">${_csvSummary.srf.toFixed(3)}톤</b>
+    </div>`;
+  }
+
+  html += `<div class="csv-sum">
+    <span>총 <b>${rows.length}</b>건 · 정상 <b style="color:var(--green)">${ok.length}</b> · 오류 <b style="color:var(--red)">${bad.length}</b></span>
+    <span>${sumStr}</span>
+  </div>`;
+
+  if (bad.length) {
+    html += `<div style="margin-top:6px;font-size:11px;color:var(--red);background:rgba(248,81,73,0.08);border-radius:6px;padding:8px 10px;">
+      ⚠️ 오류 행(${bad.length}건)은 등록에서 제외됩니다.
+    </div>`;
+  }
+
+  document.getElementById('csv-preview').innerHTML = html;
+  document.getElementById('csv-submit-btn').style.display = ok.length ? 'block' : 'none';
+  document.getElementById('csv-submit-btn').textContent = `✅ 정상 ${ok.length}건 일괄 등록`;
+}
+
+function submitCSV() {
+  const ok = _csvRows.filter(r => r.errs.length === 0);
+  if (!ok.length) { showToast('등록할 데이터가 없습니다', '#f85149'); return; }
+
+  // ── 기존 DB 전체 중복 키 셋 생성 ──
+  const existingKeys = new Set();
+  Object.keys(localStorage).filter(k => /^_rawdb_\d{4}$/.test(k)).forEach(key => {
+    let db = [];
+    try { db = JSON.parse(localStorage.getItem(key)) || []; } catch(e) {}
+    db.forEach(r => {
+      const a = Array.isArray(r);
+      const ton = parseFloat((a ? r[7] : r.ton)||0).toFixed(2);
+      existingKeys.add(`${a?r[0]:r.date}|${a?r[2]:r.car}|${a?r[6]:r.silo}|${ton}`);
+    });
+  });
+
+  // ── 신규 건만 필터 ──
+  const newRows  = [];
+  const skipRows = [];
+  ok.forEach(r => {
+    const dk = `${r.date}|${r.car}|${r.silo}|${parseFloat(r.ton||0).toFixed(2)}`;
+    if (existingKeys.has(dk)) skipRows.push(r);
+    else newRows.push(r);
+  });
+
+  if (!newRows.length) {
+    showToast(`⚠️ 전체 ${ok.length}건 이미 등록됨`, '#e3b341');
+    document.getElementById('csv-preview').innerHTML =
+      `<div style="background:rgba(227,179,65,0.12);border:1px solid rgba(227,179,65,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--yellow);">
+        ⚠️ ${ok.length}건 전부 이미 등록된 데이터입니다.<br>중복 등록이 방지됐습니다.
+      </div>`;
+    document.getElementById('csv-submit-btn').style.display = 'none';
+    return;
+  }
+
+  // ── 연도별 저장 ──
+  const stock   = getStock();
+  const siloTon = {};
+  const byYear  = {};
+
+  newRows.forEach(r => {
+    const yr = r.date ? r.date.slice(0,4) : String(new Date().getFullYear());
+    if (!byYear[yr]) byYear[yr] = [];
+    byYear[yr].push([
+      r.date, r.slip, r.car,
+      Math.round(r.gross * 1000),
+      Math.round(r.tare  * 1000),
+      r.moist != null ? r.moist.toFixed(2) : '',
+      r.silo,
+      Math.round(r.ton * 1000) / 1000,
+      r.cal != null ? r.cal.toString() : '',
+      0
+    ]);
+    siloTon[r.silo] = (siloTon[r.silo]||0) + r.ton;
+  });
+
+  Object.entries(byYear).forEach(([yr, recs]) => {
+    const existing = getDB(parseInt(yr));
+    saveDB([...existing, ...recs], parseInt(yr));
+  });
+
+  // 합계행 별도 저장
+  if (_csvSummary) {
+    const KEY_CSV_SUMMARY = '_csvSummaryLog';
+    let log = [];
+    try { log = JSON.parse(localStorage.getItem(KEY_CSV_SUMMARY)||'[]'); } catch(e){}
+    log.push({ date: newRows[0]?.date||today(), gwangju: _csvSummary.gwangju, srf: _csvSummary.srf, savedAt: new Date().toISOString() });
+    localStorage.setItem(KEY_CSV_SUMMARY, JSON.stringify(log));
+  }
+
+  Object.entries(siloTon).forEach(([k,v]) => { stock[k] = (stock[k]||0) + v; });
+  localStorage.setItem(KEY_STOCK, JSON.stringify(stock));
+
+  const summary = Object.entries(siloTon).map(([k,v]) => `${SILO_INFO[k]?.name||k} ${v.toFixed(3)}톤`).join(', ');
+  const skipMsg = skipRows.length ? `<br><span style="color:var(--yellow);">⚠️ 중복 ${skipRows.length}건 자동 제외</span>` : '';
+  showToast(`✅ ${newRows.length}건 등록 완료${skipRows.length?` (${skipRows.length}건 중복 제외)`:''}` );
+
+  document.getElementById('csv-text').value = '';
+  document.getElementById('csv-preview').innerHTML =
+    `<div style="background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--green);">
+      ✅ ${newRows.length}건 신규 등록<br>
+      <span style="color:var(--text2);">${summary}</span>${skipMsg}
+    </div>`;
+  document.getElementById('csv-submit-btn').style.display = 'none';
+  _csvRows = []; _csvSummary = null;
+
+  renderDash();
+  renderTodayRecs();
+}
+
+// ── 중복 데이터 탐지·제거 ──
+function diagnosDB() {
+  const el = document.getElementById('dup-preview');
+  const rawdbKeys = Object.keys(localStorage).filter(k => /^_rawdb_\d{4}$/.test(k)).sort();
+
+  const makeDupKey = r => {
+    const isArr = Array.isArray(r);
+    const date  = isArr ? r[0] : r.date;
+    const car   = isArr ? r[2] : r.car;
+    const silo  = isArr ? r[6] : r.silo;
+    const ton   = isArr ? r[7] : r.ton;
+    // 핵심: 톤 소수점 2자리 반올림 문자열로 비교
+    const tonStr = parseFloat(ton||0).toFixed(2);
+    return `${date}|${car}|${silo}|${tonStr}`;
+  };
+
+  let html = `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:11px;line-height:1.9;word-break:break-all;">`;
+
+  rawdbKeys.forEach(key => {
+    let db = [];
+    try { db = JSON.parse(localStorage.getItem(key)) || []; } catch(e) { return; }
+
+    const seen = {};
+    let dups = 0;
+    db.forEach(r => {
+      const k = makeDupKey(r);
+      if (seen[k]) dups++;
+      else seen[k] = true;
+    });
+
+    const totalTon = db.reduce((s,r) => s + Math.abs(parseFloat(Array.isArray(r)?r[7]:r.ton)||0), 0);
+    html += `<div style="color:var(--accent);font-weight:700;">[${key}] ${db.length}건 / ${totalTon.toFixed(2)}톤</div>`;
+    html += `<div style="color:var(--yellow);">중복(날짜+차량+저장조+실중량 소수점2자리): ${dups}건</div>`;
+
+    // 날짜별 건수
+    const byDate = {};
+    db.forEach(r => {
+      const d = Array.isArray(r) ? r[0] : r.date;
+      byDate[d] = (byDate[d]||0) + 1;
+    });
+    Object.entries(byDate).sort().forEach(([d,cnt]) => {
+      html += `<div style="color:var(--text2);margin-left:6px;">${d}: ${cnt}건</div>`;
+    });
+    html += `<hr style="border-color:var(--border);margin:8px 0;">`;
+  });
+
+  html += `</div>`;
+
+  // 날짜별 삭제 UI
+  html += `<div style="margin-top:10px;">
+    <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">🗑️ 특정 날짜 데이터 전체 삭제</div>
+    <div style="display:flex;gap:8px;">
+      <input type="date" id="del-date" class="form-input" style="flex:1;margin-bottom:0;">
+      <button onclick="deleteByDate()" class="btn-primary" style="flex:0.6;background:var(--red);font-size:12px;">삭제</button>
+    </div>
+    <div id="del-result" style="margin-top:8px;"></div>
+  </div>`;
+
+  el.innerHTML = html;
+}
+
+// ── DB 전체 기준 재고 재계산 ──
+function recalcStock() {
+  // 전체 DB에서 저장조별 입고량 합산
+  const rawdbKeys = Object.keys(localStorage).filter(k => /^_rawdb_\d{4}$/.test(k)).sort();
+  const stock = { S1:0, S2:0, S3:0, S4:0 };
+
+  rawdbKeys.forEach(key => {
+    let db = [];
+    try { db = JSON.parse(localStorage.getItem(key)) || []; } catch(e) { return; }
+    db.forEach(r => {
+      const silo = Array.isArray(r) ? r[6] : r.silo;
+      const ton  = parseFloat(Array.isArray(r) ? r[7] : r.ton) || 0;
+      if (stock[silo] !== undefined) stock[silo] += Math.abs(ton);
+    });
+  });
+
+  // 사용량 차감
+  const usage = getUsage();
+  const totalStock = SILO_ORDER.reduce((s,k) => s+(stock[k]||0), 0);
+  Object.entries(usage).forEach(([,v]) => {
+    const use = v.total || v || 0;
+    if (totalStock > 0) {
+      SILO_ORDER.forEach(k => {
+        const ratio = (stock[k]||0) / totalStock;
+        stock[k] = (stock[k]||0) - use * ratio;
+      });
+    }
+  });
+
+  localStorage.setItem(KEY_STOCK, JSON.stringify(stock));
+  return stock;
+}
+function deleteByDate() {
+  const date = document.getElementById('del-date')?.value;
+  if (!date) { showToast('날짜를 선택하세요', '#f85149'); return; }
+  const key = rawdbKey(parseInt(date.slice(0,4)));
+  let db = [];
+  try { db = JSON.parse(localStorage.getItem(key)) || []; } catch(e) {}
+  const before = db.length;
+  const cleaned = db.filter(r => (Array.isArray(r) ? r[0] : r.date) !== date);
+  const removed = before - cleaned.length;
+  if (removed === 0) {
+    document.getElementById('del-result').innerHTML =
+      `<div style="color:var(--yellow);font-size:12px;">⚠️ ${date} 데이터 없음</div>`;
+    return;
+  }
+  localStorage.setItem(key, JSON.stringify(cleaned));
+  recalcStock();
+  document.getElementById('del-result').innerHTML =
+    `<div style="background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--green);">
+      ✅ ${date} · ${removed}건 삭제 (${cleaned.length}건 남음)<br>
+      <span style="color:var(--text2);">재고 재계산 완료</span>
+    </div>`;
+  showToast(`✅ ${date} ${removed}건 삭제`);
+  renderDash(); renderSyncStats();
+}
+
+// ── 중복 탐지·제거 (기준: 날짜+차량+저장조+실중량 소수점2자리) ──
+const _makeDupKey = r => {
+  const a = Array.isArray(r);
+  const ton = parseFloat((a ? r[7] : r.ton)||0).toFixed(2);
+  return `${a?r[0]:r.date}|${a?r[2]:r.car}|${a?r[6]:r.silo}|${ton}`;
+};
+
+function detectDuplicates() {
+  const el = document.getElementById('dup-preview');
+  el.innerHTML = '<div style="color:var(--text2);font-size:12px;padding:6px 0;">⏳ 분석 중...</div>';
+  const rawdbKeys = Object.keys(localStorage).filter(k => /^_rawdb_\d{4}$/.test(k)).sort();
+  let totalDups = 0, totalRecs = 0, report = '';
+
+  rawdbKeys.forEach(key => {
+    let db = [];
+    try { db = JSON.parse(localStorage.getItem(key)) || []; } catch(e) { return; }
+    totalRecs += db.length;
+    const seen = {};
+    db.forEach((r, i) => {
+      const dk = _makeDupKey(r);
+      if (seen[dk] !== undefined) {
+        totalDups++;
+        const a = Array.isArray(r);
+        const silo = a ? r[6] : r.silo;
+        const info = SILO_INFO[silo]||{name:silo||'?',color:'var(--text2)'};
+        report += `<div class="rec-item" style="padding:4px 0;">
+          <div class="rec-dot" style="background:var(--red);"></div>
+          <div class="rec-main" style="font-size:11px;">
+            <div>${a?r[0]:r.date} · ${a?r[2]:r.car}</div>
+            <div style="color:${info.color};">${info.name} · ${parseFloat(a?r[7]:r.ton).toFixed(2)}톤</div>
+          </div>
+          <span style="font-size:10px;color:var(--red);">#${i+1}</span>
+        </div>`;
+      } else { seen[dk] = i; }
+    });
+  });
+
+  const uniqueEst = totalRecs - totalDups;
+  if (totalDups === 0) {
+    el.innerHTML = `<div style="background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--green);">
+      ✅ 중복 없음 · 전체 ${totalRecs}건</div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div style="background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">
+        전체 <b>${totalRecs}</b>건 → 제거 후 <b style="color:var(--green)">${uniqueEst}</b>건
+        <span style="color:var(--red);"> (${totalDups}건)</span>
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:6px;">날짜+차량+저장조+실중량(소수점2자리) 동일한 건</div>
+      <div style="max-height:160px;overflow-y:auto;">${report}</div>
+    </div>
+    <button class="btn-primary" style="background:var(--red);" onclick="removeDuplicates()">
+      🗑️ ${totalDups}건 제거 → ${uniqueEst}건으로
+    </button>`;
+}
+
+function removeDuplicates() {
+  const rawdbKeys = Object.keys(localStorage).filter(k => /^_rawdb_\d{4}$/.test(k)).sort();
+  let totalBefore = 0, totalAfter = 0;
+  rawdbKeys.forEach(key => {
+    let db = [];
+    try { db = JSON.parse(localStorage.getItem(key)) || []; } catch(e) { return; }
+    totalBefore += db.length;
+    const seen = {};
+    const cleaned = db.filter(r => {
+      const dk = _makeDupKey(r);
+      if (seen[dk]) return false;
+      seen[dk] = true;
+      return true;
+    });
+    totalAfter += cleaned.length;
+    localStorage.setItem(key, JSON.stringify(cleaned));
+  });
+  const removed = totalBefore - totalAfter;
+  recalcStock();
+  document.getElementById('dup-preview').innerHTML = `
+    <div style="background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--green);">
+      ✅ ${totalBefore}건 → <b>${totalAfter}건</b> (${removed}건 제거)<br>
+      <span style="color:var(--text2);">재고도 DB 기준으로 재계산됐습니다</span>
+    </div>`;
+  showToast(`✅ ${removed}건 제거 → ${totalAfter}건`);
+  renderDash(); renderSyncStats();
+}
+
+// ════════════════════════════════════════
+// ── Firebase 동기화 ──
+// ════════════════════════════════════════
+
+const FB_CONFIG = {
+  apiKey: "AIzaSyDU5MJI2w8AYazPxyzukE1lWAzLXOFfr7o",
+  authDomain: "rosegarden-4937c.firebaseapp.com",
+  projectId: "rosegarden-4937c",
+  storageBucket: "rosegarden-4937c.firebasestorage.app",
+  messagingSenderId: "109165303238",
+  appId: "1:109165303238:web:db2401090c9e79a5be8ec7"
+};
+
+let _db = null;
+const FB_COL = 'srf_data';
+
+// ── PC앱(v1) ↔ 모바일앱(v5) 키 매핑 ──
+const KEY_MAP_PC_TO_MOBILE = {
+  '_siloStock_v1':       '_siloStock_v5',
+  '_usageData_v1':       '_usageData_v5',
+  '_usageDataBySilo_v1': '_usageDataBySilo_v5',
+  '_schedSettings_v4':   '_schedSettings_v5',
+  '_schedSettings_v5':   '_schedSettings_v5',
+};
+const KEY_MAP_MOBILE_TO_PC = {
+  '_siloStock_v5':       '_siloStock_v1',
+  '_usageData_v5':       '_usageData_v1',
+  '_usageDataBySilo_v5': '_usageDataBySilo_v1',
+  '_schedSettings_v5':   '_schedSettings_v4',
+};
+
+function fbInit() {
+  // Firebase SDK 로드 확인
+  if (typeof firebase === 'undefined' || !firebase.firestore) {
+    setTimeout(fbInit, 500);
+    return false;
+  }
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+    _db = firebase.firestore();
+    fbSetStatus('연결됨', '#3fb950');
+    return true;
+  } catch(e) {
+    fbSetStatus('초기화 실패: ' + e.message, 'var(--red)');
+    console.error('Firebase init error:', e);
+    return false;
+  }
+}
+
+function fbSetStatus(msg, color) {
+  const el    = document.getElementById('fb-sync-status');
+  const badge = document.getElementById('fb-status');
+  if (el) { el.textContent = msg; el.style.color = color || 'var(--text2)'; }
+  if (badge) {
+    if (color === '#3fb950')    { badge.textContent = '☁️✅'; badge.style.color = '#3fb950'; }
+    else if (color === 'var(--red)') { badge.textContent = '☁️❌'; badge.style.color = 'var(--red)'; }
+    else { badge.textContent = '☁️⏳'; badge.style.color = 'var(--yellow)'; }
+  }
+}
+
+// ── Firebase 업로드 (모바일 → 클라우드) ──
+async function fbPush() {
+  let waited = 0;
+  while (!_db && waited < 10) {
+    fbInit();
+    if (_db) break;
+    await new Promise(r => setTimeout(r, 500));
+    waited++;
+  }
+  if (!_db) {
+    document.getElementById('fb-result').innerHTML =
+      `<div style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--red);">
+        ❌ Firebase 연결 실패 — 인터넷 연결 확인 후 다시 시도하세요</div>`;
+    fbSetStatus('연결 실패', 'var(--red)');
+    return;
+  }
+  const btn = document.getElementById('btn-fb-push');
+  const resultEl = document.getElementById('fb-result');
+  btn.textContent = '⏳ 업로드 중...'; btn.disabled = true;
+  fbSetStatus('업로드 중...', 'var(--yellow)');
+
+  try {
+    // meta 문서 — 모바일 키(v5) + PC 호환 키(v1) 동시 저장
+    const meta = {
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: 'mobile'
+    };
+    const mobileFixed = ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'];
+    mobileFixed.forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v) {
+        try {
+          const parsed = JSON.parse(v);
+          meta[k] = parsed; // 모바일 키
+          const pcKey = KEY_MAP_MOBILE_TO_PC[k];
+          if (pcKey) meta[pcKey] = parsed; // PC 호환 키도 함께 저장
+        } catch(e) {}
+      }
+    });
+    await _db.collection(FB_COL).doc('meta').set(meta);
+
+    // 연도별 입고 DB
+    const rawdbKeys = Object.keys(localStorage).filter(k => /^_rawdb_\d{4}$/.test(k));
+    for (const k of rawdbKeys) {
+      const year = k.replace('_rawdb_','');
+      const v = localStorage.getItem(k);
+      if (v) {
+        const data = JSON.parse(v);
+        // Firestore 중첩 배열 미지원 → JSON 문자열로 변환
+        const records = data.map(r => Array.isArray(r) ? JSON.stringify(r) : r);
+        await _db.collection(FB_COL).doc(`rawdb_${year}`).set({
+          records, count: data.length, format: 'json_str',
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+    }
+
+    // 월별 데이터
+    const monthlyKeys = Object.keys(localStorage).filter(k => /^_monthlyData_\d{4}$/.test(k));
+    for (const k of monthlyKeys) {
+      const year = k.replace('_monthlyData_','');
+      const v = localStorage.getItem(k);
+      if (v) {
+        await _db.collection(FB_COL).doc(`monthly_${year}`).set({
+          data: JSON.parse(v),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+    }
+
+    const total = 1 + rawdbKeys.length + monthlyKeys.length;
+    const now   = new Date().toLocaleTimeString('ko-KR');
+    resultEl.innerHTML = `<div style="background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--green);">
+      ✅ 업로드 완료 · ${total}개 문서<br>
+      <span style="color:var(--text2);">PC 앱 호환 키도 함께 저장됐습니다</span>
+    </div>`;
+    fbSetStatus(`마지막 업로드: ${now}`, '#3fb950');
+    showToast('✅ Firebase 업로드 완료');
+  } catch(e) {
+    resultEl.innerHTML = `<div style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--red);">
+      ❌ 업로드 실패: ${e.message}</div>`;
+    fbSetStatus('업로드 실패', 'var(--red)');
+  } finally {
+    btn.textContent = '☁️ Firebase에 업로드 (모바일→클라우드)';
+    btn.disabled = false;
+  }
+}
+
+// ── Firebase 가져오기 (클라우드 → 모바일) ──
+async function fbPull() {
+  // Firebase SDK 로드 대기 (최대 5초)
+  let waited = 0;
+  while (!_db && waited < 10) {
+    fbInit();
+    if (_db) break;
+    await new Promise(r => setTimeout(r, 500));
+    waited++;
+  }
+  if (!_db) {
+    document.getElementById('fb-result').innerHTML =
+      `<div style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--red);">
+        ❌ Firebase 연결 실패 — 인터넷 연결 확인 후 다시 시도하세요</div>`;
+    fbSetStatus('연결 실패', 'var(--red)');
+    return;
+  }
+  const btn = document.getElementById('btn-fb-pull');
+  const resultEl = document.getElementById('fb-result');
+  btn.textContent = '⏳ 가져오는 중...'; btn.disabled = true;
+  fbSetStatus('다운로드 중...', 'var(--yellow)');
+
+  try {
+    const snap = await _db.collection(FB_COL).get();
+    const preview = [];
+
+    snap.forEach(doc => {
+      const id = doc.id, data = doc.data();
+
+      if (id === 'meta') {
+        // PC키(v1) → 모바일키(v5)로 변환해서 저장
+        // 모바일 키 우선, 없으면 PC 키 변환
+        const allKeys = Object.keys(data).filter(k => k.startsWith('_'));
+        const processed = new Set();
+
+        // 모바일 키(v5) 직접 저장
+        ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'].forEach(mk => {
+          if (data[mk] !== undefined) {
+            localStorage.setItem(mk, JSON.stringify(data[mk]));
+            processed.add(mk);
+          }
+        });
+
+        // PC 키(v1)를 모바일 키(v5)로 변환해서 저장 (모바일 키가 없을 때만)
+        Object.entries(KEY_MAP_PC_TO_MOBILE).forEach(([pcKey, mobileKey]) => {
+          if (data[pcKey] !== undefined && !processed.has(mobileKey)) {
+            localStorage.setItem(mobileKey, JSON.stringify(data[pcKey]));
+            processed.add(mobileKey);
+          }
+        });
+
+        preview.push('재고·사용량 복원');
+
+      } else if (id.startsWith('rawdb_')) {
+        const year = id.replace('rawdb_','');
+        if (data.records) {
+          const records = data.format === 'json_str'
+            ? data.records.map(r => typeof r === 'string' ? JSON.parse(r) : r)
+            : data.records;
+          localStorage.setItem(`_rawdb_${year}`, JSON.stringify(records));
+          preview.push(`${year}년 ${data.count||records.length}건`);
+        }
+      } else if (id.startsWith('monthly_')) {
+        const year = id.replace('monthly_','');
+        if (data.data) {
+          localStorage.setItem(`_monthlyData_${year}`, JSON.stringify(data.data));
+          preview.push(`${year}년 월별`);
+        }
+      }
+    });
+
+    const now = new Date().toLocaleTimeString('ko-KR');
+    resultEl.innerHTML = `<div style="background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--green);">
+      ✅ 가져오기 완료 (${now})<br>
+      <span style="color:var(--text2);">${preview.join(' · ')}</span>
+    </div>`;
+    fbSetStatus(`마지막 동기화: ${now}`, '#3fb950');
+    showToast('✅ Firebase 가져오기 완료');
+    loadAll();
+    renderSyncStats();
+  } catch(e) {
+    resultEl.innerHTML = `<div style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--red);">
+      ❌ 가져오기 실패: ${e.message}</div>`;
+    fbSetStatus('가져오기 실패', 'var(--red)');
+  } finally {
+    btn.textContent = '📥 Firebase에서 가져오기 (클라우드→모바일)';
+    btn.disabled = false;
+  }
+}
+
+// ════════════════════════════════════════
+// ── Google Drive 연동 ──
+// ════════════════════════════════════════
+
+async function callDriveMCP(toolName, params) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      mcp_servers: [{ type: 'url', url: 'https://drivemcp.googleapis.com/mcp/v1', name: 'gdrive' }],
+      messages: [{
+        role: 'user',
+        content: `Use the Google Drive tool "${toolName}" with these parameters: ${JSON.stringify(params)}. Return only the raw result JSON with no extra commentary.`
+      }]
+    })
+  });
+  if (!response.ok) throw new Error(`API 오류: ${response.status}`);
+  const data = await response.json();
+  // mcp_tool_result 블록 추출
+  const resultBlock = data.content?.find(b => b.type === 'mcp_tool_result');
+  if (resultBlock?.content?.[0]?.text) {
+    try { return JSON.parse(resultBlock.content[0].text); } catch(e) { return resultBlock.content[0].text; }
+  }
+  // 텍스트 블록에서 JSON 파싱 시도
+  const textBlock = data.content?.find(b => b.type === 'text');
+  if (textBlock?.text) {
+    try {
+      const clean = textBlock.text.replace(/```json|```/g,'').trim();
+      return JSON.parse(clean);
+    } catch(e) { return textBlock.text; }
+  }
+  throw new Error('Drive 응답 파싱 실패');
+}
+
+// ── Drive 백업 ──
+async function backupToDrive() {
+  const btn = document.getElementById('btn-drive-backup');
+  const resultEl = document.getElementById('drive-backup-result');
+  btn.textContent = '⏳ 백업 중...'; btn.disabled = true;
+
+  try {
+    // 데이터 수집
+    const fixedKeys = ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'];
+    const rawdbKeys = Object.keys(localStorage).filter(k => /^_rawdb_\d{4}$/.test(k));
+    const monthlyKeys = Object.keys(localStorage).filter(k => /^_monthlyData_\d{4}$/.test(k));
+    const out = {};
+    [...fixedKeys, ...rawdbKeys, ...monthlyKeys].forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v) { try { out[k] = JSON.parse(v); } catch(e) {} }
+    });
+
+    const ts   = new Date().toISOString().slice(0,10);
+    const fileName = `srf_backup_${ts}.json`;
+    const content  = JSON.stringify(out, null, 2);
+
+    const result = await callDriveMCP('create_file', {
+      title: fileName,
+      textContent: content,
+      contentMimeType: 'application/json',
+      disableConversionToGoogleType: true
+    });
+
+    const fileId = result?.id || result?.fileId || '(확인 필요)';
+    resultEl.innerHTML = `
+      <div style="background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--green);">
+        ✅ 백업 완료<br>
+        <span style="color:var(--text2);">파일명: ${fileName}<br>파일 ID: <code style="font-size:10px;">${fileId}</code></span>
+      </div>`;
+    showToast(`✅ Drive 백업 완료`);
+  } catch(err) {
+    resultEl.innerHTML = `
+      <div style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--red);">
+        ❌ 백업 실패: ${err.message}
+      </div>`;
+  } finally {
+    btn.textContent = '☁️ Drive에 백업'; btn.disabled = false;
+  }
+}
+
+// ── Drive 파일 불러오기 ──
+async function loadFromDrive(mode) {
+  const fileId  = document.getElementById('drive-file-id').value.trim();
+  const resultEl = document.getElementById('drive-load-result');
+  if (!fileId) { showToast('파일 ID를 입력하세요', '#f85149'); return; }
+
+  resultEl.innerHTML = `<div style="color:var(--text2);font-size:12px;padding:8px 0;">⏳ Drive에서 불러오는 중...</div>`;
+
+  try {
+    const result = await callDriveMCP('download_file_content', {
+      fileId,
+      exportMimeType: 'text/csv'  // CSV/엑셀은 CSV로, JSON은 무시됨
+    });
+
+    // base64 디코딩
+    let text = '';
+    if (typeof result === 'string') {
+      text = result;
+    } else if (result?.content) {
+      // base64인 경우
+      try { text = atob(result.content); } catch(e) { text = result.content; }
+    } else {
+      text = JSON.stringify(result);
+    }
+
+    if (mode === 'json') {
+      // JSON 백업 복원
+      const data = JSON.parse(text);
+      const fixedKeys = ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'];
+      const rawdbKeys = Object.keys(data).filter(k => /^_rawdb_\d{4}$/.test(k));
+      const monthlyKeys = Object.keys(data).filter(k => /^_monthlyData_\d{4}$/.test(k));
+      const allKeys = [...fixedKeys, ...rawdbKeys, ...monthlyKeys];
+      let cnt = 0;
+      allKeys.forEach(k => {
+        if (data[k] !== undefined) { localStorage.setItem(k, JSON.stringify(data[k])); cnt++; }
+      });
+      loadAll();
+      resultEl.innerHTML = `
+        <div style="background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--green);">
+          ✅ 백업 복원 완료 (${cnt}개 키)
+        </div>`;
+      showToast('✅ Drive 백업 복원 완료');
+
+    } else {
+      // CSV/엑셀 → 입고 미리보기
+      parseAndPreviewCSV(text);
+      // 입고등록 탭으로 이동
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById('page-input').classList.add('active');
+      document.querySelectorAll('.tab-btn')[1].classList.add('active');
+      document.getElementById('content').scrollTop = 0;
+      resultEl.innerHTML = `
+        <div style="background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--green);">
+          ✅ 파일 로드 완료 → 입고등록 탭에서 미리보기 확인
+        </div>`;
+      showToast('✅ Drive 파일 로드 완료');
+      // 파일 탭으로 전환
+      setCsvTab('paste');
+      document.getElementById('csv-text').value = text;
+      previewCSV();
+    }
+  } catch(err) {
+    resultEl.innerHTML = `
+      <div style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--red);">
+        ❌ 불러오기 실패: ${err.message}<br>
+        <span style="font-size:10px;">파일 ID 확인 또는 공유 권한(뷰어 이상) 필요</span>
+      </div>`;
+  }
+}
+
+// ── 동기화: JSON 가져오기 ──
+function importJSON(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      const fixedKeys = ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'];
+      const rawdbKeys = Object.keys(data).filter(k => /^_rawdb_\d{4}$/.test(k));
+      const keys = [...fixedKeys, ...rawdbKeys];
+      let imported = 0;
+      const preview = [];
+
+      keys.forEach(k => {
+        if (data[k] !== undefined) {
+          localStorage.setItem(k, JSON.stringify(data[k]));
+          imported++;
+          if (/^_rawdb_\d{4}$/.test(k)) {
+            preview.push(`${k}: ${Array.isArray(data[k]) ? data[k].length : '?'}건`);
+          } else if (k === KEY_STOCK) {
+            const s = data[k];
+            preview.push(`재고: 광주${fmt(s.S1)} 전남${fmt(s.S2)} 나주${fmt(s.S4)} 순천${fmt(s.S3)}톤`);
+          } else if (k === KEY_USAGE) {
+            preview.push(`사용량: ${Object.keys(data[k]).length}일치`);
+          }
+        }
+      });
+
+      const el = document.getElementById('import-preview');
+      el.innerHTML = `
+        <div style="background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--green);">
+          ✅ ${imported}개 키 가져오기 완료<br>
+          <span style="color:var(--text2);">${preview.join('<br>')}</span>
+        </div>`;
+
+      loadAll();
+      renderSyncStats();
+      showToast('✅ 데이터 가져오기 완료');
+    } catch(err) {
+      document.getElementById('import-preview').innerHTML =
+        `<div style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--red);">❌ JSON 파일 오류: ${err.message}</div>`;
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+// ── 동기화: JSON 내보내기 ──
+function exportJSON() {
+  const fixedKeys = ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'];
+  const rawdbKeys = Object.keys(localStorage).filter(k => /^_rawdb_\d{4}$/.test(k));
+  const allKeys   = [...fixedKeys, ...rawdbKeys];
+  const out = {};
+  allKeys.forEach(k => { const v = localStorage.getItem(k); if(v) { try { out[k] = JSON.parse(v); } catch(e) {} } });
+
+  const jsonStr = JSON.stringify(out);
+
+  // 파일 다운로드
+  const a = document.createElement('a');
+  const ts = new Date().toISOString().slice(0,10);
+  a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(jsonStr);
+  a.download = `srf_export_${ts}.json`;
+  a.click();
+
+  // PC 주입 코드 생성
+  const injectCode = `const d=${jsonStr};Object.keys(d).forEach(k=>localStorage.setItem(k,JSON.stringify(d[k])));console.log('✅ 데이터 주입 완료');location.reload();`;
+  document.getElementById('inject-code').textContent = injectCode;
+  document.getElementById('inject-code-wrap').style.display = 'block';
+  showToast('✅ 내보내기 완료');
+}
+
+// ── 콘솔 코드 복사 ──
+function copyExportCode() {
+  const code = document.getElementById('export-code').textContent;
+  const btn  = document.getElementById('copy-export-btn');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(code).then(() => {
+      btn.textContent = '✅'; setTimeout(() => btn.textContent = '복사', 1500);
+    }).catch(() => fallbackCopy(code, btn));
+  } else { fallbackCopy(code, btn); }
+}
+function copyInjectCode() {
+  const code = document.getElementById('inject-code').textContent;
+  const btn  = document.getElementById('copy-inject-btn');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(code).then(() => {
+      btn.textContent = '✅'; setTimeout(() => btn.textContent = '복사', 1500);
+    }).catch(() => fallbackCopy(code, btn));
+  } else { fallbackCopy(code, btn); }
+}
+
+// ── 동기화 현황 ──
+function renderSyncStats() {
+  const stock   = getStock();
+  const usage   = getUsage();
+  const el      = document.getElementById('sync-stats');
+  if (!el) return;
+
+  const rawdbKeys = Object.keys(localStorage).filter(k => /^_rawdb_\d{4}$/.test(k)).sort();
+  const totalRecs = rawdbKeys.reduce((s,k) => {
+    try { return s + (JSON.parse(localStorage.getItem(k))||[]).length; } catch(e) { return s; }
+  }, 0);
+  const totalStock = SILO_ORDER.reduce((s,k) => s+(stock[k]||0), 0);
+  const useDays    = Object.keys(usage).length;
+  const rawSize    = rawdbKeys.reduce((s,k) => s + (localStorage.getItem(k)||'').length, 0);
+
+  const yearRows = rawdbKeys.map(k => {
+    const yr   = k.replace('_rawdb_','');
+    const cnt  = (() => { try { return (JSON.parse(localStorage.getItem(k))||[]).length; } catch(e) { return 0; } })();
+    const kb   = Math.round((localStorage.getItem(k)||'').length / 1024);
+    return `<div class="rec-item" style="border-bottom:none;padding:4px 0;">
+      <div class="rec-dot" style="background:var(--accent);width:6px;height:6px;"></div>
+      <div class="rec-main" style="font-size:11px;">${yr}년</div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent);">${cnt}건 / ~${kb}KB</span>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="rec-item">
+      <div class="rec-dot" style="background:var(--accent);"></div>
+      <div class="rec-main"><div>전체 입고기록</div>
+        <div style="font-size:10px;color:var(--text2);margin-top:2px;">${yearRows||'없음'}</div>
+      </div>
+      <span class="rec-ton" style="color:var(--accent);">${totalRecs}건</span>
+    </div>
+    <div class="rec-item">
+      <div class="rec-dot" style="background:var(--green);"></div>
+      <div class="rec-main"><div>현재 총재고</div><div class="rec-date">_siloStock_v5</div></div>
+      <span class="rec-ton" style="color:var(--green);">${fmt(totalStock)}톤</span>
+    </div>
+    <div class="rec-item">
+      <div class="rec-dot" style="background:var(--yellow);"></div>
+      <div class="rec-main"><div>사용량 기록</div><div class="rec-date">_usageData_v5</div></div>
+      <span class="rec-ton" style="color:var(--yellow);">${useDays}일</span>
+    </div>
+    <div class="rec-item" style="border-bottom:none;">
+      <div class="rec-dot" style="background:var(--text2);"></div>
+      <div class="rec-main"><div>DB 총 크기</div><div class="rec-date">전체 연도 합산</div></div>
+      <span class="rec-ton" style="color:var(--text2);">~${Math.round(rawSize/1024)} KB</span>
+    </div>`;
+}
+
+// ── 초기 실행 ──
+initMonthFilter();
+initUsageYearSel();
+initMonYearSel();
+initDates();
+initRptForm();
+loadAll();
+// Firebase 초기화
+setTimeout(fbInit, 1000);
+
+// ── PWA Service Worker 등록 ──
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(() => console.log('SW registered'))
+      .catch(e => console.log('SW error:', e));
+  });
+}
+</script>
+</body>
+</html>
