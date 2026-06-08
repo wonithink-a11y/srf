@@ -1704,20 +1704,28 @@ function submitUsage() {
 
 // ── 이력 조회 ──
 function normalizePcRec(r) {
-  // PC형식: ["2026-01-01 00:00","차량번호",계근톤,공차톤,"저장조"]
-  if (Array.isArray(r) && r.length <= 6 && typeof r[2] === 'number' && r[2] < 1000) {
-    const date = (r[0]||'').slice(0,10);
-    const ton  = Math.round((parseFloat(r[2]||0) - parseFloat(r[3]||0)) * 100) / 100;
-    const silo = normSilo(r[4]||'광주') || 'S1';
+  // Firebase 거치면서 JSON 문자열로 저장된 경우 파싱
+  if (typeof r === 'string') {
+    try { r = JSON.parse(r); } catch(e) {}
+  }
+  if (!Array.isArray(r) && typeof r === 'object') {
+    return { date: r.date||'', car: r.car||'', silo: r.silo||'', ton: Math.abs(parseFloat(r.ton)||0), slip: r.slip||'', isPc: false };
+  }
+  if (!Array.isArray(r)) return { date:'', car:'', silo:'', ton:0, slip:'', isPc:false };
+
+  // PC형식: ["2026-01-01 00:00","차량번호",계근톤,공차톤,"저장조"] (5컬럼 이하, 인덱스2가 소수점 톤)
+  const col2 = parseFloat(r[2]);
+  const col3 = parseFloat(r[3]);
+  if (r.length <= 6 && !isNaN(col2) && col2 < 1000 && col2 > 0) {
+    const date = (r[0]||'').slice(0,10).replace(/T.*/,'');
+    const ton  = Math.round((col2 - col3) * 100) / 100;
+    const silo = normSilo(r[4]||'') || 'S1';
     return { date, car: r[1]||'', silo, ton: Math.abs(ton), slip: '', isPc: true };
   }
   // 모바일형식: [date, slip, car, gross_kg, tare_kg, moist, silo, ton, ...]
-  if (Array.isArray(r)) {
-    const date = (r[0]||'').slice(0,10);
-    const ton  = parseFloat(r[7]||0) || (parseFloat(r[3]||0)-parseFloat(r[4]||0))/1000;
-    return { date, car: r[2]||'', silo: r[6]||'', ton: Math.abs(ton), slip: r[1]||'', isPc: false };
-  }
-  return { date: r.date||'', car: r.car||'', silo: r.silo||'', ton: r.ton||0, slip: r.slip||'', isPc: false };
+  const date = (r[0]||'').slice(0,10).replace(/T.*/,'');
+  const ton  = parseFloat(r[7]||0) || (parseFloat(r[3]||0)-parseFloat(r[4]||0))/1000;
+  return { date, car: r[2]||'', silo: r[6]||'', ton: Math.abs(ton), slip: r[1]||'', isPc: false };
 }
 
 function renderHistory() {
@@ -2412,7 +2420,6 @@ function diagnosDB() {
 
 // ── DB 전체 기준 재고 재계산 ──
 function recalcStock() {
-  // 전체 DB에서 저장조별 입고량 합산
   const rawdbKeys = Object.keys(localStorage).filter(k => /^_rawdb_\d{4}$/.test(k)).sort();
   const stock = { S1:0, S2:0, S3:0, S4:0 };
 
@@ -2420,9 +2427,10 @@ function recalcStock() {
     let db = [];
     try { db = JSON.parse(localStorage.getItem(key)) || []; } catch(e) { return; }
     db.forEach(r => {
-      const silo = Array.isArray(r) ? r[6] : r.silo;
-      const ton  = parseFloat(Array.isArray(r) ? r[7] : r.ton) || 0;
-      if (stock[silo] !== undefined) stock[silo] += Math.abs(ton);
+      const norm = normalizePcRec(r);
+      const siloKey = normSilo(norm.silo) || norm.silo;
+      const ton = parseFloat(norm.ton) || 0;
+      if (stock[siloKey] !== undefined) stock[siloKey] += Math.abs(ton);
     });
   });
 
