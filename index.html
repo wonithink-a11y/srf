@@ -152,6 +152,61 @@
   }
   .btn-secondary:active { background: var(--bg3); }
 
+  /* ── 이력 세그먼트 버튼 ── */
+  .hist-seg { display:flex; gap:6px; }
+  .hseg-btn {
+    flex:1; padding:7px 4px; border-radius:8px;
+    border:1px solid var(--border); background:var(--bg3);
+    color:var(--text2); font-size:11px; font-weight:600;
+    font-family:'Noto Sans KR',sans-serif; cursor:pointer;
+    transition: all 0.15s;
+  }
+  .hseg-btn.active {
+    background:var(--accent); color:#fff; border-color:var(--accent);
+  }
+  .hseg-btn:active { opacity:0.8; }
+
+  /* ── 일별 아코디언 ── */
+  .day-group { border-bottom:1px solid var(--border); }
+  .day-group:last-child { border-bottom:none; }
+  .day-header {
+    display:flex; align-items:center; padding:11px 2px;
+    cursor:pointer; user-select:none; gap:8px;
+  }
+  .day-header:active { background:rgba(255,255,255,0.03); }
+  .day-date { font-size:13px; font-weight:700; flex:1; }
+  .day-total { font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:600; color:var(--accent); }
+  .day-cnt { font-size:11px; color:var(--text2); margin-left:4px; }
+  .day-arrow { font-size:11px; color:var(--text2); transition:transform 0.2s; }
+  .day-arrow.open { transform:rotate(90deg); }
+  .day-body { display:none; padding-bottom:4px; }
+  .day-body.open { display:block; }
+  .day-rec {
+    display:flex; align-items:center; gap:8px;
+    padding:7px 8px; border-radius:8px; margin-bottom:3px;
+    background:var(--bg3); font-size:12px;
+  }
+  .day-rec-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  .day-rec-main { flex:1; color:var(--text2); }
+  .day-rec-ton { font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:600; }
+
+  /* ── 월별/연간 테이블 ── */
+  .hist-table { width:100%; border-collapse:collapse; font-size:12px; margin-top:4px; }
+  .hist-table th {
+    background:var(--bg3); color:var(--text2); padding:7px 6px;
+    text-align:center; font-weight:600; font-size:11px;
+    border-bottom:1px solid var(--border); position:sticky; top:0;
+  }
+  .hist-table td { padding:7px 6px; border-bottom:1px solid rgba(48,54,61,0.4); }
+  .hist-table td:first-child { text-align:center; color:var(--text2); font-weight:700; }
+  .hist-table td:not(:first-child) { text-align:right; font-family:'IBM Plex Mono',monospace; }
+  .hist-table tr.total-row td { background:rgba(88,166,255,0.08); color:var(--accent); font-weight:700; border-top:1px solid rgba(88,166,255,0.3); }
+  .hist-table tr:last-child td { border-bottom:none; }
+
+  /* 연간 바 */
+  .year-bar-wrap { margin-bottom:3px; }
+  .year-bar { height:8px; border-radius:4px; background:var(--accent); opacity:0.85; min-width:2px; }
+
   /* ── 입고 이력 ── */
   .rec-item {
     display: flex; align-items: center; gap: 10px;
@@ -561,6 +616,8 @@
   <div id="page-history" class="page">
     <div class="card">
       <div class="card-title">입고 이력</div>
+
+      <!-- 공통 필터 -->
       <div class="form-row" style="margin-bottom:10px;">
         <select id="hist-silo" class="form-select" style="margin-bottom:0;">
           <option value="">전체</option>
@@ -569,19 +626,32 @@
           <option value="S4">나주</option>
           <option value="S3">순천</option>
         </select>
-        <select id="hist-month" class="form-select" style="margin-bottom:0;"></select>
+        <select id="hist-year" class="form-select" style="margin-bottom:0;"></select>
       </div>
 
-      <!-- 일별 삭제 -->
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
-        <input type="date" id="hist-del-date" class="form-input"
-          style="flex:1;margin-bottom:0;font-size:12px;">
-        <button onclick="confirmDeleteByDate()"
-          style="padding:9px 12px;border-radius:8px;border:1px solid var(--red);background:none;color:var(--red);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">
-          🗑️ 날짜 전체 삭제
-        </button>
+      <!-- 뷰 세그먼트 -->
+      <div class="hist-seg" style="margin-bottom:12px;">
+        <button id="hseg-detail"  class="hseg-btn active" onclick="setHistView('detail')">📋 건별</button>
+        <button id="hseg-daily"   class="hseg-btn"        onclick="setHistView('daily')">📅 일별</button>
+        <button id="hseg-monthly" class="hseg-btn"        onclick="setHistView('monthly')">📆 월별</button>
+        <button id="hseg-yearly"  class="hseg-btn"        onclick="setHistView('yearly')">📊 연간</button>
       </div>
-      <div id="hist-del-result" style="margin-bottom:8px;"></div>
+
+      <!-- 건별 전용 컨트롤 -->
+      <div id="hist-detail-ctrl">
+        <div class="form-row" style="margin-bottom:10px;">
+          <select id="hist-month" class="form-select" style="margin-bottom:0;"></select>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+          <input type="date" id="hist-del-date" class="form-input"
+            style="flex:1;margin-bottom:0;font-size:12px;">
+          <button onclick="confirmDeleteByDate()"
+            style="padding:9px 12px;border-radius:8px;border:1px solid var(--red);background:none;color:var(--red);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">
+            🗑️ 날짜 삭제
+          </button>
+        </div>
+        <div id="hist-del-result" style="margin-bottom:8px;"></div>
+      </div>
 
       <div id="hist-list"></div>
     </div>
@@ -852,6 +922,9 @@ function showPage(id, btn) {
   if (id === 'history') {
     const d = document.getElementById('hist-del-date');
     if (d && !d.value) d.value = today();
+    // 건별 컨트롤 표시 상태 동기화
+    const ctrl = document.getElementById('hist-detail-ctrl');
+    if (ctrl) ctrl.style.display = (_histView === 'detail') ? '' : 'none';
     renderHistory();
   }
   if (id === 'usage') renderUsageStats();
@@ -1735,19 +1808,54 @@ function normalizePcRec(r) {
   return { date, car: r[2]||'', silo: r[6]||'', ton: Math.abs(ton), slip: r[1]||'', isPc: false };
 }
 
-function renderHistory() {
+// ── 이력 조회 뷰 상태 ──
+let _histView = 'detail'; // detail | daily | monthly | yearly
+
+function setHistView(v) {
+  _histView = v;
+  ['detail','daily','monthly','yearly'].forEach(id => {
+    document.getElementById('hseg-'+id).classList.toggle('active', id === v);
+  });
+  // 건별 전용 컨트롤 표시/숨김
+  document.getElementById('hist-detail-ctrl').style.display = (v === 'detail') ? '' : 'none';
+  renderHistory();
+}
+
+function getHistFilteredDB() {
   const db = getAllDB();
-  const siloFilter  = document.getElementById('hist-silo').value;
-  const monthFilter = document.getElementById('hist-month').value;
-
+  const siloFilter = document.getElementById('hist-silo').value;
+  const yearFilter = document.getElementById('hist-year').value;
   let recs = db.map(r => normalizePcRec(r));
+  if (siloFilter) recs = recs.filter(r => {
+    const sk = normSilo(r.silo) || r.silo;
+    return sk === siloFilter || r.silo === siloFilter;
+  });
+  if (yearFilter) recs = recs.filter(r => r.date && r.date.slice(0,4) === yearFilter);
+  return recs;
+}
 
-  if (siloFilter)  recs = recs.filter(r => {
+function renderHistory() {
+  const v = _histView;
+  if (v === 'detail')  return renderHistDetail();
+  if (v === 'daily')   return renderHistDaily();
+  if (v === 'monthly') return renderHistMonthly();
+  if (v === 'yearly')  return renderHistYearly();
+}
+
+// ── 건별 뷰 ──
+function renderHistDetail() {
+  const siloFilter  = document.getElementById('hist-silo').value;
+  const monthFilter = document.getElementById('hist-month') ? document.getElementById('hist-month').value : '';
+  const yearFilter  = document.getElementById('hist-year').value;
+  const db = getAllDB();
+  let recs = db.map(r => normalizePcRec(r));
+  if (siloFilter) recs = recs.filter(r => {
     const sk = normSilo(r.silo) || r.silo;
     return sk === siloFilter || r.silo === siloFilter;
   });
   if (monthFilter) recs = recs.filter(r => r.date && r.date.slice(0,7) === monthFilter);
-  recs = recs.slice().reverse().slice(0, 80);
+  else if (yearFilter) recs = recs.filter(r => r.date && r.date.slice(0,4) === yearFilter);
+  recs = recs.slice().reverse().slice(0, 100);
 
   const el = document.getElementById('hist-list');
   if (!recs.length) { el.innerHTML = '<div class="empty-msg">조건에 맞는 이력이 없습니다</div>'; return; }
@@ -1767,6 +1875,222 @@ function renderHistory() {
         style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:0 4px;margin-left:4px;flex-shrink:0;">×</button>
     </div>`;
   }).join('');
+}
+
+// ── 일별 아코디언 뷰 ──
+function renderHistDaily() {
+  const el = document.getElementById('hist-list');
+  const recs = getHistFilteredDB();
+  if (!recs.length) { el.innerHTML = '<div class="empty-msg">조건에 맞는 이력이 없습니다</div>'; return; }
+
+  // 날짜별 그룹핑
+  const groups = {};
+  recs.forEach(r => {
+    if (!r.date) return;
+    if (!groups[r.date]) groups[r.date] = [];
+    groups[r.date].push(r);
+  });
+  const dates = Object.keys(groups).sort().reverse();
+
+  el.innerHTML = dates.map(date => {
+    const items = groups[date];
+    const total = items.reduce((s, r) => s + parseFloat(r.ton||0), 0);
+    const siloTotals = {};
+    items.forEach(r => {
+      const sk = normSilo(r.silo) || r.silo;
+      siloTotals[sk] = (siloTotals[sk]||0) + parseFloat(r.ton||0);
+    });
+    const siloSummary = Object.entries(siloTotals).map(([k,v]) => {
+      const info = SILO_INFO[k] || { name: k, color: 'var(--text2)' };
+      return `<span style="color:${info.color};font-size:10px;margin-left:6px;">${info.name} ${v.toFixed(1)}t</span>`;
+    }).join('');
+
+    const recRows = items.map(r => {
+      const sk = normSilo(r.silo) || r.silo;
+      const info = SILO_INFO[sk] || { name: r.silo||'?', color:'var(--text2)' };
+      return `<div class="day-rec">
+        <div class="day-rec-dot" style="background:${info.color};"></div>
+        <div class="day-rec-main"><span style="color:${info.color};font-weight:600;">${info.name}</span> ${r.car||''}</div>
+        <div class="day-rec-ton" style="color:${info.color};">${parseFloat(r.ton||0).toFixed(2)}톤</div>
+      </div>`;
+    }).join('');
+
+    // 날짜 한국어 표시
+    const [y,mo,d] = date.split('-');
+    const dayNames = ['일','월','화','수','목','금','토'];
+    const dn = dayNames[new Date(date).getDay()];
+    const dateLabel = `${parseInt(mo)}/${parseInt(d)}(${dn})`;
+
+    return `<div class="day-group">
+      <div class="day-header" onclick="toggleDayGroup(this)">
+        <div class="day-date">${dateLabel}</div>
+        ${siloSummary}
+        <div class="day-total">${total.toFixed(1)}t</div>
+        <div class="day-cnt">${items.length}건</div>
+        <div class="day-arrow">▶</div>
+      </div>
+      <div class="day-body">${recRows}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleDayGroup(header) {
+  const arrow = header.querySelector('.day-arrow');
+  const body  = header.nextElementSibling;
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  arrow.classList.toggle('open', !isOpen);
+}
+
+// ── 월별 집계 뷰 ──
+function renderHistMonthly() {
+  const el = document.getElementById('hist-list');
+  const recs = getHistFilteredDB();
+  if (!recs.length) { el.innerHTML = '<div class="empty-msg">조건에 맞는 이력이 없습니다</div>'; return; }
+
+  // 월별 그룹핑
+  const groups = {};
+  recs.forEach(r => {
+    if (!r.date) return;
+    const ym = r.date.slice(0,7);
+    if (!groups[ym]) groups[ym] = { total:0, S1:0, S2:0, S3:0, S4:0, cnt:0 };
+    const sk = normSilo(r.silo) || r.silo;
+    const t = parseFloat(r.ton||0);
+    groups[ym].total += t;
+    if (groups[ym][sk] !== undefined) groups[ym][sk] += t;
+    groups[ym].cnt++;
+  });
+
+  const months = Object.keys(groups).sort().reverse();
+  const grandTotal = months.reduce((s, m) => s + groups[m].total, 0);
+
+  const siloFilter = document.getElementById('hist-silo').value;
+  const showSilos  = !siloFilter;
+
+  let thead, rows;
+  if (showSilos) {
+    thead = `<tr>
+      <th>월</th><th>광주</th><th>전남</th><th>나주</th><th>순천</th><th>합계</th><th>건수</th>
+    </tr>`;
+    rows = months.map(ym => {
+      const g = groups[ym];
+      const [y,m] = ym.split('-');
+      return `<tr>
+        <td>${y}.${parseInt(m)}</td>
+        <td style="color:var(--s1);">${g.S1>0?g.S1.toFixed(1):'-'}</td>
+        <td style="color:var(--s2);">${g.S2>0?g.S2.toFixed(1):'-'}</td>
+        <td style="color:var(--s4);">${g.S4>0?g.S4.toFixed(1):'-'}</td>
+        <td style="color:var(--s3);">${g.S3>0?g.S3.toFixed(1):'-'}</td>
+        <td style="color:var(--accent);font-weight:700;">${g.total.toFixed(1)}</td>
+        <td style="color:var(--text2);">${g.cnt}</td>
+      </tr>`;
+    }).join('');
+    rows += `<tr class="total-row">
+      <td>합계</td>
+      <td>${months.reduce((s,m)=>s+groups[m].S1,0).toFixed(1)}</td>
+      <td>${months.reduce((s,m)=>s+groups[m].S2,0).toFixed(1)}</td>
+      <td>${months.reduce((s,m)=>s+groups[m].S4,0).toFixed(1)}</td>
+      <td>${months.reduce((s,m)=>s+groups[m].S3,0).toFixed(1)}</td>
+      <td>${grandTotal.toFixed(1)}</td>
+      <td>${months.reduce((s,m)=>s+groups[m].cnt,0)}</td>
+    </tr>`;
+  } else {
+    const info = SILO_INFO[siloFilter] || { name: siloFilter };
+    thead = `<tr><th>월</th><th>${info.name} (톤)</th><th>건수</th></tr>`;
+    rows = months.map(ym => {
+      const g = groups[ym];
+      const [y,m] = ym.split('-');
+      return `<tr>
+        <td>${y}.${parseInt(m)}</td>
+        <td style="color:var(--accent);font-weight:700;">${g.total.toFixed(1)}</td>
+        <td style="color:var(--text2);">${g.cnt}</td>
+      </tr>`;
+    }).join('');
+    rows += `<tr class="total-row"><td>합계</td><td>${grandTotal.toFixed(1)}</td><td>${months.reduce((s,m)=>s+groups[m].cnt,0)}</td></tr>`;
+  }
+
+  el.innerHTML = `<div style="overflow-x:auto;">
+    <table class="hist-table"><thead>${thead}</thead><tbody>${rows}</tbody></table>
+  </div>`;
+}
+
+// ── 연간 집계 뷰 ──
+function renderHistYearly() {
+  const el = document.getElementById('hist-list');
+  const db = getAllDB();
+  const siloFilter = document.getElementById('hist-silo').value;
+  let recs = db.map(r => normalizePcRec(r));
+  if (siloFilter) recs = recs.filter(r => {
+    const sk = normSilo(r.silo) || r.silo;
+    return sk === siloFilter || r.silo === siloFilter;
+  });
+  if (!recs.length) { el.innerHTML = '<div class="empty-msg">데이터가 없습니다</div>'; return; }
+
+  const groups = {};
+  recs.forEach(r => {
+    if (!r.date) return;
+    const y = r.date.slice(0,4);
+    if (!groups[y]) groups[y] = { total:0, S1:0, S2:0, S3:0, S4:0, cnt:0 };
+    const sk = normSilo(r.silo) || r.silo;
+    const t = parseFloat(r.ton||0);
+    groups[y].total += t;
+    if (groups[y][sk] !== undefined) groups[y][sk] += t;
+    groups[y].cnt++;
+  });
+
+  const years = Object.keys(groups).sort().reverse();
+  const maxTotal = Math.max(...years.map(y => groups[y].total));
+  const grandTotal = years.reduce((s,y) => s+groups[y].total, 0);
+  const siloFilter2 = document.getElementById('hist-silo').value;
+  const showSilos = !siloFilter2;
+
+  let thead, rows;
+  if (showSilos) {
+    thead = `<tr><th>연도</th><th>광주</th><th>전남</th><th>나주</th><th>순천</th><th>합계</th></tr>`;
+    rows = years.map(y => {
+      const g = groups[y];
+      const barW = maxTotal > 0 ? Math.round((g.total/maxTotal)*80) : 0;
+      return `<tr>
+        <td>${y}</td>
+        <td style="color:var(--s1);">${g.S1>0?Math.round(g.S1).toLocaleString():'-'}</td>
+        <td style="color:var(--s2);">${g.S2>0?Math.round(g.S2).toLocaleString():'-'}</td>
+        <td style="color:var(--s4);">${g.S4>0?Math.round(g.S4).toLocaleString():'-'}</td>
+        <td style="color:var(--s3);">${g.S3>0?Math.round(g.S3).toLocaleString():'-'}</td>
+        <td>
+          <div class="year-bar-wrap"><div class="year-bar" style="width:${barW}%;"></div></div>
+          <span style="color:var(--accent);font-weight:700;">${Math.round(g.total).toLocaleString()}</span>
+        </td>
+      </tr>`;
+    }).join('');
+    rows += `<tr class="total-row">
+      <td>합계</td>
+      <td>${Math.round(years.reduce((s,y)=>s+groups[y].S1,0)).toLocaleString()}</td>
+      <td>${Math.round(years.reduce((s,y)=>s+groups[y].S2,0)).toLocaleString()}</td>
+      <td>${Math.round(years.reduce((s,y)=>s+groups[y].S4,0)).toLocaleString()}</td>
+      <td>${Math.round(years.reduce((s,y)=>s+groups[y].S3,0)).toLocaleString()}</td>
+      <td>${Math.round(grandTotal).toLocaleString()}</td>
+    </tr>`;
+  } else {
+    const info = SILO_INFO[siloFilter2] || { name: siloFilter2 };
+    thead = `<tr><th>연도</th><th>${info.name} 입고량 (톤)</th><th>건수</th></tr>`;
+    rows = years.map(y => {
+      const g = groups[y];
+      const barW = maxTotal > 0 ? Math.round((g.total/maxTotal)*80) : 0;
+      return `<tr>
+        <td>${y}</td>
+        <td>
+          <div class="year-bar-wrap"><div class="year-bar" style="width:${barW}%;"></div></div>
+          <span style="color:var(--accent);font-weight:700;">${Math.round(g.total).toLocaleString()}</span>
+        </td>
+        <td style="color:var(--text2);">${g.cnt}</td>
+      </tr>`;
+    }).join('');
+    rows += `<tr class="total-row"><td>합계</td><td>${Math.round(grandTotal).toLocaleString()}</td><td>${years.reduce((s,y)=>s+groups[y].cnt,0)}</td></tr>`;
+  }
+
+  el.innerHTML = `<div style="overflow-x:auto;">
+    <table class="hist-table"><thead>${thead}</thead><tbody>${rows}</tbody></table>
+  </div>`;
 }
 
 let _pendingDelKey = null;
@@ -1938,18 +2262,34 @@ document.getElementById('del-confirm-overlay').addEventListener('click', functio
 
 document.getElementById('hist-silo').addEventListener('change', renderHistory);
 document.getElementById('hist-month').addEventListener('change', renderHistory);
-
-// ── 월 필터 초기화 ──
-function initMonthFilter() {
+document.getElementById('hist-year').addEventListener('change', function() {
+  // 연도 변경 시 월 셀렉트도 해당 연도로 리셋
   const sel = document.getElementById('hist-month');
+  if (sel) sel.value = '';
+  renderHistory();
+});
+
+// ── 연도/월 필터 초기화 ──
+function initMonthFilter() {
   const now = new Date();
   const curYear = now.getFullYear();
   const curMonth = now.getMonth(); // 0-based
   const startYear = 2017;
 
-  sel.innerHTML = '<option value="">전체 월</option>';
+  // 연도 셀렉트
+  const ySel = document.getElementById('hist-year');
+  if (ySel) {
+    ySel.innerHTML = '<option value="">전체 연도</option>';
+    for (let y = curYear; y >= startYear; y--) {
+      ySel.innerHTML += `<option value="${y}">${y}년</option>`;
+    }
+    ySel.value = String(curYear); // 기본: 올해
+  }
 
-  // 최신 월부터 역순으로 생성
+  // 월 셀렉트 (건별 전용)
+  const sel = document.getElementById('hist-month');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">전체 월</option>';
   for (let y = curYear; y >= startYear; y--) {
     const endM = (y === curYear) ? curMonth : 11;
     for (let m = endM; m >= 0; m--) {
