@@ -1708,23 +1708,30 @@ function normalizePcRec(r) {
   if (typeof r === 'string') {
     try { r = JSON.parse(r); } catch(e) {}
   }
-  if (!Array.isArray(r) && typeof r === 'object') {
+  if (!Array.isArray(r) && typeof r === 'object' && r !== null) {
     return { date: r.date||'', car: r.car||'', silo: r.silo||'', ton: Math.abs(parseFloat(r.ton)||0), slip: r.slip||'', isPc: false };
   }
   if (!Array.isArray(r)) return { date:'', car:'', silo:'', ton:0, slip:'', isPc:false };
 
-  // PC형식: ["2026-01-01 00:00","차량번호",계근톤,공차톤,"저장조"] (5컬럼 이하, 인덱스2가 소수점 톤)
-  const col2 = parseFloat(r[2]);
-  const col3 = parseFloat(r[3]);
-  if (r.length <= 6 && !isNaN(col2) && col2 < 1000 && col2 > 0) {
+  // PC형식 판별:
+  // - 길이 5 이하
+  // - r[2]가 숫자 타입(typeof === 'number')이고 1000 미만
+  // - r[4]가 한글 저장조명
+  const isPC = r.length <= 6
+    && typeof r[2] === 'number' && r[2] < 1000 && r[2] > 0
+    && typeof r[3] === 'number'
+    && typeof r[4] === 'string' && ['광주','전남','나주','순천'].includes(r[4]);
+
+  if (isPC) {
     const date = (r[0]||'').slice(0,10).replace(/T.*/,'');
-    const ton  = Math.round((col2 - col3) * 100) / 100;
-    const silo = normSilo(r[4]||'') || 'S1';
+    const ton  = Math.round((r[2] - r[3]) * 100) / 100;
+    const silo = normSilo(r[4]) || 'S1';
     return { date, car: r[1]||'', silo, ton: Math.abs(ton), slip: '', isPc: true };
   }
+
   // 모바일형식: [date, slip, car, gross_kg, tare_kg, moist, silo, ton, ...]
   const date = (r[0]||'').slice(0,10).replace(/T.*/,'');
-  const ton  = parseFloat(r[7]||0) || (parseFloat(r[3]||0)-parseFloat(r[4]||0))/1000;
+  const ton  = parseFloat(r[7]||0) || (parseFloat(r[3]||0) - parseFloat(r[4]||0)) / 1000;
   return { date, car: r[2]||'', silo: r[6]||'', ton: Math.abs(ton), slip: r[1]||'', isPc: false };
 }
 
