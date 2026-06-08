@@ -2644,8 +2644,10 @@ async function fbPush() {
       const v = localStorage.getItem(k);
       if (v) {
         const data = JSON.parse(v);
+        // Firestore 중첩 배열 미지원 → JSON 문자열로 변환
+        const records = data.map(r => Array.isArray(r) ? JSON.stringify(r) : r);
         await _db.collection(FB_COL).doc(`rawdb_${year}`).set({
-          records: data, count: data.length,
+          records, count: data.length, format: 'json_str',
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
       }
@@ -2738,8 +2740,11 @@ async function fbPull() {
       } else if (id.startsWith('rawdb_')) {
         const year = id.replace('rawdb_','');
         if (data.records) {
-          localStorage.setItem(`_rawdb_${year}`, JSON.stringify(data.records));
-          preview.push(`${year}년 ${data.count||data.records.length}건`);
+          const records = data.format === 'json_str'
+            ? data.records.map(r => typeof r === 'string' ? JSON.parse(r) : r)
+            : data.records;
+          localStorage.setItem(`_rawdb_${year}`, JSON.stringify(records));
+          preview.push(`${year}년 ${data.count||records.length}건`);
         }
       } else if (id.startsWith('monthly_')) {
         const year = id.replace('monthly_','');
