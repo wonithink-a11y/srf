@@ -2598,7 +2598,20 @@ function fbSetStatus(msg, color) {
 
 // ── Firebase 업로드 (모바일 → 클라우드) ──
 async function fbPush() {
-  if (!_db && !fbInit()) return;
+  let waited = 0;
+  while (!_db && waited < 10) {
+    fbInit();
+    if (_db) break;
+    await new Promise(r => setTimeout(r, 500));
+    waited++;
+  }
+  if (!_db) {
+    document.getElementById('fb-result').innerHTML =
+      `<div style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--red);">
+        ❌ Firebase 연결 실패 — 인터넷 연결 확인 후 다시 시도하세요</div>`;
+    fbSetStatus('연결 실패', 'var(--red)');
+    return;
+  }
   const btn = document.getElementById('btn-fb-push');
   const resultEl = document.getElementById('fb-result');
   btn.textContent = '⏳ 업로드 중...'; btn.disabled = true;
@@ -2671,7 +2684,21 @@ async function fbPush() {
 
 // ── Firebase 가져오기 (클라우드 → 모바일) ──
 async function fbPull() {
-  if (!_db && !fbInit()) return;
+  // Firebase SDK 로드 대기 (최대 5초)
+  let waited = 0;
+  while (!_db && waited < 10) {
+    fbInit();
+    if (_db) break;
+    await new Promise(r => setTimeout(r, 500));
+    waited++;
+  }
+  if (!_db) {
+    document.getElementById('fb-result').innerHTML =
+      `<div style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--red);">
+        ❌ Firebase 연결 실패 — 인터넷 연결 확인 후 다시 시도하세요</div>`;
+    fbSetStatus('연결 실패', 'var(--red)');
+    return;
+  }
   const btn = document.getElementById('btn-fb-pull');
   const resultEl = document.getElementById('fb-result');
   btn.textContent = '⏳ 가져오는 중...'; btn.disabled = true;
