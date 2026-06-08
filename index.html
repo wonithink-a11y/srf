@@ -2642,7 +2642,7 @@ async function fbPush() {
   fbSetStatus('업로드 중...', 'var(--yellow)');
 
   try {
-    // meta 문서 — 모바일 키(v5) + PC 호환 키(v1) 동시 저장
+    // meta 문서 — 모바일 키(v5)만 저장, PC 키 절대 건드리지 않음
     const meta = {
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedBy: 'mobile'
@@ -2650,15 +2650,9 @@ async function fbPush() {
     const mobileFixed = ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'];
     mobileFixed.forEach(k => {
       const v = localStorage.getItem(k);
-      if (v) {
-        try {
-          const parsed = JSON.parse(v);
-          meta[k] = parsed; // 모바일 키
-          const pcKey = KEY_MAP_MOBILE_TO_PC[k];
-          if (pcKey) meta[pcKey] = parsed; // PC 호환 키도 함께 저장
-        } catch(e) {}
-      }
+      if (v) { try { meta[k] = JSON.parse(v); } catch(e) {} }
     });
+    // meta 문서에 저장 (PC는 meta_pc 문서 사용하므로 충돌 없음)
     await _db.collection(FB_COL).doc('meta').set(meta);
 
     // 연도별 입고 DB
@@ -2737,28 +2731,16 @@ async function fbPull() {
     snap.forEach(doc => {
       const id = doc.id, data = doc.data();
 
-      if (id === 'meta') {
-        // PC키(v1) → 모바일키(v5)로 변환해서 저장
-        // 모바일 키 우선, 없으면 PC 키 변환
-        const allKeys = Object.keys(data).filter(k => k.startsWith('_'));
-        const processed = new Set();
+      // meta_pc는 PC 전용 문서 — 모바일에서 건드리지 않음
+      if (id === 'meta_pc') return;
 
-        // 모바일 키(v5) 직접 저장
+      if (id === 'meta') {
+        // 모바일 키(v5)만 저장
         ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'].forEach(mk => {
           if (data[mk] !== undefined) {
             localStorage.setItem(mk, JSON.stringify(data[mk]));
-            processed.add(mk);
           }
         });
-
-        // PC 키(v1)를 모바일 키(v5)로 변환해서 저장 (모바일 키가 없을 때만)
-        Object.entries(KEY_MAP_PC_TO_MOBILE).forEach(([pcKey, mobileKey]) => {
-          if (data[pcKey] !== undefined && !processed.has(mobileKey)) {
-            localStorage.setItem(mobileKey, JSON.stringify(data[pcKey]));
-            processed.add(mobileKey);
-          }
-        });
-
         preview.push('재고·사용량 복원');
 
       } else if (id.startsWith('rawdb_')) {
