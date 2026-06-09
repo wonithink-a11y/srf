@@ -886,7 +886,12 @@ function getDB(year) {
   const key = rawdbKey(year || new Date().getFullYear());
   try {
     const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    // 배열 보장: 객체로 저장된 경우(Firestore 변환 등) 배열로 복원
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && typeof parsed === 'object') return Object.values(parsed);
+    return [];
   } catch(e) { return []; }
 }
 
@@ -900,7 +905,13 @@ function getAllDB() {
   const allKeys = Object.keys(localStorage).filter(k => /^_rawdb_\d{4}$/.test(k));
   let all = [];
   allKeys.sort().forEach(k => {
-    try { all = all.concat(JSON.parse(localStorage.getItem(k)) || []); } catch(e){}
+    try {
+      const parsed = JSON.parse(localStorage.getItem(k));
+      const arr = Array.isArray(parsed)
+        ? parsed
+        : (parsed && typeof parsed === 'object' ? Object.values(parsed) : []);
+      all = all.concat(arr);
+    } catch(e){}
   });
   return all;
 }
@@ -3205,11 +3216,17 @@ async function fbPull() {
       } else if (id.startsWith('rawdb_')) {
         const year = id.replace('rawdb_','');
         if (data.records) {
-          const records = data.format === 'json_str'
+          let records = data.format === 'json_str'
             ? data.records.map(r => typeof r === 'string' ? JSON.parse(r) : r)
             : data.records;
-          localStorage.setItem(`_rawdb_${year}`, JSON.stringify(records));
-          preview.push(`${year}년 ${data.count||records.length}건`);
+          // 배열 보장 (Firestore가 객체로 변환한 경우 복원)
+          if (!Array.isArray(records) && records && typeof records === 'object') {
+            records = Object.values(records);
+          }
+          if (Array.isArray(records)) {
+            localStorage.setItem(`_rawdb_${year}`, JSON.stringify(records));
+            preview.push(`${year}년 ${data.count||records.length}건`);
+          }
         }
       } else if (id.startsWith('monthly_')) {
         const year = id.replace('monthly_','');
