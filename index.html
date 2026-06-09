@@ -178,6 +178,8 @@
   .day-total { font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:600; color:var(--accent); }
   .day-cnt { font-size:11px; color:var(--text2); margin-left:4px; }
   .day-arrow { font-size:11px; color:var(--text2); transition:transform 0.2s; }
+  .day-tr { cursor:pointer; }
+  .day-tr:active td { background:rgba(255,255,255,0.03); }
   .day-arrow.open { transform:rotate(90deg); }
   .day-body { display:none; padding-bottom:4px; }
   .day-body.open { display:block; }
@@ -191,17 +193,24 @@
   .day-rec-ton { font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:600; }
 
   /* ── 월별/연간 테이블 ── */
-  .hist-table { width:100%; border-collapse:collapse; font-size:12px; margin-top:4px; }
+  .hist-table { width:100%; border-collapse:collapse; font-size:11px; margin-top:4px; table-layout:fixed; }
   .hist-table th {
-    background:var(--bg3); color:var(--text2); padding:7px 6px;
-    text-align:center; font-weight:600; font-size:11px;
+    background:var(--bg3); color:var(--text2); padding:6px 3px;
+    text-align:center; font-weight:600; font-size:10px;
     border-bottom:1px solid var(--border); position:sticky; top:0;
+    word-break:keep-all; white-space:nowrap; overflow:hidden;
   }
-  .hist-table td { padding:7px 6px; border-bottom:1px solid rgba(48,54,61,0.4); }
-  .hist-table td:first-child { text-align:center; color:var(--text2); font-weight:700; }
-  .hist-table td:not(:first-child) { text-align:right; font-family:'IBM Plex Mono',monospace; }
-  .hist-table tr.total-row td { background:rgba(88,166,255,0.08); color:var(--accent); font-weight:700; border-top:1px solid rgba(88,166,255,0.3); }
+  .hist-table td { padding:6px 3px; border-bottom:1px solid rgba(48,54,61,0.4); overflow:hidden; }
+  .hist-table td:first-child { text-align:center; color:var(--text2); font-weight:700; white-space:nowrap; }
+  .hist-table td:not(:first-child) { text-align:right; font-family:'IBM Plex Mono',monospace; font-size:11px; white-space:nowrap; }
+  .hist-table tr.total-row { display:table-row; } /* .total-row flex 충돌 방지 */
+  .hist-table tr.total-row td { background:rgba(88,166,255,0.08); color:var(--accent); font-weight:700; }
+  .hist-table tfoot { border-top:2px solid rgba(88,166,255,0.4); }
+  .hist-table tfoot td { background:rgba(88,166,255,0.08); color:var(--accent); font-weight:700; padding:7px 3px; }
+  .hist-table tfoot td:first-child { color:var(--accent); }
   .hist-table tr:last-child td { border-bottom:none; }
+  /* 월별/연간 6칸 고정 너비 배분 */
+  .hist-table th:first-child, .hist-table td:first-child { width:46px; }
 
   /* 연간 바 */
   .year-bar-wrap { margin-bottom:3px; }
@@ -331,7 +340,76 @@
       <button class="btn-secondary" onclick="openStockModal()">✏️ 재고 직접 수정</button>
     </div>
 
-    <!-- 현황 보고문 생성 -->
+    <!-- 알림 -->
+    <div class="card">
+      <div class="card-title">알림</div>
+      <div id="alert-list"></div>
+    </div>
+
+  </div>
+
+  <!-- ② 입고 등록 (CSV 일괄 등록) -->
+  <div id="page-input" class="page">
+
+    <!-- CSV 일괄 등록 -->
+    <div class="card">
+      <div class="card-title">📋 CSV 일괄 등록</div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.8;margin-bottom:10px;">
+        <b style="color:var(--text);">컬럼 순서 (헤더 자동 인식)</b><br>
+        <code style="background:var(--bg3);padding:2px 6px;border-radius:4px;font-size:10px;color:var(--accent);">순번, 입고일자, 차량번호, 총중량[기준], 공차중량[기준], 실중량[기준], 입고게이트, ...</code><br>
+        <span style="color:var(--yellow);">· 중량 단위 톤/kg 자동 감지 &nbsp;·&nbsp; 합계행 자동 분리 저장</span><br>
+        <span style="color:var(--text2);">· 게이트: 나주·S4·4 / 광주·S1·1 / 전남·S2·2 / 순천·S3·3</span>
+      </div>
+
+      <!-- 탭 전환 -->
+      <div style="display:flex;gap:6px;margin-bottom:10px;">
+        <button id="csv-tab-paste" onclick="setCsvTab('paste')"
+          style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#0d1117;font-size:12px;font-weight:700;cursor:pointer;">
+          클립보드 붙여넣기
+        </button>
+        <button id="csv-tab-file" onclick="setCsvTab('file')"
+          style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text2);font-size:12px;cursor:pointer;">
+          파일 선택
+        </button>
+      </div>
+
+      <!-- 붙여넣기 영역 -->
+      <div id="csv-paste-area">
+        <textarea id="csv-text" placeholder="여기에 CSV 내용을 붙여넣으세요&#10;2026-06-05,001,12가3456,24500,12300,12.20,S1,12.20,3500&#10;2026-06-05,002,34나5678,25000,12800,,광주,,"
+          style="width:100%;height:120px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:11px;font-family:'IBM Plex Mono',monospace;line-height:1.6;resize:vertical;outline:none;"
+          oninput="previewCSV()"></textarea>
+      </div>
+
+      <!-- 파일 선택 영역 -->
+      <div id="csv-file-area" style="display:none;">
+        <label style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:16px;border:2px dashed var(--border);border-radius:10px;cursor:pointer;color:var(--text2);font-size:13px;">
+          📁 CSV 또는 엑셀(.xlsx) 파일 선택
+          <input type="file" id="csv-file-input" accept=".csv,.txt,.xlsx,.xls" style="display:none;" onchange="loadFile(this)">
+        </label>
+        <!-- 시트 선택 (엑셀 전용) -->
+        <div id="sheet-select-wrap" style="display:none;margin-top:10px;">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">📑 시트 선택</div>
+          <div id="sheet-btn-list" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        </div>
+      </div>
+
+      <!-- 미리보기 -->
+      <div id="csv-preview" style="margin-top:10px;"></div>
+
+      <button class="btn-primary" onclick="submitCSV()" style="margin-top:10px;display:none;" id="csv-submit-btn">
+        ✅ 일괄 등록
+      </button>
+    </div>
+
+    <!-- 오늘 입고 이력 -->
+    <div class="card">
+      <div class="card-title">오늘 입고 이력</div>
+      <div id="today-recs"></div>
+    </div>
+
+  </div>
+
+<!-- 현황 보고문 생성 -->
     <div class="card">
       <div class="card-title">📢 현황 보고문 생성</div>
 
@@ -426,73 +504,6 @@
         <pre id="rpt-text" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:'Noto Sans KR',sans-serif;font-size:13px;line-height:1.8;white-space:pre-wrap;word-break:break-all;color:var(--text);"></pre>
         <button onclick="copyReport()" class="btn-primary" style="margin-top:8px;" id="rpt-copy-btn">📋 복사</button>
       </div>
-    </div>
-
-    <!-- 알림 -->
-    <div class="card">
-      <div class="card-title">알림</div>
-      <div id="alert-list"></div>
-    </div>
-
-  </div>
-
-  <!-- ② 입고 등록 (CSV 일괄 등록) -->
-  <div id="page-input" class="page">
-
-    <!-- CSV 일괄 등록 -->
-    <div class="card">
-      <div class="card-title">📋 CSV 일괄 등록</div>
-      <div style="font-size:11px;color:var(--text2);line-height:1.8;margin-bottom:10px;">
-        <b style="color:var(--text);">컬럼 순서 (헤더 자동 인식)</b><br>
-        <code style="background:var(--bg3);padding:2px 6px;border-radius:4px;font-size:10px;color:var(--accent);">순번, 입고일자, 차량번호, 총중량[기준], 공차중량[기준], 실중량[기준], 입고게이트, ...</code><br>
-        <span style="color:var(--yellow);">· 중량 단위 톤/kg 자동 감지 &nbsp;·&nbsp; 합계행 자동 분리 저장</span><br>
-        <span style="color:var(--text2);">· 게이트: 나주·S4·4 / 광주·S1·1 / 전남·S2·2 / 순천·S3·3</span>
-      </div>
-
-      <!-- 탭 전환 -->
-      <div style="display:flex;gap:6px;margin-bottom:10px;">
-        <button id="csv-tab-paste" onclick="setCsvTab('paste')"
-          style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#0d1117;font-size:12px;font-weight:700;cursor:pointer;">
-          클립보드 붙여넣기
-        </button>
-        <button id="csv-tab-file" onclick="setCsvTab('file')"
-          style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text2);font-size:12px;cursor:pointer;">
-          파일 선택
-        </button>
-      </div>
-
-      <!-- 붙여넣기 영역 -->
-      <div id="csv-paste-area">
-        <textarea id="csv-text" placeholder="여기에 CSV 내용을 붙여넣으세요&#10;2026-06-05,001,12가3456,24500,12300,12.20,S1,12.20,3500&#10;2026-06-05,002,34나5678,25000,12800,,광주,,"
-          style="width:100%;height:120px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:11px;font-family:'IBM Plex Mono',monospace;line-height:1.6;resize:vertical;outline:none;"
-          oninput="previewCSV()"></textarea>
-      </div>
-
-      <!-- 파일 선택 영역 -->
-      <div id="csv-file-area" style="display:none;">
-        <label style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:16px;border:2px dashed var(--border);border-radius:10px;cursor:pointer;color:var(--text2);font-size:13px;">
-          📁 CSV 또는 엑셀(.xlsx) 파일 선택
-          <input type="file" id="csv-file-input" accept=".csv,.txt,.xlsx,.xls" style="display:none;" onchange="loadFile(this)">
-        </label>
-        <!-- 시트 선택 (엑셀 전용) -->
-        <div id="sheet-select-wrap" style="display:none;margin-top:10px;">
-          <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">📑 시트 선택</div>
-          <div id="sheet-btn-list" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-        </div>
-      </div>
-
-      <!-- 미리보기 -->
-      <div id="csv-preview" style="margin-top:10px;"></div>
-
-      <button class="btn-primary" onclick="submitCSV()" style="margin-top:10px;display:none;" id="csv-submit-btn">
-        ✅ 일괄 등록
-      </button>
-    </div>
-
-    <!-- 오늘 입고 이력 -->
-    <div class="card">
-      <div class="card-title">오늘 입고 이력</div>
-      <div id="today-recs"></div>
     </div>
 
   </div>
@@ -618,15 +629,16 @@
       <div class="card-title">입고 이력</div>
 
       <!-- 공통 필터 -->
-      <div class="form-row" style="margin-bottom:10px;">
-        <select id="hist-silo" class="form-select" style="margin-bottom:0;">
+      <div style="display:flex;gap:6px;margin-bottom:10px;">
+        <select id="hist-year" class="form-select" style="margin-bottom:0;flex:1;"></select>
+        <select id="hist-month-common" class="form-select" style="margin-bottom:0;flex:1;"></select>
+        <select id="hist-silo" class="form-select" style="margin-bottom:0;flex:1;">
           <option value="">전체</option>
           <option value="S1">광주</option>
           <option value="S2">전남</option>
           <option value="S4">나주</option>
           <option value="S3">순천</option>
         </select>
-        <select id="hist-year" class="form-select" style="margin-bottom:0;"></select>
       </div>
 
       <!-- 뷰 세그먼트 -->
@@ -639,9 +651,6 @@
 
       <!-- 건별 전용 컨트롤 -->
       <div id="hist-detail-ctrl">
-        <div class="form-row" style="margin-bottom:10px;">
-          <select id="hist-month" class="form-select" style="margin-bottom:0;"></select>
-        </div>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
           <input type="date" id="hist-del-date" class="form-input"
             style="flex:1;margin-bottom:0;font-size:12px;">
@@ -772,14 +781,14 @@ a.click();</pre>
   <button class="tab-btn active" onclick="showPage('dash',this)">
     <span class="ico">📊</span><span>대시보드</span>
   </button>
-  <button class="tab-btn" onclick="showPage('input',this)">
-    <span class="ico">📋</span><span>입고등록</span>
+  <button class="tab-btn" onclick="showPage('history',this)">
+    <span class="ico">📥</span><span>입고량</span>
   </button>
   <button class="tab-btn" onclick="showPage('usage',this)">
     <span class="ico">🔥</span><span>사용량</span>
   </button>
-  <button class="tab-btn" onclick="showPage('history',this)">
-    <span class="ico">📋</span><span>이력</span>
+  <button class="tab-btn" onclick="showPage('input',this)">
+    <span class="ico">📋</span><span>계근등록</span>
   </button>
   <button class="tab-btn" onclick="showPage('sync',this)">
     <span class="ico">🔄</span><span>동기화</span>
@@ -1823,14 +1832,16 @@ function setHistView(v) {
 
 function getHistFilteredDB() {
   const db = getAllDB();
-  const siloFilter = document.getElementById('hist-silo').value;
-  const yearFilter = document.getElementById('hist-year').value;
+  const siloFilter  = document.getElementById('hist-silo').value;
+  const yearFilter  = document.getElementById('hist-year').value;
+  const monthCommon = document.getElementById('hist-month-common') ? document.getElementById('hist-month-common').value : '';
   let recs = db.map(r => normalizePcRec(r));
   if (siloFilter) recs = recs.filter(r => {
     const sk = normSilo(r.silo) || r.silo;
     return sk === siloFilter || r.silo === siloFilter;
   });
-  if (yearFilter) recs = recs.filter(r => r.date && r.date.slice(0,4) === yearFilter);
+  if (yearFilter)  recs = recs.filter(r => r.date && r.date.slice(0,4) === yearFilter);
+  if (monthCommon) recs = recs.filter(r => r.date && r.date.slice(5,7) === monthCommon);
   return recs;
 }
 
@@ -1845,16 +1856,16 @@ function renderHistory() {
 // ── 건별 뷰 ──
 function renderHistDetail() {
   const siloFilter  = document.getElementById('hist-silo').value;
-  const monthFilter = document.getElementById('hist-month') ? document.getElementById('hist-month').value : '';
   const yearFilter  = document.getElementById('hist-year').value;
+  const monthCommon = document.getElementById('hist-month-common') ? document.getElementById('hist-month-common').value : '';
   const db = getAllDB();
   let recs = db.map(r => normalizePcRec(r));
   if (siloFilter) recs = recs.filter(r => {
     const sk = normSilo(r.silo) || r.silo;
     return sk === siloFilter || r.silo === siloFilter;
   });
-  if (monthFilter) recs = recs.filter(r => r.date && r.date.slice(0,7) === monthFilter);
-  else if (yearFilter) recs = recs.filter(r => r.date && r.date.slice(0,4) === yearFilter);
+  if (yearFilter)  recs = recs.filter(r => r.date && r.date.slice(0,4) === yearFilter);
+  if (monthCommon) recs = recs.filter(r => r.date && r.date.slice(5,7) === monthCommon);
   recs = recs.slice().reverse().slice(0, 100);
 
   const el = document.getElementById('hist-list');
@@ -1892,19 +1903,42 @@ function renderHistDaily() {
   });
   const dates = Object.keys(groups).sort().reverse();
 
-  el.innerHTML = dates.map(date => {
+  // 테이블 헤더 (월별/연간과 동일 구조)
+  const siloFilter = document.getElementById('hist-silo').value;
+  const showSilos  = !siloFilter;
+
+  const thead = showSilos
+    ? `<tr>
+        <th style="text-align:left;">날짜</th>
+        <th style="color:var(--s1);">광주</th>
+        <th style="color:var(--s2);">전남</th>
+        <th style="color:var(--s4);">나주</th>
+        <th style="color:var(--s3);">순천</th>
+        <th style="color:var(--accent);">합계</th>
+        <th style="color:var(--text2);">건</th>
+      </tr>`
+    : `<tr>
+        <th style="text-align:left;">날짜</th>
+        <th style="color:var(--accent);">합계(톤)</th>
+        <th>건수</th>
+      </tr>`;
+
+  const rows = dates.map(date => {
     const items = groups[date];
     const total = items.reduce((s, r) => s + parseFloat(r.ton||0), 0);
-    const siloTotals = {};
+    const siloTotals = { S1:0, S2:0, S3:0, S4:0 };
     items.forEach(r => {
       const sk = normSilo(r.silo) || r.silo;
-      siloTotals[sk] = (siloTotals[sk]||0) + parseFloat(r.ton||0);
+      if (siloTotals[sk] !== undefined) siloTotals[sk] += parseFloat(r.ton||0);
     });
-    const siloSummary = Object.entries(siloTotals).map(([k,v]) => {
-      const info = SILO_INFO[k] || { name: k, color: 'var(--text2)' };
-      return `<span style="color:${info.color};font-size:10px;margin-left:6px;">${info.name} ${v.toFixed(1)}t</span>`;
-    }).join('');
 
+    // 날짜 한국어 표시
+    const [y,mo,d] = date.split('-');
+    const dayNames = ['일','월','화','수','목','금','토'];
+    const dn = dayNames[new Date(date).getDay()];
+    const dateLabel = `${parseInt(mo)}/${parseInt(d)}(${dn})`;
+
+    // 건별 펼침 rows
     const recRows = items.map(r => {
       const sk = normSilo(r.silo) || r.silo;
       const info = SILO_INFO[sk] || { name: r.silo||'?', color:'var(--text2)' };
@@ -1915,32 +1949,49 @@ function renderHistDaily() {
       </div>`;
     }).join('');
 
-    // 날짜 한국어 표시
-    const [y,mo,d] = date.split('-');
-    const dayNames = ['일','월','화','수','목','금','토'];
-    const dn = dayNames[new Date(date).getDay()];
-    const dateLabel = `${parseInt(mo)}/${parseInt(d)}(${dn})`;
+    const dataRow = showSilos
+      ? `<td style="text-align:left;font-weight:700;">${dateLabel}</td>
+         <td style="color:var(--s1);">${siloTotals.S1>0?Math.round(siloTotals.S1):'-'}</td>
+         <td style="color:var(--s2);">${siloTotals.S2>0?Math.round(siloTotals.S2):'-'}</td>
+         <td style="color:var(--s4);">${siloTotals.S4>0?Math.round(siloTotals.S4):'-'}</td>
+         <td style="color:var(--s3);">${siloTotals.S3>0?Math.round(siloTotals.S3):'-'}</td>
+         <td style="color:var(--accent);font-weight:700;">${Math.round(total)}</td>
+         <td style="color:var(--text2);font-size:10px;">${items.length}</td>`
+      : `<td style="text-align:left;font-weight:700;" onclick="toggleDayGroupByDate('${date}')">${dateLabel}</td>
+         <td style="color:var(--accent);font-weight:700;">${total.toFixed(2)}</td>
+         <td style="color:var(--text2);">${items.length}</td>`;
 
-    return `<div class="day-group">
-      <div class="day-header" onclick="toggleDayGroup(this)">
-        <div class="day-date">${dateLabel}</div>
-        ${siloSummary}
-        <div class="day-total">${total.toFixed(1)}t</div>
-        <div class="day-cnt">${items.length}건</div>
-        <div class="day-arrow">▶</div>
-      </div>
-      <div class="day-body">${recRows}</div>
-    </div>`;
+    return `<tr class="day-tr" data-date="${date}" onclick="toggleDayGroupByDate('${date}')">
+        ${dataRow}
+        <td style="width:24px;text-align:center;padding:6px 2px;">
+          <span class="day-arrow" id="arrow-${date}">▶</span>
+        </td>
+      </tr>
+      <tr class="day-detail-row" id="detail-${date}" style="display:none;">
+        <td colspan="${showSilos?8:4}" style="padding:4px 0 8px 0;background:var(--bg);">
+          ${recRows}
+        </td>
+      </tr>`;
   }).join('');
+
+  el.innerHTML = `<div style="overflow-x:auto;">
+    <table class="hist-table">
+      <thead>${thead}</thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
 }
 
-function toggleDayGroup(header) {
-  const arrow = header.querySelector('.day-arrow');
-  const body  = header.nextElementSibling;
-  const isOpen = body.classList.contains('open');
-  body.classList.toggle('open', !isOpen);
-  arrow.classList.toggle('open', !isOpen);
+function toggleDayGroupByDate(date) {
+  const detailRow = document.getElementById('detail-'+date);
+  const arrow     = document.getElementById('arrow-'+date);
+  if (!detailRow) return;
+  const isOpen = detailRow.style.display !== 'none';
+  detailRow.style.display = isOpen ? 'none' : 'table-row';
+  if (arrow) arrow.classList.toggle('open', !isOpen);
 }
+
+
 
 // ── 월별 집계 뷰 ──
 function renderHistMonthly() {
@@ -1969,8 +2020,14 @@ function renderHistMonthly() {
 
   let thead, rows;
   if (showSilos) {
+    // 헤더: 월 | 광주 | 전남 | 나주 | 순천 | 합계  (6칸, 건수 생략으로 너비 확보)
     thead = `<tr>
-      <th>월</th><th>광주</th><th>전남</th><th>나주</th><th>순천</th><th>합계</th><th>건수</th>
+      <th>월</th>
+      <th style="color:var(--s1);">광주</th>
+      <th style="color:var(--s2);">전남</th>
+      <th style="color:var(--s4);">나주</th>
+      <th style="color:var(--s3);">순천</th>
+      <th style="color:var(--accent);">합계</th>
     </tr>`;
     rows = months.map(ym => {
       const g = groups[ym];
@@ -1982,7 +2039,6 @@ function renderHistMonthly() {
         <td style="color:var(--s4);">${g.S4>0?g.S4.toFixed(1):'-'}</td>
         <td style="color:var(--s3);">${g.S3>0?g.S3.toFixed(1):'-'}</td>
         <td style="color:var(--accent);font-weight:700;">${g.total.toFixed(1)}</td>
-        <td style="color:var(--text2);">${g.cnt}</td>
       </tr>`;
     }).join('');
     rows += `<tr class="total-row">
@@ -1992,7 +2048,6 @@ function renderHistMonthly() {
       <td>${months.reduce((s,m)=>s+groups[m].S4,0).toFixed(1)}</td>
       <td>${months.reduce((s,m)=>s+groups[m].S3,0).toFixed(1)}</td>
       <td>${grandTotal.toFixed(1)}</td>
-      <td>${months.reduce((s,m)=>s+groups[m].cnt,0)}</td>
     </tr>`;
   } else {
     const info = SILO_INFO[siloFilter] || { name: siloFilter };
@@ -2009,8 +2064,17 @@ function renderHistMonthly() {
     rows += `<tr class="total-row"><td>합계</td><td>${grandTotal.toFixed(1)}</td><td>${months.reduce((s,m)=>s+groups[m].cnt,0)}</td></tr>`;
   }
 
+  // 합계행 분리: rows에서 total-row 추출
+  const mTotalMatch = rows.match(/<tr class="total-row">[\s\S]*?<\/tr>/);
+  const mTotalRow   = mTotalMatch ? mTotalMatch[0] : '';
+  const mBodyRows   = rows.replace(mTotalRow, '');
+
   el.innerHTML = `<div style="overflow-x:auto;">
-    <table class="hist-table"><thead>${thead}</thead><tbody>${rows}</tbody></table>
+    <table class="hist-table">
+      <thead>${thead}</thead>
+      <tbody>${mBodyRows}</tbody>
+      ${mTotalRow ? `<tfoot>${mTotalRow}</tfoot>` : ''}
+    </table>
   </div>`;
 }
 
@@ -2046,20 +2110,24 @@ function renderHistYearly() {
 
   let thead, rows;
   if (showSilos) {
-    thead = `<tr><th>연도</th><th>광주</th><th>전남</th><th>나주</th><th>순천</th><th>합계</th></tr>`;
+    // 헤더 6칸: 연도 | 광주 | 전남 | 나주 | 순천 | 합계
+    thead = `<tr>
+      <th>연도</th>
+      <th style="color:var(--s1);">광주</th>
+      <th style="color:var(--s2);">전남</th>
+      <th style="color:var(--s4);">나주</th>
+      <th style="color:var(--s3);">순천</th>
+      <th style="color:var(--accent);">합계</th>
+    </tr>`;
     rows = years.map(y => {
       const g = groups[y];
-      const barW = maxTotal > 0 ? Math.round((g.total/maxTotal)*80) : 0;
       return `<tr>
         <td>${y}</td>
         <td style="color:var(--s1);">${g.S1>0?Math.round(g.S1).toLocaleString():'-'}</td>
         <td style="color:var(--s2);">${g.S2>0?Math.round(g.S2).toLocaleString():'-'}</td>
         <td style="color:var(--s4);">${g.S4>0?Math.round(g.S4).toLocaleString():'-'}</td>
         <td style="color:var(--s3);">${g.S3>0?Math.round(g.S3).toLocaleString():'-'}</td>
-        <td>
-          <div class="year-bar-wrap"><div class="year-bar" style="width:${barW}%;"></div></div>
-          <span style="color:var(--accent);font-weight:700;">${Math.round(g.total).toLocaleString()}</span>
-        </td>
+        <td style="color:var(--accent);font-weight:700;">${Math.round(g.total).toLocaleString()}</td>
       </tr>`;
     }).join('');
     rows += `<tr class="total-row">
@@ -2068,28 +2136,34 @@ function renderHistYearly() {
       <td>${Math.round(years.reduce((s,y)=>s+groups[y].S2,0)).toLocaleString()}</td>
       <td>${Math.round(years.reduce((s,y)=>s+groups[y].S4,0)).toLocaleString()}</td>
       <td>${Math.round(years.reduce((s,y)=>s+groups[y].S3,0)).toLocaleString()}</td>
-      <td>${Math.round(grandTotal).toLocaleString()}</td>
+      <td><span style="color:var(--accent);font-weight:700;">${Math.round(grandTotal).toLocaleString()}</span></td>
     </tr>`;
   } else {
     const info = SILO_INFO[siloFilter2] || { name: siloFilter2 };
     thead = `<tr><th>연도</th><th>${info.name} 입고량 (톤)</th><th>건수</th></tr>`;
     rows = years.map(y => {
       const g = groups[y];
-      const barW = maxTotal > 0 ? Math.round((g.total/maxTotal)*80) : 0;
+      const barW = maxTotal > 0 ? Math.round((g.total/maxTotal)*70) : 0;
       return `<tr>
         <td>${y}</td>
-        <td>
-          <div class="year-bar-wrap"><div class="year-bar" style="width:${barW}%;"></div></div>
-          <span style="color:var(--accent);font-weight:700;">${Math.round(g.total).toLocaleString()}</span>
-        </td>
+        <td style="color:var(--accent);font-weight:700;">${Math.round(g.total).toLocaleString()}</td>
         <td style="color:var(--text2);">${g.cnt}</td>
       </tr>`;
     }).join('');
     rows += `<tr class="total-row"><td>합계</td><td>${Math.round(grandTotal).toLocaleString()}</td><td>${years.reduce((s,y)=>s+groups[y].cnt,0)}</td></tr>`;
   }
 
+  // 합계행 분리
+  const yTotalMatch = rows.match(/<tr class="total-row">[\s\S]*?<\/tr>/);
+  const yTotalRow   = yTotalMatch ? yTotalMatch[0] : '';
+  const yBodyRows   = rows.replace(yTotalRow, '');
+
   el.innerHTML = `<div style="overflow-x:auto;">
-    <table class="hist-table"><thead>${thead}</thead><tbody>${rows}</tbody></table>
+    <table class="hist-table">
+      <thead>${thead}</thead>
+      <tbody>${yBodyRows}</tbody>
+      ${yTotalRow ? `<tfoot>${yTotalRow}</tfoot>` : ''}
+    </table>
   </div>`;
 }
 
@@ -2261,11 +2335,8 @@ document.getElementById('del-confirm-overlay').addEventListener('click', functio
 });
 
 document.getElementById('hist-silo').addEventListener('change', renderHistory);
-document.getElementById('hist-month').addEventListener('change', renderHistory);
+document.getElementById('hist-month-common').addEventListener('change', renderHistory);
 document.getElementById('hist-year').addEventListener('change', function() {
-  // 연도 변경 시 월 셀렉트도 해당 연도로 리셋
-  const sel = document.getElementById('hist-month');
-  if (sel) sel.value = '';
   renderHistory();
 });
 
@@ -2286,18 +2357,17 @@ function initMonthFilter() {
     ySel.value = String(curYear); // 기본: 올해
   }
 
-  // 월 셀렉트 (건별 전용)
-  const sel = document.getElementById('hist-month');
-  if (!sel) return;
-  sel.innerHTML = '<option value="">전체 월</option>';
-  for (let y = curYear; y >= startYear; y--) {
-    const endM = (y === curYear) ? curMonth : 11;
-    for (let m = endM; m >= 0; m--) {
-      const val = `${y}-${String(m+1).padStart(2,'0')}`;
-      const lbl = `${y}년 ${m+1}월`;
-      sel.innerHTML += `<option value="${val}">${lbl}</option>`;
+  // 공통 월 셀렉트 (1~12월) - 기본값: 현재 월
+  const mSel = document.getElementById('hist-month-common');
+  if (mSel) {
+    mSel.innerHTML = '<option value="">전체 월</option>';
+    for (let m = 1; m <= 12; m++) {
+      mSel.innerHTML += `<option value="${String(m).padStart(2,'0')}">${m}월</option>`;
     }
+    mSel.value = String(now.getMonth() + 1).padStart(2,'0'); // 현재 월 선택
   }
+
+
 }
 
 // ── 날짜 기본값 ──
@@ -3031,6 +3101,48 @@ async function fbPush() {
       }
     }
 
+    // ── 모바일 월별(_monthlyData) → PC 연간대장(annual_ledger) 형식 병합 업로드 ──
+    // PC가 읽을 수 있도록 기존 annual_ledger를 가져와 병합
+    try {
+      let annualObj = {};
+      const annualSnap = await _db.collection(FB_COL).doc('annual_ledger').get();
+      if (annualSnap.exists && annualSnap.data().json) {
+        try { annualObj = JSON.parse(annualSnap.data().json); } catch(e) {}
+      }
+      let changed = false;
+      for (const k of monthlyKeys) {
+        const year = k.replace('_monthlyData_','');
+        const mob = JSON.parse(localStorage.getItem(k) || '{}');
+        if (!annualObj[year]) annualObj[year] = { summary: {}, months: {} };
+        if (!annualObj[year].months) annualObj[year].months = {};
+        for (let m = 1; m <= 12; m++) {
+          const row = mob[m] || mob[String(m)];
+          if (!row) continue;
+          const prev = annualObj[year].months[m] || {};
+          // 나주(S4)로 입고량 기록 (모바일은 저장조 미구분 → total에 기록)
+          annualObj[year].months[m] = {
+            inflowS1: prev.inflowS1 || 0,
+            inflowS2: 0,
+            inflowS3: prev.inflowS3 || 0,
+            inflowS4: prev.inflowS4 || 0,
+            total:    row.inbound != null ? row.inbound : (prev.total||0),
+            usage:    row.usage   != null ? row.usage   : (prev.usage||0),
+            stockEnd: prev.stockEnd != null ? prev.stockEnd : null,
+            opDays:   prev.opDays   != null ? prev.opDays   : null,
+            note:     row.note || prev.note || ''
+          };
+          changed = true;
+        }
+      }
+      if (changed) {
+        await _db.collection(FB_COL).doc('annual_ledger').set({
+          json: JSON.stringify(annualObj),
+          source: 'mobile',
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+    } catch(e) {}
+
     const total = 1 + rawdbKeys.length + monthlyKeys.length;
     const now   = new Date().toLocaleTimeString('ko-KR');
     resultEl.innerHTML = `<div style="background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--green);">
@@ -3105,6 +3217,36 @@ async function fbPull() {
           localStorage.setItem(`_monthlyData_${year}`, JSON.stringify(data.data));
           preview.push(`${year}년 월별`);
         }
+      } else if (id === 'annual_ledger') {
+        // PC 연간/월간 관리대장(_annualLedger_v2) → 모바일 _monthlyData_YYYY로 변환
+        try {
+          const annual = data.json ? JSON.parse(data.json) : null;
+          if (annual) {
+            let cnt = 0;
+            Object.entries(annual).forEach(([yr, yd]) => {
+              const months = (yd && yd.months) ? yd.months : {};
+              const mobMonthly = {};
+              for (let m = 1; m <= 12; m++) {
+                const mv = months[m] || months[String(m)] || {};
+                const inbound = (mv.total != null)
+                  ? mv.total
+                  : ((mv.inflowS1||0)+(mv.inflowS2||0)+(mv.inflowS3||0)+(mv.inflowS4||0));
+                const usage = mv.usage != null ? mv.usage : 0;
+                const note  = mv.note || '';
+                if (inbound || usage || note) {
+                  mobMonthly[m] = { inbound: inbound||0, usage: usage||0, note };
+                }
+              }
+              if (Object.keys(mobMonthly).length) {
+                let existing = {};
+                try { existing = JSON.parse(localStorage.getItem(`_monthlyData_${yr}`)||'{}'); } catch(e){}
+                localStorage.setItem(`_monthlyData_${yr}`, JSON.stringify({ ...existing, ...mobMonthly }));
+                cnt++;
+              }
+            });
+            if (cnt) preview.push(`연간대장 ${cnt}년치`);
+          }
+        } catch(e) {}
       }
     });
 
@@ -3258,7 +3400,7 @@ async function loadFromDrive(mode) {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.getElementById('page-input').classList.add('active');
-      document.querySelectorAll('.tab-btn')[1].classList.add('active');
+      document.querySelectorAll('.tab-btn')[3].classList.add('active');
       document.getElementById('content').scrollTop = 0;
       resultEl.innerHTML = `
         <div style="background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--green);">
