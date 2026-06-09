@@ -407,8 +407,6 @@
       <div id="today-recs"></div>
     </div>
 
-  </div>
-
 <!-- 현황 보고문 생성 -->
     <div class="card">
       <div class="card-title">📢 현황 보고문 생성</div>
@@ -511,71 +509,158 @@
   <!-- ③ 사용량/입고량 -->
   <div id="page-usage" class="page">
 
-    <!-- 탭 전환: 일별 / 월별 -->
-    <div style="display:flex;gap:6px;padding:0 0 12px;">
+
+    <!-- 탭 전환: 일별등록 / 월별입력 / 연간대장 -->
+    <div style="display:flex;gap:5px;padding:0 0 12px;">
       <button id="usage-tab-daily" onclick="setUsageTab('daily')"
-        style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--accent);background:var(--accent);color:#0d1117;font-size:13px;font-weight:700;cursor:pointer;">
-        📅 일별 등록
+        style="flex:1;padding:8px 4px;border-radius:9px;border:1px solid var(--accent);background:var(--accent);color:#0d1117;font-size:12px;font-weight:700;cursor:pointer;">
+        📅 일별등록
       </button>
       <button id="usage-tab-monthly" onclick="setUsageTab('monthly')"
-        style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--border);background:none;color:var(--text2);font-size:13px;cursor:pointer;">
-        📆 월별 입력
+        style="flex:1;padding:8px 4px;border-radius:9px;border:1px solid var(--border);background:none;color:var(--text2);font-size:12px;cursor:pointer;">
+        📆 월별입력
       </button>
+      <button id="usage-tab-ledger" onclick="setUsageTab('ledger')"
+        style="flex:1;padding:8px 4px;border-radius:9px;border:1px solid var(--border);background:none;color:var(--text2);font-size:12px;cursor:pointer;">
+        📊 연간대장
+      </button>
+    </div>
+
+    <!-- 연간관리대장 -->
+    <div id="usage-ledger-area" style="display:none;">
+      <div class="card" style="padding:10px 8px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div class="card-title" style="margin:0;">📊 연간 관리대장</div>
+          <button onclick="addLedgerYear()" style="background:var(--accent);color:#0d1117;border:none;border-radius:7px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;">+ 연도 추가</button>
+        </div>
+        <div id="ledger-container" style="overflow-x:auto;"></div>
+      </div>
     </div>
 
     <!-- 일별 등록 -->
     <div id="usage-daily-area">
-      <div class="card">
-        <div class="card-title">일별 사용량 등록</div>
-        <label class="form-label">날짜</label>
-        <input type="date" id="use-date" class="form-input">
-
-        <label class="form-label">사용량 입력 방식</label>
-        <div style="display:flex;gap:6px;margin-bottom:12px;">
-          <button id="use-tab-total" onclick="setUseTab('total')"
-            style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#0d1117;font-size:12px;font-weight:700;cursor:pointer;">전체 합계</button>
-          <button id="use-tab-silo" onclick="setUseTab('silo')"
-            style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text2);font-size:12px;cursor:pointer;">저장조별</button>
+      <!-- ① 크레인 계측 입력 -->
+      <div class="card" style="padding:10px 8px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div class="card-title" style="margin:0;">🏗️ 크레인 계측</div>
+          <input type="date" id="use-date" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:5px 8px;font-size:12px;">
         </div>
 
-        <!-- 전체 합계 입력 -->
-        <div id="use-area-total">
-          <label class="form-label">일일 사용량 합계 (톤)</label>
-          <input type="number" id="use-total" class="form-input" placeholder="300">
+        <!-- 쉬프트별 저장조 계측 테이블 (kg) -->
+        <div style="overflow-x:auto;margin-bottom:10px;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:360px;">
+            <thead>
+              <tr style="background:rgba(56,189,248,.08);">
+                <th style="padding:6px 4px;text-align:center;color:var(--text2);font-size:11px;width:38px;">쉬프트</th>
+                <th style="padding:6px 3px;text-align:center;color:var(--s1);font-size:11px;">광주<br><span style="font-size:9px;color:var(--text2);">(KG)</span></th>
+                <th style="padding:6px 3px;text-align:center;color:var(--s2);font-size:11px;">전남<br><span style="font-size:9px;color:var(--text2);">(KG)</span></th>
+                <th style="padding:6px 3px;text-align:center;color:var(--s4);font-size:11px;">나주<br><span style="font-size:9px;color:var(--text2);">(KG)</span></th>
+                <th style="padding:6px 3px;text-align:center;color:var(--s3);font-size:11px;">순천<br><span style="font-size:9px;color:var(--text2);">(KG)</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- N/S -->
+              <tr style="background:var(--bg2);">
+                <td style="text-align:center;padding:4px 2px;font-size:11px;font-weight:700;color:var(--text2);">N/S</td>
+                <td style="padding:3px 2px;"><input type="number" id="ck-ns-s1" oninput="calcCrane()" placeholder="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--s1);padding:5px 4px;border-radius:5px;font-size:12px;text-align:right;"></td>
+                <td style="padding:3px 2px;"><input type="number" id="ck-ns-s2" oninput="calcCrane()" placeholder="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--s2);padding:5px 4px;border-radius:5px;font-size:12px;text-align:right;"></td>
+                <td style="padding:3px 2px;"><input type="number" id="ck-ns-s4" oninput="calcCrane()" placeholder="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--s4);padding:5px 4px;border-radius:5px;font-size:12px;text-align:right;"></td>
+                <td style="padding:3px 2px;"><input type="number" id="ck-ns-s3" oninput="calcCrane()" placeholder="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--s3);padding:5px 4px;border-radius:5px;font-size:12px;text-align:right;"></td>
+              </tr>
+              <!-- D/S -->
+              <tr style="background:var(--bg2);">
+                <td style="text-align:center;padding:4px 2px;font-size:11px;font-weight:700;color:var(--text2);">D/S</td>
+                <td style="padding:3px 2px;"><input type="number" id="ck-ds-s1" oninput="calcCrane()" placeholder="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--s1);padding:5px 4px;border-radius:5px;font-size:12px;text-align:right;"></td>
+                <td style="padding:3px 2px;"><input type="number" id="ck-ds-s2" oninput="calcCrane()" placeholder="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--s2);padding:5px 4px;border-radius:5px;font-size:12px;text-align:right;"></td>
+                <td style="padding:3px 2px;"><input type="number" id="ck-ds-s4" oninput="calcCrane()" placeholder="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--s4);padding:5px 4px;border-radius:5px;font-size:12px;text-align:right;"></td>
+                <td style="padding:3px 2px;"><input type="number" id="ck-ds-s3" oninput="calcCrane()" placeholder="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--s3);padding:5px 4px;border-radius:5px;font-size:12px;text-align:right;"></td>
+              </tr>
+              <!-- A/S -->
+              <tr style="background:var(--bg2);">
+                <td style="text-align:center;padding:4px 2px;font-size:11px;font-weight:700;color:var(--text2);">A/S</td>
+                <td style="padding:3px 2px;"><input type="number" id="ck-as-s1" oninput="calcCrane()" placeholder="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--s1);padding:5px 4px;border-radius:5px;font-size:12px;text-align:right;"></td>
+                <td style="padding:3px 2px;"><input type="number" id="ck-as-s2" oninput="calcCrane()" placeholder="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--s2);padding:5px 4px;border-radius:5px;font-size:12px;text-align:right;"></td>
+                <td style="padding:3px 2px;"><input type="number" id="ck-as-s4" oninput="calcCrane()" placeholder="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--s4);padding:5px 4px;border-radius:5px;font-size:12px;text-align:right;"></td>
+                <td style="padding:3px 2px;"><input type="number" id="ck-as-s3" oninput="calcCrane()" placeholder="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--s3);padding:5px 4px;border-radius:5px;font-size:12px;text-align:right;"></td>
+              </tr>
+              <!-- 합계 행 -->
+              <tr style="background:rgba(56,189,248,.05);font-weight:700;">
+                <td style="text-align:center;padding:5px 2px;font-size:11px;color:var(--text2);">합계</td>
+                <td id="ck-sum-s1" style="text-align:right;padding:5px 4px;color:var(--s1);font-family:'IBM Plex Mono',monospace;font-size:12px;">0</td>
+                <td id="ck-sum-s2" style="text-align:right;padding:5px 4px;color:var(--s2);font-family:'IBM Plex Mono',monospace;font-size:12px;">0</td>
+                <td id="ck-sum-s4" style="text-align:right;padding:5px 4px;color:var(--s4);font-family:'IBM Plex Mono',monospace;font-size:12px;">0</td>
+                <td id="ck-sum-s3" style="text-align:right;padding:5px 4px;color:var(--s3);font-family:'IBM Plex Mono',monospace;font-size:12px;">0</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
-        <!-- 저장조별 입력 -->
-        <div id="use-area-silo" style="display:none;">
-          <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">저장조별로 입력하면 재고가 개별 차감됩니다</div>
-          <div class="form-row">
-            <div>
-              <label class="form-label" style="color:var(--s1);">광주 (톤)</label>
-              <input type="number" id="use-s1" class="form-input" placeholder="0" oninput="updateSiloUsePreview()">
+        <!-- 계산 결과 카드들 -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;">
+          <div style="background:var(--bg3);border-radius:8px;padding:8px 6px;text-align:center;">
+            <div style="font-size:9px;color:var(--text2);margin-bottom:3px;">크레인합계(kg)</div>
+            <div id="ck-total-kg" style="font-size:14px;font-weight:700;color:var(--accent);font-family:'IBM Plex Mono',monospace;">0</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:8px;padding:8px 6px;text-align:center;">
+            <div style="font-size:9px;color:var(--text2);margin-bottom:3px;">크레인합계(톤)</div>
+            <div id="ck-total-ton" style="font-size:14px;font-weight:700;color:var(--accent);font-family:'IBM Plex Mono',monospace;">0.000</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:8px;padding:8px 6px;text-align:center;">
+            <div style="font-size:9px;color:var(--text2);margin-bottom:3px;">수기작성(톤)</div>
+            <input type="number" id="ck-manual" oninput="calcCrane()" placeholder="0.0" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:14px;font-weight:700;text-align:center;font-family:'IBM Plex Mono',monospace;padding:0;">
+          </div>
+        </div>
+
+        <!-- 보정량 + 편차 -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
+          <div style="background:var(--bg3);border-radius:8px;padding:8px 6px;">
+            <div style="font-size:9px;color:var(--text2);margin-bottom:3px;">보정량(최종, 톤) <span style="color:var(--text2);">수기와 다를 때만</span></div>
+            <input type="number" id="ck-adjust" oninput="calcCrane()" placeholder="—" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--green);font-size:14px;font-weight:700;text-align:center;font-family:'IBM Plex Mono',monospace;padding:3px 0;">
+          </div>
+          <div style="background:var(--bg3);border-radius:8px;padding:8px 6px;">
+            <div style="font-size:9px;color:var(--text2);margin-bottom:4px;">편차 / 확인</div>
+            <div id="ck-diff" style="font-size:12px;font-weight:700;color:var(--text2);font-family:'IBM Plex Mono',monospace;">—</div>
+            <div id="ck-confirm" style="font-size:11px;color:var(--text2);margin-top:2px;">—</div>
+          </div>
+        </div>
+
+        <!-- 지자체별 배분량 -->
+        <div style="background:rgba(56,189,248,.05);border:1px solid rgba(56,189,248,.15);border-radius:8px;padding:8px;margin-bottom:10px;">
+          <div style="font-size:10px;color:var(--text2);margin-bottom:6px;">📊 수기입력 기준 저장조별 배분량 <span style="color:var(--text2);">(크레인 kg 비율 적용, 소수점 2자리)</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;" id="ck-dist-grid">
+            <div style="background:var(--bg3);border-radius:6px;padding:6px 4px;text-align:center;">
+              <div style="font-size:9px;color:var(--s1);margin-bottom:2px;">광주</div>
+              <div id="ck-dist-s1" style="font-size:12px;font-weight:700;color:var(--s1);">—</div>
+              <div id="ck-pct-s1" style="font-size:9px;color:var(--text2);">—%</div>
             </div>
-            <div>
-              <label class="form-label" style="color:var(--s2);">전남 (톤)</label>
-              <input type="number" id="use-s2" class="form-input" placeholder="0" oninput="updateSiloUsePreview()">
+            <div style="background:var(--bg3);border-radius:6px;padding:6px 4px;text-align:center;">
+              <div style="font-size:9px;color:var(--s2);margin-bottom:2px;">전남</div>
+              <div id="ck-dist-s2" style="font-size:12px;font-weight:700;color:var(--s2);">—</div>
+              <div id="ck-pct-s2" style="font-size:9px;color:var(--text2);">—%</div>
+            </div>
+            <div style="background:var(--bg3);border-radius:6px;padding:6px 4px;text-align:center;">
+              <div style="font-size:9px;color:var(--s4);margin-bottom:2px;">나주</div>
+              <div id="ck-dist-s4" style="font-size:12px;font-weight:700;color:var(--s4);">—</div>
+              <div id="ck-pct-s4" style="font-size:9px;color:var(--text2);">—%</div>
+            </div>
+            <div style="background:var(--bg3);border-radius:6px;padding:6px 4px;text-align:center;">
+              <div style="font-size:9px;color:var(--s3);margin-bottom:2px;">순천</div>
+              <div id="ck-dist-s3" style="font-size:12px;font-weight:700;color:var(--s3);">—</div>
+              <div id="ck-pct-s3" style="font-size:9px;color:var(--text2);">—%</div>
             </div>
           </div>
-          <div class="form-row">
-            <div>
-              <label class="form-label" style="color:var(--s4);">나주 (톤)</label>
-              <input type="number" id="use-s4" class="form-input" placeholder="0" oninput="updateSiloUsePreview()">
-            </div>
-            <div>
-              <label class="form-label" style="color:var(--s3);">순천 (톤)</label>
-              <input type="number" id="use-s3" class="form-input" placeholder="0" oninput="updateSiloUsePreview()">
-            </div>
-          </div>
-          <div id="use-silo-total-preview" style="font-size:12px;color:var(--accent);text-align:right;margin-bottom:8px;font-family:'IBM Plex Mono',monospace;"></div>
         </div>
 
-        <!-- 공통 -->
-        <!-- 전체합계 입력용 hidden (저장조별 모드에서 합산값 저장) -->
-        <input type="hidden" id="use-total-hidden">
         <label class="form-label">비고</label>
         <input type="text" id="use-note" class="form-input" placeholder="정상가동 / 부분가동 등">
-        <button class="btn-primary" onclick="submitUsage()">💾 사용량 저장</button>
+        <!-- hidden fields (기존 submitUsage 호환) -->
+        <input type="hidden" id="use-total">
+        <input type="hidden" id="use-total-hidden">
+        <div id="use-area-silo" style="display:none;">
+          <input type="hidden" id="use-s1"><input type="hidden" id="use-s2">
+          <input type="hidden" id="use-s4"><input type="hidden" id="use-s3">
+        </div>
+        <button class="btn-primary" onclick="submitUsageCrane()" style="margin-top:4px;">💾 사용량 저장</button>
       </div>
     </div>
 
@@ -1448,18 +1533,234 @@ function initRptForm() {
 
 // ════════════════════════════════════════
 function setUsageTab(tab) {
-  const isDaily = tab === 'daily';
-  document.getElementById('usage-daily-area').style.display   = isDaily ? 'block' : 'none';
-  document.getElementById('usage-monthly-area').style.display = isDaily ? 'none'  : 'block';
-  const bd = document.getElementById('usage-tab-daily');
-  const bm = document.getElementById('usage-tab-monthly');
-  bd.style.background  = isDaily ? 'var(--accent)' : 'none';
-  bd.style.color       = isDaily ? '#0d1117' : 'var(--text2)';
-  bd.style.borderColor = isDaily ? 'var(--accent)' : 'var(--border)';
-  bm.style.background  = isDaily ? 'none' : 'var(--accent)';
-  bm.style.color       = isDaily ? 'var(--text2)' : '#0d1117';
-  bm.style.borderColor = isDaily ? 'var(--border)' : 'var(--accent)';
-  if (!isDaily) renderMonthlyGrid();
+  const areas = { ledger:'usage-ledger-area', daily:'usage-daily-area', monthly:'usage-monthly-area' };
+  const btns  = { ledger:'usage-tab-ledger',  daily:'usage-tab-daily',  monthly:'usage-tab-monthly' };
+  Object.keys(areas).forEach(t => {
+    const el = document.getElementById(areas[t]);
+    if (el) el.style.display = t === tab ? 'block' : 'none';
+    const bt = document.getElementById(btns[t]);
+    if (bt) {
+      bt.style.background  = t === tab ? 'var(--accent)' : 'none';
+      bt.style.color       = t === tab ? '#0d1117' : 'var(--text2)';
+      bt.style.borderColor = t === tab ? 'var(--accent)' : 'var(--border)';
+      bt.style.fontWeight  = t === tab ? '700' : '400';
+    }
+  });
+  if (tab === 'ledger') renderLedger();
+  if (tab === 'daily') {
+    const d = document.getElementById('use-date');
+    if (d && !d.value) d.value = today();
+    calcCrane();
+  }
+  if (tab === 'monthly') renderMonthlyGrid();
+}
+
+// ── 연간 관리대장 (_annualLedger_v2) ──
+function getLedger() {
+  try { return JSON.parse(localStorage.getItem('_annualLedger_v2') || '{}'); } catch(e) { return {}; }
+}
+function saveLedger(obj) {
+  localStorage.setItem('_annualLedger_v2', JSON.stringify(obj));
+}
+function addLedgerYear() {
+  const yr = prompt('추가할 연도를 입력하세요:', new Date().getFullYear());
+  if (!yr || isNaN(yr)) return;
+  const ledger = getLedger();
+  if (ledger[yr]) { showToast(`${yr}년 데이터가 이미 있습니다`); renderLedger(); return; }
+  ledger[yr] = { summary: { inflowS1:0, inflowS2:0, inflowS3:0, inflowS4:0, total:0, usage:0, stockEnd:null, opDays:null, note:'' }, months: {} };
+  for (let m=1; m<=12; m++) {
+    ledger[yr].months[m] = { inflowS1:0, inflowS2:0, inflowS3:0, inflowS4:0, total:0, usage:0, stockEnd:null, opDays:null, note:'' };
+  }
+  saveLedger(ledger);
+  renderLedger();
+  showToast(`${yr}년 추가됨`);
+}
+function deleteLedgerYear(yr) {
+  if (!confirm(`${yr}년 데이터를 삭제할까요?`)) return;
+  const ledger = getLedger();
+  delete ledger[yr];
+  saveLedger(ledger);
+  renderLedger();
+}
+function toggleLedgerYear(yr) {
+  const el = document.getElementById(`lyr-detail-${yr}`);
+  const btn = document.getElementById(`lyr-toggle-${yr}`);
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'table-row-group';
+  btn.textContent = open ? '▼ 월별' : '▲ 닫기';
+}
+function saveLedgerSummary(yr) {
+  const ledger = getLedger();
+  if (!ledger[yr]) return;
+  const g = (id) => { const el=document.getElementById(id); return el && el.value !== '' ? parseFloat(el.value)||0 : null; };
+  const gs = (id) => { const el=document.getElementById(id); return el ? el.value : ''; };
+  ledger[yr].summary = {
+    inflowS1: g(`ls1_${yr}`) || 0,
+    inflowS2: 0,
+    inflowS3: g(`ls3_${yr}`) || 0,
+    inflowS4: g(`ls4_${yr}`) || 0,
+    total:    g(`ltot_${yr}`) || 0,
+    usage:    g(`luse_${yr}`) || 0,
+    stockEnd: g(`lstk_${yr}`),
+    opDays:   g(`lopd_${yr}`),
+    note:     gs(`lnote_${yr}`)
+  };
+  saveLedger(ledger);
+  showToast(`${yr}년 연간 저장됨`);
+  renderLedger();
+}
+function saveLedgerMonth(yr, m) {
+  const ledger = getLedger();
+  if (!ledger[yr]) return;
+  const g = (id) => { const el=document.getElementById(id); return el && el.value !== '' ? parseFloat(el.value)||0 : null; };
+  const gs = (id) => { const el=document.getElementById(id); return el ? el.value : ''; };
+  ledger[yr].months[m] = {
+    inflowS1: g(`lms1_${yr}_${m}`) || 0,
+    inflowS2: 0,
+    inflowS3: g(`lms3_${yr}_${m}`) || 0,
+    inflowS4: g(`lms4_${yr}_${m}`) || 0,
+    total:    g(`lmtot_${yr}_${m}`) || 0,
+    usage:    g(`lmuse_${yr}_${m}`) || 0,
+    stockEnd: g(`lmstk_${yr}_${m}`),
+    opDays:   g(`lmopd_${yr}_${m}`),
+    note:     gs(`lmnote_${yr}_${m}`)
+  };
+  // 연간 합계 자동 계산
+  let sumS1=0,sumS3=0,sumS4=0,sumTot=0,sumUse=0,sumOpd=0;
+  for(let mm=1;mm<=12;mm++){
+    const mv=ledger[yr].months[mm]||{};
+    sumS1+= mv.inflowS1||0; sumS3+=mv.inflowS3||0; sumS4+=mv.inflowS4||0;
+    sumTot+=mv.total||0; sumUse+=mv.usage||0;
+    if(mv.opDays) sumOpd+=mv.opDays;
+  }
+  ledger[yr].summary.inflowS1=Math.round(sumS1);
+  ledger[yr].summary.inflowS3=Math.round(sumS3);
+  ledger[yr].summary.inflowS4=Math.round(sumS4);
+  ledger[yr].summary.total=Math.round(sumTot);
+  ledger[yr].summary.usage=Math.round(sumUse);
+  ledger[yr].summary.opDays=sumOpd||null;
+  saveLedger(ledger);
+  showToast(`${yr}년 ${m}월 저장됨`);
+  renderLedger();
+}
+function renderLedger() {
+  const cont = document.getElementById('ledger-container');
+  if (!cont) return;
+  const ledger = getLedger();
+  const years = Object.keys(ledger).map(Number).sort((a,b)=>b-a);
+  if (!years.length) {
+    cont.innerHTML = `<div style="text-align:center;color:var(--text2);padding:20px;font-size:13px;">데이터가 없습니다<br><span style="font-size:11px;">+ 연도 추가를 눌러 시작하세요</span></div>`;
+    return;
+  }
+  const fw = (v,d=0) => (v!=null&&v!=='') ? (+v).toLocaleString('ko-KR',{maximumFractionDigits:d}) : '—';
+  const inp = (id,val,color,w='70px') =>
+    `<input type="number" id="${id}" value="${val!=null&&val!==''?val:''}" placeholder="—"
+      style="width:${w};background:var(--bg2);border:1px solid var(--border);color:${color};
+      padding:4px 5px;border-radius:4px;font-size:11px;text-align:right;">`;
+  const tinp = (id,val,w='80px') =>
+    `<input type="text" id="${id}" value="${val||''}" placeholder="비고"
+      style="width:${w};background:var(--bg2);border:1px solid var(--border);color:var(--text2);
+      padding:4px 5px;border-radius:4px;font-size:11px;">`;
+
+  const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+  let html = `<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px;">
+    <thead><tr style="background:rgba(56,189,248,.08);font-size:11px;color:var(--text2);">
+      <th style="padding:6px 4px;text-align:left;white-space:nowrap;">연도</th>
+      <th style="color:#38bdf8;padding:4px 3px;">광주(톤)</th>
+      <th style="color:#a78bfa;padding:4px 3px;">나주(톤)</th>
+      <th style="color:#f59e0b;padding:4px 3px;">순천(톤)</th>
+      <th style="padding:4px 3px;font-weight:700;">입고합계</th>
+      <th style="color:var(--accent);padding:4px 3px;">사용량</th>
+      <th style="color:var(--green);padding:4px 3px;">연말재고</th>
+      <th style="padding:4px 3px;">가동일</th>
+      <th style="padding:4px 3px;">비고</th>
+      <th style="padding:4px 3px;"></th>
+    </tr></thead>`;
+
+  for (const yr of years) {
+    const yd = ledger[yr] || {};
+    const s = yd.summary || {};
+    // 연간 요약 행
+    html += `<tbody><tr style="background:var(--bg3);">
+      <td style="padding:8px 6px;font-size:14px;font-weight:800;color:var(--accent);white-space:nowrap;">
+        ${yr}년 <span style="font-size:9px;color:var(--yellow);">월별↑</span>
+      </td>
+      <td style="padding:4px 2px;">${inp(`ls1_${yr}`,s.inflowS1,'#38bdf8','72px')}</td>
+      <td style="padding:4px 2px;">${inp(`ls4_${yr}`,s.inflowS4,'#a78bfa','72px')}</td>
+      <td style="padding:4px 2px;">${inp(`ls3_${yr}`,s.inflowS3,'#f59e0b','72px')}</td>
+      <td style="padding:4px 2px;">${inp(`ltot_${yr}`,s.total,'var(--text)','78px')}</td>
+      <td style="padding:4px 2px;">${inp(`luse_${yr}`,s.usage,'var(--accent)','78px')}</td>
+      <td style="padding:4px 2px;">${inp(`lstk_${yr}`,s.stockEnd,'var(--green)','78px')}</td>
+      <td style="padding:4px 2px;">${inp(`lopd_${yr}`,s.opDays,'var(--text)','48px')}</td>
+      <td style="padding:4px 2px;">${tinp(`lnote_${yr}`,s.note,'90px')}</td>
+      <td style="padding:4px 2px;white-space:nowrap;">
+        <button onclick="saveLedgerSummary('${yr}')" style="background:var(--accent);color:#0d1117;border:none;border-radius:5px;padding:4px 8px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;">💾 저장</button>
+        <button id="lyr-toggle-${yr}" onclick="toggleLedgerYear('${yr}')" style="background:var(--bg2);color:var(--text2);border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:10px;cursor:pointer;margin-left:3px;">▼ 월별</button>
+        <button onclick="deleteLedgerYear('${yr}')" style="background:none;color:var(--red);border:1px solid rgba(239,68,68,.3);border-radius:5px;padding:3px 6px;font-size:10px;cursor:pointer;margin-left:2px;">🗑</button>
+      </td>
+    </tr></tbody>`;
+
+    // 월별 상세 (기본 숨김)
+    const months = yd.months || {};
+    html += `<tbody id="lyr-detail-${yr}" style="display:none;background:rgba(0,0,0,.1);">
+      <tr><td colspan="10" style="padding:0;">
+        <table style="width:100%;font-size:11px;border-collapse:collapse;">
+          <thead><tr style="background:rgba(56,189,248,.05);font-size:10px;color:var(--text2);">
+            <th style="padding:4px 6px;text-align:center;">월</th>
+            <th style="color:#38bdf8;padding:3px 2px;">광주</th>
+            <th style="color:#a78bfa;padding:3px 2px;">나주</th>
+            <th style="color:#f59e0b;padding:3px 2px;">순천</th>
+            <th style="padding:3px 2px;font-weight:700;">입고합계</th>
+            <th style="color:var(--accent);padding:3px 2px;">사용량</th>
+            <th style="color:var(--green);padding:3px 2px;">월말재고</th>
+            <th style="padding:3px 2px;">가동일</th>
+            <th style="padding:3px 2px;">비고</th>
+            <th></th>
+          </tr></thead><tbody>`;
+
+    // 월별 합계 계산
+    let mSumS1=0,mSumS3=0,mSumS4=0,mSumTot=0,mSumUse=0,mSumOpd=0;
+    for (let m=1; m<=12; m++) {
+      const mv = months[m] || months[String(m)] || {};
+      mSumS1+=mv.inflowS1||0; mSumS3+=mv.inflowS3||0; mSumS4+=mv.inflowS4||0;
+      mSumTot+=mv.total||0; mSumUse+=mv.usage||0;
+      if(mv.opDays) mSumOpd+=mv.opDays;
+      html += `<tr style="background:var(--bg2);">
+        <td style="text-align:center;padding:2px 6px;font-weight:600;color:var(--text2);">${MONTHS[m-1]}</td>
+        <td style="padding:1px 2px;">${inp(`lms1_${yr}_${m}`,mv.inflowS1,'#38bdf8','60px')}</td>
+        <td style="padding:1px 2px;">${inp(`lms4_${yr}_${m}`,mv.inflowS4,'#a78bfa','60px')}</td>
+        <td style="padding:1px 2px;">${inp(`lms3_${yr}_${m}`,mv.inflowS3,'#f59e0b','60px')}</td>
+        <td style="padding:1px 2px;">${inp(`lmtot_${yr}_${m}`,mv.total,'var(--text)','68px')}</td>
+        <td style="padding:1px 2px;">${inp(`lmuse_${yr}_${m}`,mv.usage,'var(--accent)','68px')}</td>
+        <td style="padding:1px 2px;">${inp(`lmstk_${yr}_${m}`,mv.stockEnd,'var(--green)','68px')}</td>
+        <td style="padding:1px 2px;">${inp(`lmopd_${yr}_${m}`,mv.opDays,'var(--text)','44px')}</td>
+        <td style="padding:1px 2px;">${tinp(`lmnote_${yr}_${m}`,mv.note,'72px')}</td>
+        <td style="padding:1px 2px;text-align:center;">
+          <button onclick="saveLedgerMonth('${yr}',${m})" style="background:var(--bg3);color:var(--text2);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer;">저장</button>
+        </td>
+      </tr>`;
+    }
+    // 월계 행
+    html += `</tbody>
+          <tfoot><tr style="font-size:10px;font-weight:700;background:rgba(56,189,248,.06);border-top:1px solid var(--border);">
+            <td style="text-align:center;padding:3px 6px;color:var(--text2);">월계</td>
+            <td style="color:#38bdf8;padding:3px 2px;">${fw(mSumS1)}</td>
+            <td style="color:#a78bfa;padding:3px 2px;">${fw(mSumS4)}</td>
+            <td style="color:#f59e0b;padding:3px 2px;">${fw(mSumS3)}</td>
+            <td style="padding:3px 2px;font-weight:700;">${fw(mSumTot)}</td>
+            <td style="color:var(--accent);padding:3px 2px;">${fw(mSumUse)}</td>
+            <td style="padding:3px 2px;">—</td>
+            <td style="padding:3px 2px;">${mSumOpd}일</td>
+            <td colspan="2"></td>
+          </tr></tfoot>
+        </table>
+      </td></tr>
+    </tbody>`;
+  }
+  html += `</table>`;
+  cont.innerHTML = html;
 }
 
 // ── 월별 연도 셀렉터 초기화 ──
@@ -1791,6 +2092,149 @@ function submitUsage() {
   }
 
   document.getElementById('use-note').value = '';
+  renderDash();
+  renderUsageStats();
+}
+
+// ── 크레인 계측 사용량 ──
+function calcCrane() {
+  const silos = ['s1','s2','s4','s3'];
+  const shifts = ['ns','ds','as'];
+  // 저장조별 kg 합계
+  const siloKg = {};
+  let totalKg = 0;
+  silos.forEach(s => {
+    let kg = 0;
+    shifts.forEach(sh => {
+      kg += parseFloat(document.getElementById(`ck-${sh}-${s}`)?.value)||0;
+    });
+    siloKg[s] = kg;
+    totalKg += kg;
+    const el = document.getElementById(`ck-sum-${s}`);
+    if (el) el.textContent = kg ? kg.toLocaleString() : '0';
+  });
+  const totalTon = totalKg / 1000;
+  const kgEl = document.getElementById('ck-total-kg');
+  const tonEl = document.getElementById('ck-total-ton');
+  if (kgEl) kgEl.textContent = totalKg ? totalKg.toLocaleString() : '0';
+  if (tonEl) tonEl.textContent = totalTon.toFixed(3);
+
+  // 수기입력 & 보정량
+  const manual = parseFloat(document.getElementById('ck-manual')?.value)||0;
+  const adjust = parseFloat(document.getElementById('ck-adjust')?.value);
+  const finalTon = !isNaN(adjust) && adjust > 0 ? adjust : manual;
+
+  // 편차
+  const diffEl = document.getElementById('ck-diff');
+  const confEl = document.getElementById('ck-confirm');
+  if (manual > 0 && totalTon > 0) {
+    const diff = finalTon - totalTon;
+    const pct  = (diff / totalTon * 100).toFixed(1);
+    const color = Math.abs(diff) < 5 ? 'var(--green)' : 'var(--yellow)';
+    if (diffEl) { diffEl.textContent = `${diff>0?'+':''}${diff.toFixed(3)}톤`; diffEl.style.color = color; }
+    if (confEl) { confEl.textContent = `${pct}%`; confEl.style.color = color; }
+  } else {
+    if (diffEl) { diffEl.textContent = '—'; diffEl.style.color = 'var(--text2)'; }
+    if (confEl) { confEl.textContent = '—'; confEl.style.color = 'var(--text2)'; }
+  }
+
+  // 저장조별 배분량 (수기/보정량 기준 × 크레인 kg 비율)
+  if (finalTon > 0 && totalKg > 0) {
+    const distMap = { s1:'var(--s1)', s2:'var(--s2)', s4:'var(--s4)', s3:'var(--s3)' };
+    silos.forEach(s => {
+      const ratio = siloKg[s] / totalKg;
+      const dist  = finalTon * ratio;
+      const pct   = (ratio * 100).toFixed(1);
+      const distEl = document.getElementById(`ck-dist-${s}`);
+      const pctEl  = document.getElementById(`ck-pct-${s}`);
+      if (distEl) distEl.textContent = dist > 0 ? dist.toFixed(2)+'톤' : '—';
+      if (pctEl)  pctEl.textContent  = dist > 0 ? pct+'%' : '—%';
+    });
+  } else {
+    silos.forEach(s => {
+      const d = document.getElementById(`ck-dist-${s}`);
+      const p = document.getElementById(`ck-pct-${s}`);
+      if (d) d.textContent = '—';
+      if (p) p.textContent = '—%';
+    });
+  }
+}
+
+function submitUsageCrane() {
+  const date = document.getElementById('use-date').value;
+  const note = (document.getElementById('use-note')?.value||'').trim();
+  if (!date) { showToast('날짜를 입력하세요', '#f85149'); return; }
+
+  const silos = ['s1','s2','s4','s3'];
+  const shifts = ['ns','ds','as'];
+  const siloKg = {};
+  let totalKg = 0;
+  silos.forEach(s => {
+    let kg = 0;
+    shifts.forEach(sh => { kg += parseFloat(document.getElementById(`ck-${sh}-${s}`)?.value)||0; });
+    siloKg[s] = kg;
+    totalKg += kg;
+  });
+
+  const manual = parseFloat(document.getElementById('ck-manual')?.value)||0;
+  const adjust = parseFloat(document.getElementById('ck-adjust')?.value);
+  const finalTon = (!isNaN(adjust) && adjust > 0) ? adjust : manual;
+
+  if (finalTon <= 0 && totalKg <= 0) { showToast('사용량을 입력하세요', '#f85149'); return; }
+
+  const useFinal = finalTon > 0 ? finalTon : (totalKg/1000);
+  const stock    = getStock();
+  const usage    = getUsage();
+
+  // 저장조별 배분 (비율)
+  const siloUse = { S1:0, S2:0, S4:0, S3:0 };
+  if (totalKg > 0) {
+    siloUse.S1 = parseFloat((useFinal * siloKg.s1/totalKg).toFixed(3));
+    siloUse.S2 = parseFloat((useFinal * siloKg.s2/totalKg).toFixed(3));
+    siloUse.S4 = parseFloat((useFinal * siloKg.s4/totalKg).toFixed(3));
+    siloUse.S3 = parseFloat((useFinal * siloKg.s3/totalKg).toFixed(3));
+  } else {
+    siloUse.S1 = useFinal;
+  }
+
+  // 재고 차감
+  SILO_ORDER.forEach(k => {
+    if (siloUse[k] > 0) stock[k] = (stock[k]||0) - siloUse[k];
+  });
+
+  // 크레인 계측 원본도 저장
+  const craneData = {};
+  shifts.forEach(sh => {
+    craneData[sh] = {};
+    silos.forEach(s => {
+      const v = parseFloat(document.getElementById(`ck-${sh}-${s}`)?.value)||0;
+      if (v) craneData[sh][s] = v;
+    });
+  });
+
+  usage[date] = {
+    total: useFinal,
+    note,
+    bySilo: siloUse,
+    crane: { totalKg, manual, adjust: !isNaN(adjust)?adjust:null, shifts: craneData }
+  };
+
+  localStorage.setItem(KEY_USAGE,     JSON.stringify(usage));
+  localStorage.setItem(KEY_STOCK,     JSON.stringify(stock));
+  if (typeof KEY_USAGESILO !== 'undefined') {
+    const ubySilo = (() => { try { return JSON.parse(localStorage.getItem(KEY_USAGESILO)||'{}'); } catch(e){return{};} })();
+    ubySilo[date] = { GJ: siloUse.S1||0, JN: siloUse.S2||0, NJ: siloUse.S4||0, SC: siloUse.S3||0 };
+    localStorage.setItem(KEY_USAGESILO, JSON.stringify(ubySilo));
+  }
+
+  showToast(`✅ ${date} ${useFinal.toFixed(3)}톤 저장`);
+  // 입력값 초기화
+  ['s1','s2','s4','s3'].forEach(s => {
+    ['ns','ds','as'].forEach(sh => { const el=document.getElementById(`ck-${sh}-${s}`); if(el) el.value=''; });
+  });
+  ['ck-manual','ck-adjust'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  if(document.getElementById('use-note')) document.getElementById('use-note').value='';
+  calcCrane();
   renderDash();
   renderUsageStats();
 }
