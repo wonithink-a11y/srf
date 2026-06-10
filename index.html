@@ -2431,9 +2431,18 @@ function normalizePcRec(r) {
   // ── PC형식 최우선 판별 ──
   // 구조: [datetime, car, gross(소수톤), tare(소수톤), silo한글]
   // gross/tare는 17~30 범위의 소수, silo는 한글 저장조명
-  const SILO_KR = ['광주','전남','나주','순천'];
-  const r2 = parseFloat(r[2]), r3 = parseFloat(r[3]);
-  const isPC = r2 > 0 && r2 < 100          // gross: 소수톤 (17~30 범위)
+  const SILO_KR = ['광주','전남','나주','순천','S1','S2','S3','S4'];
+  let r2 = parseFloat(r[2]), r3 = parseFloat(r[3]);
+
+  // 모바일→Firebase 오염 데이터 보정: gross < 1 이면 ×1000 (0.021 → 21.0톤)
+  if (r2 > 0 && r2 < 1 && r3 > 0 && r3 < 1
+      && typeof r[4] === 'string' && SILO_KR.includes(r[4])) {
+    r2 = Math.round(r2 * 1000 * 100) / 100;
+    r3 = Math.round(r3 * 1000 * 100) / 100;
+  }
+
+  const isPC = r2 >= 1                      // gross: 최소 1톤 이상 (오염 데이터 차단)
+    && r2 < 100                             // gross: 소수톤 (17~30 범위)
     && r3 > 0 && r3 < 100                   // tare: 소수톤
     && r2 > r3                              // gross > tare (net양수)
     && typeof r[4] === 'string' && SILO_KR.includes(r[4]); // 한글 저장조
@@ -3366,9 +3375,9 @@ function submitCSV() {
     let db = [];
     try { db = JSON.parse(localStorage.getItem(key)) || []; } catch(e) {}
     db.forEach(r => {
-      const a = Array.isArray(r);
-      const ton = parseFloat((a ? r[7] : r.ton)||0).toFixed(2);
-      existingKeys.add(`${a?r[0]:r.date}|${a?r[2]:r.car}|${a?r[6]:r.silo}|${ton}`);
+      const nr = normalizePcRec(r);
+      const ton = parseFloat(nr.ton||0).toFixed(2);
+      existingKeys.add(`${nr.date}|${nr.car}|${nr.silo}|${ton}`);
     });
   });
 
@@ -3399,15 +3408,12 @@ function submitCSV() {
   newRows.forEach(r => {
     const yr = r.date ? r.date.slice(0,4) : String(new Date().getFullYear());
     if (!byYear[yr]) byYear[yr] = [];
+    // PC 포맷과 동일: [datetime, car, gross톤, tare톤, 저장조한글]
     byYear[yr].push([
-      r.date, r.slip, r.car,
-      Math.round(r.gross * 1000),
-      Math.round(r.tare  * 1000),
-      r.moist != null ? r.moist.toFixed(2) : '',
-      r.silo,
-      Math.round(r.ton * 1000) / 1000,
-      r.cal != null ? r.cal.toString() : '',
-      0
+      r.date + ' 00:00', r.car,
+      Math.round(r.gross * 100) / 100,
+      Math.round(r.tare  * 100) / 100,
+      r.silo
     ]);
     siloTon[r.silo] = (siloTon[r.silo]||0) + r.ton;
   });
