@@ -662,6 +662,21 @@
         </div>
         <button class="btn-primary" onclick="submitUsageCrane()" style="margin-top:4px;">💾 사용량 저장</button>
       </div>
+
+      <!-- 이번달 사용량 이력 (접이식) -->
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div onclick="toggleMonthUsageLog()" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;user-select:none;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:14px;">📋</span>
+            <span style="font-size:13px;font-weight:700;color:var(--text);">이번달 사용량 이력</span>
+            <span id="month-usage-badge" style="font-size:10px;background:rgba(88,166,255,.15);color:var(--accent);border-radius:10px;padding:2px 7px;"></span>
+          </div>
+          <span id="month-usage-arrow" style="color:var(--text2);font-size:12px;transition:transform .2s;">▼</span>
+        </div>
+        <div id="month-usage-log" style="display:none;border-top:1px solid var(--border);padding:8px 10px 10px;">
+          <div id="month-usage-log-inner"></div>
+        </div>
+      </div>
     </div>
 
     <!-- 월별 입력 -->
@@ -1551,6 +1566,7 @@ function setUsageTab(tab) {
     const d = document.getElementById('use-date');
     if (d && !d.value) d.value = today();
     calcCrane();
+    renderMonthUsageLog(); // 배지 갱신
   }
   if (tab === 'monthly') renderMonthlyGrid();
 }
@@ -1582,6 +1598,126 @@ function deleteLedgerYear(yr) {
   saveLedger(ledger);
   renderLedger();
 }
+function toggleMonthUsageLog() {
+  const el  = document.getElementById('month-usage-log');
+  const arr = document.getElementById('month-usage-arrow');
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  arr.style.transform = open ? '' : 'rotate(180deg)';
+  if (!open) renderMonthUsageLog();
+}
+
+function renderMonthUsageLog() {
+  const inner = document.getElementById('month-usage-log-inner');
+  const badge = document.getElementById('month-usage-badge');
+  if (!inner) return;
+
+  const usage = getUsage();           // { "2026-06-01": { total, note, bySilo, crane }, ... }
+  const now   = new Date();
+  const ym    = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+
+  // 이번달 항목만 필터, 날짜 내림차순
+  const rows = Object.entries(usage)
+    .filter(([d]) => d.startsWith(ym))
+    .sort(([a],[b]) => b.localeCompare(a));
+
+  if (badge) badge.textContent = rows.length ? `${rows.length}건` : '0건';
+
+  if (!rows.length) {
+    inner.innerHTML = `<div style="text-align:center;color:var(--text2);font-size:12px;padding:12px 0;">이번달 사용량 기록이 없습니다</div>`;
+    return;
+  }
+
+  // 합계 계산
+  const monthTotal = rows.reduce((s,[,v]) => s + (v.total||0), 0);
+
+  let html = `
+    <div style="font-size:11px;color:var(--text2);margin-bottom:6px;text-align:right;">
+      이번달 합계: <span style="color:var(--accent);font-weight:700;font-family:'IBM Plex Mono',monospace;">${monthTotal.toFixed(3)}톤</span>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="font-size:10px;color:var(--text2);border-bottom:1px solid var(--border);">
+          <th style="padding:4px 4px;text-align:left;">날짜</th>
+          <th style="padding:4px 4px;text-align:right;color:var(--accent);">사용량(톤)</th>
+          <th style="padding:4px 4px;text-align:right;color:var(--s1);">광주</th>
+          <th style="padding:4px 4px;text-align:right;color:var(--s4);">나주</th>
+          <th style="padding:4px 4px;text-align:right;color:var(--s3);">순천</th>
+          <th style="padding:4px 4px;text-align:left;color:var(--text2);">비고</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+  rows.forEach(([date, v]) => {
+    const bs   = v.bySilo || {};
+    const s1   = bs.S1 ? bs.S1.toFixed(2) : '—';
+    const s4   = bs.S4 ? bs.S4.toFixed(2) : '—';
+    const s3   = bs.S3 ? bs.S3.toFixed(2) : '—';
+    const day  = date.slice(5);   // MM-DD
+    const note = v.note || '';
+    html += `
+        <tr style="border-bottom:1px solid rgba(255,255,255,.04);" onclick="toggleUsageDetail('${date}')" style="cursor:pointer;">
+          <td style="padding:6px 4px;font-weight:600;color:var(--text);cursor:pointer;" onclick="toggleUsageDetail('${date}')">${day}</td>
+          <td style="padding:6px 4px;text-align:right;color:var(--accent);font-family:'IBM Plex Mono',monospace;font-weight:700;">${(v.total||0).toFixed(3)}</td>
+          <td style="padding:6px 4px;text-align:right;color:var(--s1);font-size:11px;font-family:'IBM Plex Mono',monospace;">${s1}</td>
+          <td style="padding:6px 4px;text-align:right;color:var(--s4);font-size:11px;font-family:'IBM Plex Mono',monospace;">${s4}</td>
+          <td style="padding:6px 4px;text-align:right;color:var(--s3);font-size:11px;font-family:'IBM Plex Mono',monospace;">${s3}</td>
+          <td style="padding:6px 4px;color:var(--text2);font-size:11px;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${note}</td>
+        </tr>`;
+
+    // 크레인 상세 (접이식)
+    if (v.crane) {
+      const cr = v.crane;
+      const shifts = [['N/S','ns'],['D/S','ds'],['A/S','as']];
+      let crHtml = '';
+      shifts.forEach(([label, key]) => {
+        const sh = (cr.shifts||{})[key] || {};
+        const s1kg = sh.s1||0, s2kg=sh.s2||0, s4kg=sh.s4||0, s3kg=sh.s3||0;
+        const rowTotal = s1kg+s2kg+s4kg+s3kg;
+        if (!rowTotal) return;
+        crHtml += `<tr style="font-size:10px;color:var(--text2);">
+          <td style="padding:2px 4px 2px 16px;">${label}</td>
+          <td style="text-align:right;color:var(--s1);">${s1kg?s1kg.toLocaleString():''}</td>
+          <td style="text-align:right;color:var(--s2);">${s2kg?s2kg.toLocaleString():''}</td>
+          <td style="text-align:right;color:var(--s4);">${s4kg?s4kg.toLocaleString():''}</td>
+          <td style="text-align:right;color:var(--s3);">${s3kg?s3kg.toLocaleString():''}</td>
+          <td></td></tr>`;
+      });
+      if (crHtml) {
+        html += `<tr id="ud-${date}" style="display:none;background:rgba(0,0,0,.2);">
+          <td colspan="6" style="padding:0;">
+            <table style="width:100%;font-size:10px;border-collapse:collapse;">
+              <tr style="color:var(--text2);font-size:9px;">
+                <td style="padding:2px 4px 2px 16px;">쉬프트</td>
+                <td style="text-align:right;color:var(--s1);">광주kg</td>
+                <td style="text-align:right;color:var(--s2);">전남kg</td>
+                <td style="text-align:right;color:var(--s4);">나주kg</td>
+                <td style="text-align:right;color:var(--s3);">순천kg</td>
+                <td></td>
+              </tr>
+              ${crHtml}
+              <tr style="font-size:10px;color:var(--text2);border-top:1px solid rgba(255,255,255,.06);">
+                <td style="padding:2px 4px 4px 16px;">합계</td>
+                <td colspan="4" style="text-align:right;padding-right:4px;">${cr.totalKg ? cr.totalKg.toLocaleString()+'kg' : ''} = ${(cr.totalKg/1000).toFixed(3)}톤</td>
+                <td></td>
+              </tr>
+            </table>
+          </td>
+        </tr>`;
+      }
+    }
+  });
+
+  html += `</tbody></table>`;
+  inner.innerHTML = html;
+}
+
+function toggleUsageDetail(date) {
+  const el = document.getElementById(`ud-${date}`);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+}
+
 function toggleLedgerYear(yr) {
   const el = document.getElementById(`lyr-detail-${yr}`);
   const btn = document.getElementById(`lyr-toggle-${yr}`);
@@ -2237,23 +2373,33 @@ function submitUsageCrane() {
   calcCrane();
   renderDash();
   renderUsageStats();
+  // 이력 패널 열려있으면 갱신
+  const logEl = document.getElementById('month-usage-log');
+  if (logEl && logEl.style.display !== 'none') renderMonthUsageLog();
+  else renderMonthUsageLog(); // 배지 갱신용 (패널 닫혀도 badge 업데이트)
 }
 
 // ── 이력 조회 ──
 function normalizePcRec(r) {
   // Firebase 거치면서 JSON 문자열로 저장된 경우 파싱
   if (typeof r === 'string') {
-    try { r = JSON.parse(r); } catch(e) {}
+    try { r = JSON.parse(r); } catch(e) {} 
   }
   if (!Array.isArray(r) && typeof r === 'object' && r !== null) {
     return { date: r.date||'', car: r.car||'', silo: r.silo||'', ton: Math.abs(parseFloat(r.ton)||0), slip: r.slip||'', isPc: false };
   }
   if (!Array.isArray(r)) return { date:'', car:'', silo:'', ton:0, slip:'', isPc:false };
 
-  // PC형식 판별:
-  // - 길이 5 이하
-  // - r[2]가 숫자 타입(typeof === 'number')이고 1000 미만
-  // - r[4]가 한글 저장조명
+  // 모바일형식 우선 판별: 길이 7 이상이고 r[7]이 유효한 숫자(ton값)인 경우
+  // [date, slip, car, gross_kg, tare_kg, moist, silo, ton, ...]
+  const hasMobileTon = r.length >= 8 && (parseFloat(r[7]) > 0 || (parseFloat(r[3]) > 1000 && parseFloat(r[4]) > 1000));
+  if (hasMobileTon) {
+    const date = (r[0]||'').slice(0,10).replace(/T.*/,'');
+    const ton  = parseFloat(r[7]||0) || (parseFloat(r[3]||0) - parseFloat(r[4]||0)) / 1000;
+    return { date, car: r[2]||'', silo: r[6]||'', ton: Math.abs(ton), slip: r[1]||'', isPc: false };
+  }
+
+  // PC형식 판별: 길이 5~6, r[2]가 소수톤값(0 < x < 1000), r[4]가 한글 저장조명
   const isPC = r.length <= 6
     && typeof r[2] === 'number' && r[2] < 1000 && r[2] > 0
     && typeof r[3] === 'number'
@@ -2266,7 +2412,7 @@ function normalizePcRec(r) {
     return { date, car: r[1]||'', silo, ton: Math.abs(ton), slip: '', isPc: true };
   }
 
-  // 모바일형식: [date, slip, car, gross_kg, tare_kg, moist, silo, ton, ...]
+  // 모바일형식 fallback: [date, slip, car, gross_kg, tare_kg, moist, silo, ton, ...]
   const date = (r[0]||'').slice(0,10).replace(/T.*/,'');
   const ton  = parseFloat(r[7]||0) || (parseFloat(r[3]||0) - parseFloat(r[4]||0)) / 1000;
   return { date, car: r[2]||'', silo: r[6]||'', ton: Math.abs(ton), slip: r[1]||'', isPc: false };
