@@ -811,7 +811,7 @@
         PC 앱을 열고 브라우저 콘솔(F12)에서<br>아래 코드를 실행 → <code style="background:var(--bg3);padding:1px 5px;border-radius:4px;color:var(--accent);">srf_export.json</code> 다운로드
       </div>
       <div style="position:relative;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:14px;">
-        <pre id="export-code" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7ee787;white-space:pre-wrap;word-break:break-all;line-height:1.6;">const fixed=['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'];
+        <pre id="export-code" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7ee787;white-space:pre-wrap;word-break:break-all;line-height:1.6;">const fixed=['_siloStock_v1','_usageData_v1','_usageDataBySilo_v1','_schedSettings_v4'];
 const rawdb=Object.keys(localStorage).filter(k=>/^_rawdb_\d{4}$/.test(k));
 const out={};
 [...fixed,...rawdb].forEach(k=>{const v=localStorage.getItem(k);if(v)out[k]=JSON.parse(v);});
@@ -991,9 +991,9 @@ function fmtTon(n) {
   return Math.round(n).toLocaleString('ko-KR');
 }
 
-const KEY_STOCK     = '_siloStock_v5';
-const KEY_USAGE     = '_usageData_v5';
-const KEY_USAGESILO = '_usageDataBySilo_v5';
+const KEY_STOCK     = '_siloStock_v1';
+const KEY_USAGE     = '_usageData_v1';
+const KEY_USAGESILO = '_usageDataBySilo_v1';
 
 // ── 연도별 키 분리 ──
 function rawdbKey(year) {
@@ -3681,19 +3681,18 @@ const FB_CONFIG = {
 let _db = null;
 const FB_COL = 'srf_data';
 
-// ── PC앱(v1) ↔ 모바일앱(v5) 키 매핑 ──
+// ── 공통 키 (PC/모바일 v1 통일) ──
 const KEY_MAP_PC_TO_MOBILE = {
-  '_siloStock_v1':       '_siloStock_v5',
-  '_usageData_v1':       '_usageData_v5',
-  '_usageDataBySilo_v1': '_usageDataBySilo_v5',
-  '_schedSettings_v4':   '_schedSettings_v5',
-  '_schedSettings_v5':   '_schedSettings_v5',
+  '_siloStock_v1':       '_siloStock_v1',
+  '_usageData_v1':       '_usageData_v1',
+  '_usageDataBySilo_v1': '_usageDataBySilo_v1',
+  '_schedSettings_v4':   '_schedSettings_v4',
 };
 const KEY_MAP_MOBILE_TO_PC = {
-  '_siloStock_v5':       '_siloStock_v1',
-  '_usageData_v5':       '_usageData_v1',
-  '_usageDataBySilo_v5': '_usageDataBySilo_v1',
-  '_schedSettings_v5':   '_schedSettings_v4',
+  '_siloStock_v1':       '_siloStock_v1',
+  '_usageData_v1':       '_usageData_v1',
+  '_usageDataBySilo_v1': '_usageDataBySilo_v1',
+  '_schedSettings_v4':   '_schedSettings_v4',
 };
 
 function fbInit() {
@@ -3752,7 +3751,7 @@ async function fbPush() {
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedBy: 'mobile'
     };
-    const mobileFixed = ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'];
+    const mobileFixed = ['_siloStock_v1','_usageData_v1','_usageDataBySilo_v1','_schedSettings_v4'];
     mobileFixed.forEach(k => {
       const v = localStorage.getItem(k);
       if (v) { try { meta[k] = JSON.parse(v); } catch(e) {} }
@@ -3975,7 +3974,7 @@ async function fbPull() {
 
       if (id === 'meta') {
         // 모바일 키(v5)만 저장
-        ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_fcHistory_v5','_schedSettings_v5'].forEach(mk => {
+        ['_siloStock_v1','_usageData_v1','_usageDataBySilo_v1','_fcHistory_v1','_schedSettings_v4'].forEach(mk => {
           if (data[mk] !== undefined) {
             localStorage.setItem(mk, JSON.stringify(data[mk]));
           }
@@ -4115,7 +4114,7 @@ async function backupToDrive() {
 
   try {
     // 데이터 수집
-    const fixedKeys = ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'];
+    const fixedKeys = ['_siloStock_v1','_usageData_v1','_usageDataBySilo_v1','_schedSettings_v4'];
     const rawdbKeys = Object.keys(localStorage).filter(k => /^_rawdb_\d{4}$/.test(k));
     const monthlyKeys = Object.keys(localStorage).filter(k => /^_monthlyData_\d{4}$/.test(k));
     const out = {};
@@ -4180,7 +4179,7 @@ async function loadFromDrive(mode) {
     if (mode === 'json') {
       // JSON 백업 복원
       const data = JSON.parse(text);
-      const fixedKeys = ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'];
+      const fixedKeys = ['_siloStock_v1','_usageData_v1','_usageDataBySilo_v1','_schedSettings_v4'];
       const rawdbKeys = Object.keys(data).filter(k => /^_rawdb_\d{4}$/.test(k));
       const monthlyKeys = Object.keys(data).filter(k => /^_monthlyData_\d{4}$/.test(k));
       const allKeys = [...fixedKeys, ...rawdbKeys, ...monthlyKeys];
@@ -4231,7 +4230,7 @@ function importJSON(input) {
   reader.onload = function(e) {
     try {
       const data = JSON.parse(e.target.result);
-      const fixedKeys = ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'];
+      const fixedKeys = ['_siloStock_v1','_usageData_v1','_usageDataBySilo_v1','_schedSettings_v4'];
       const rawdbKeys = Object.keys(data).filter(k => /^_rawdb_\d{4}$/.test(k));
       const keys = [...fixedKeys, ...rawdbKeys];
       let imported = 0;
@@ -4273,7 +4272,7 @@ function importJSON(input) {
 
 // ── 동기화: JSON 내보내기 ──
 function exportJSON() {
-  const fixedKeys = ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'];
+  const fixedKeys = ['_siloStock_v1','_usageData_v1','_usageDataBySilo_v1','_schedSettings_v4'];
   const rawdbKeys = Object.keys(localStorage).filter(k => /^_rawdb_\d{4}$/.test(k));
   const allKeys   = [...fixedKeys, ...rawdbKeys];
   const out = {};
@@ -4351,12 +4350,12 @@ function renderSyncStats() {
     </div>
     <div class="rec-item">
       <div class="rec-dot" style="background:var(--green);"></div>
-      <div class="rec-main"><div>현재 총재고</div><div class="rec-date">_siloStock_v5</div></div>
+      <div class="rec-main"><div>현재 총재고</div><div class="rec-date">_siloStock_v1</div></div>
       <span class="rec-ton" style="color:var(--green);">${fmt(totalStock)}톤</span>
     </div>
     <div class="rec-item">
       <div class="rec-dot" style="background:var(--yellow);"></div>
-      <div class="rec-main"><div>사용량 기록</div><div class="rec-date">_usageData_v5</div></div>
+      <div class="rec-main"><div>사용량 기록</div><div class="rec-date">_usageData_v1</div></div>
       <span class="rec-ton" style="color:var(--yellow);">${useDays}일</span>
     </div>
     <div class="rec-item" style="border-bottom:none;">
