@@ -796,6 +796,9 @@
       <button class="btn-primary" onclick="fbPush()" id="btn-fb-push" style="margin-bottom:8px;">
         ☁️ Firebase에 업로드 (모바일→클라우드)
       </button>
+      <button onclick="fixFirebaseRawdb()" style="width:100%;padding:10px;margin-bottom:8px;background:#f0883e;color:#0d1117;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">
+        🔧 Firebase rawdb 직접 보정 업로드
+      </button>
       <button class="btn-secondary" onclick="fbPull()" id="btn-fb-pull">
         📥 Firebase에서 가져오기 (클라우드→모바일)
       </button>
@@ -2870,7 +2873,9 @@ function diagRec() {
   const el = document.getElementById('diag-result');
   try {
     const raw = localStorage.getItem('_rawdb_2026');
+    if (!raw) { el.innerHTML = '오류: _rawdb_2026 데이터 없음 (Firebase 가져오기 먼저)'; return; }
     const arr = JSON.parse(raw);
+    if (!arr) { el.innerHTML = '오류: rawdb 파싱 실패'; return; }
     const all = (Array.isArray(arr) ? arr : Object.values(arr));
     // 6월 데이터 먼저 찾기
     const junRecs = all.filter(r => {
@@ -3753,7 +3758,7 @@ async function fbPush() {
       if (v) { try { meta[k] = JSON.parse(v); } catch(e) {} }
     });
     // meta 문서에 저장 (PC는 meta_pc 문서 사용하므로 충돌 없음)
-    await _db.collection(FB_COL).doc('meta').set(meta);
+    await _db.collection(FB_COL).doc('meta').set(meta, { merge: true });
 
     // 연도별 입고 DB
     const rawdbKeys = Object.keys(localStorage).filter(k => /^_rawdb_\d{4}$/.test(k));
@@ -3887,6 +3892,56 @@ function isRawdbPullEnabled() {
   return localStorage.getItem(FB_RAWDB_KEY) === 'true';
 }
 
+// Firebase rawdb 직접 보정: 0.021 → 21.0 으로 수정 후 재업로드
+async function fixFirebaseRawdb() {
+  if (!_db) { alert('Firebase 연결 안됨'); return; }
+  const el = document.getElementById('fb-result');
+  el.textContent = '⏳ Firebase rawdb 보정 중...';
+  el.style.color = 'var(--accent)';
+  try {
+    const snap = await _db.collection(FB_COL).get();
+    let fixed = 0;
+    for (const doc of snap.docs) {
+      const id = doc.id;
+      if (!id.startsWith('rawdb_')) continue;
+      const data = doc.data();
+      if (!data.records) continue;
+      let records = data.format === 'json_str'
+        ? data.records.map(r => typeof r === 'string' ? JSON.parse(r) : r)
+        : data.records;
+      let changed = false;
+      records = records.map(r => {
+        if (!Array.isArray(r) || r.length < 5) return r;
+        const g = parseFloat(r[2]), t = parseFloat(r[3]);
+        if (g > 0 && g < 1 && t > 0 && t < 1) {
+          changed = true;
+          fixed++;
+          return [r[0], r[1],
+            Math.round(g * 1000 * 100) / 100,
+            Math.round(t * 1000 * 100) / 100,
+            r[4]];
+        }
+        return r;
+      });
+      if (changed) {
+        const newRecords = records.map(r => Array.isArray(r) ? JSON.stringify(r) : r);
+        await _db.collection(FB_COL).doc(id).set({
+          ...data,
+          records: newRecords,
+          count: records.length,
+          format: 'json_str',
+          fixedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+    }
+    el.textContent = `✅ Firebase rawdb 보정 완료: ${fixed}건 수정\n이제 Firebase 가져오기 하세요.`;
+    el.style.color = 'var(--green)';
+  } catch(e) {
+    el.textContent = '❌ 실패: ' + e.message;
+    el.style.color = 'var(--red)';
+  }
+}
+
 async function fbPull() {
   // Firebase SDK 로드 대기 (최대 5초)
   let waited = 0;
@@ -3920,7 +3975,7 @@ async function fbPull() {
 
       if (id === 'meta') {
         // 모바일 키(v5)만 저장
-        ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_schedSettings_v5'].forEach(mk => {
+        ['_siloStock_v5','_usageData_v5','_usageDataBySilo_v5','_fcHistory_v5','_schedSettings_v5'].forEach(mk => {
           if (data[mk] !== undefined) {
             localStorage.setItem(mk, JSON.stringify(data[mk]));
           }
