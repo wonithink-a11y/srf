@@ -1288,29 +1288,28 @@ function autoLoadInbound() {
     allRecs = allRecs.concat(getDB(y));
   }
 
-  // 기간 필터
-  const recs = allRecs.filter(r => {
-    const d = Array.isArray(r) ? r[0] : r.date;
-    return d && d >= from && d <= to;
-  });
+  // 기간 필터 (normalizePcRec으로 PC/모바일 통합 파싱)
+  const recs = allRecs
+    .map(r => normalizePcRec(r))
+    .filter(r => r.date && r.date >= from && r.date <= to && r.ton > 0);
 
   // 날짜별 + 저장조별 집계
   const byDate = {};
   recs.forEach(r => {
-    const d    = Array.isArray(r) ? r[0] : r.date;
-    const silo = Array.isArray(r) ? r[6] : r.silo;
-    const ton  = Array.isArray(r) ? Math.abs(r[7]||0) : Math.abs(r.ton||0);
+    const d    = r.date;
+    const silo = r.silo;
+    const ton  = r.ton;
+    if (!d || !silo) return;
     if (!byDate[d]) byDate[d] = {};
     byDate[d][silo] = (byDate[d][silo]||0) + ton;
   });
 
   const dates = Object.keys(byDate).sort();
-  const totalTon = recs.reduce((s,r) => s + Math.abs(Array.isArray(r)?r[7]||0:r.ton||0), 0);
+  const totalTon = recs.reduce((s,r) => s + r.ton, 0);
   const siloSum  = {};
   recs.forEach(r => {
-    const silo = Array.isArray(r) ? r[6] : r.silo;
-    const ton  = Math.abs(Array.isArray(r) ? r[7]||0 : r.ton||0);
-    siloSum[silo] = (siloSum[silo]||0) + ton;
+    if (!r.silo) return;
+    siloSum[r.silo] = (siloSum[r.silo]||0) + r.ton;
   });
 
   // 미리보기 렌더
