@@ -319,6 +319,12 @@
   <!-- ① 대시보드 -->
   <div id="page-dash" class="page active">
 
+    <!-- 저장조별 현재고 현황 -->
+    <div class="card">
+      <div class="card-title">저장조별 현재고 현황</div>
+      <div id="silo-bars"></div>
+    </div>
+
     <!-- 지자체별 전체재고 -->
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
@@ -336,12 +342,6 @@
       <div class="total-sub" id="d-days" style="margin-bottom:12px;">잔여 가동일 계산 중...</div>
       <div id="kpi-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;"></div>
       <button class="btn-secondary" onclick="openStockModal()">✏️ 재고 직접 수정</button>
-    </div>
-
-    <!-- 저장조별 현재고 현황 -->
-    <div class="card">
-      <div class="card-title">저장조별 현재고 현황</div>
-      <div id="silo-bars"></div>
     </div>
 
     <!-- 알림 -->
@@ -953,10 +953,10 @@ a.click();</pre>
 <script>
 // ── 상수 ──
 const SILO_INFO = {
-  S1: { name: '광주', color: 'var(--s1)', cap: 4000 },
-  S2: { name: '전남', color: 'var(--s2)', cap: 2000 },
-  S4: { name: '나주', color: 'var(--s4)', cap:  500 },
-  S3: { name: '순천', color: 'var(--s3)', cap: 1000 },
+  S1: { name: '광주 ST', color: 'var(--s1)', cap: 4000 },
+  S2: { name: '전남 ST', color: 'var(--s2)', cap: 2000 },
+  S4: { name: '나주 ST', color: 'var(--s4)', cap:  500 },
+  S3: { name: '순천 ST', color: 'var(--s3)', cap: 1000 },
 };
 const SILO_ORDER = ['S1','S2','S4','S3'];
 const SILO_HEX = { S1:'#38bdf8', S2:'#22c55e', S4:'#a78bfa', S3:'#f59e0b' };
@@ -1228,13 +1228,35 @@ function renderDash() {
     const pctColor    = (isNeg || isOver) ? 'var(--red)' : 'var(--text2)';
     const borderColor = (isNeg || isOver) ? 'rgba(248,81,73,0.4)' : jj.hex + '44';
     const barColor    = (isNeg || isOver) ? 'var(--red)' : jj.color;
-    const sub = jj.silos.length > 1
-      ? `<div style="display:flex;gap:3px;justify-content:center;flex-wrap:wrap;margin-bottom:5px;">
-          ${jj.silos.map(k=>`<span style="font-size:8px;color:${SILO_INFO[k].color};background:${SILO_HEX[k]}22;border-radius:4px;padding:1px 4px;">${SILO_INFO[k].name} ${fmtTon(stock[k]||0)}</span>`).join('')}
-        </div>` : '';
-    return `<div style="background:var(--bg3);border:1px solid ${borderColor};border-radius:10px;padding:10px 8px;text-align:center;">
-      <div style="font-size:12px;font-weight:700;color:${jj.color};margin-bottom:5px;">${jj.name}</div>
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:700;color:${valColor};line-height:1;">${fmtTon(ton)}</div>
+    // 기여 저장조 목록 (자체 + 임시보관중인 자기 연료)
+    const jjNameKeys = { GJ:['광주','전남'], NJ:['나주'], SC:['순천'] }[jj.id] || [];
+    const rows = [];
+    // 자체 소유 저장조
+    jj.silos.forEach(k => {
+      const val = hasTempData ? (selfStock[k]||0) : (stock[k]||0);
+      rows.push({ name: SILO_INFO[k].name, val, color: SILO_INFO[k].color, isTemp: false });
+    });
+    // 다른 저장조에 임시보관중인 자기 연료
+    if (hasTempData) {
+      SILO_ORDER.forEach(k => {
+        if (jj.silos.includes(k)) return;
+        const td = tempData[k]; if (!td) return;
+        let amt = 0;
+        Object.entries(td.items).forEach(([name, a]) => {
+          if (jjNameKeys.some(n => name.includes(n))) amt += a;
+        });
+        if (amt > 0.05) rows.push({ name: SILO_INFO[k].name, val: amt, color: SILO_INFO[k].color, isTemp: true });
+      });
+    }
+    const sub = rows.length ? `<div style="margin-top:7px;border-top:1px solid var(--border);padding-top:6px;">
+      ${rows.map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;gap:4px;">
+        <span style="font-size:9px;color:${r.color};white-space:nowrap;">${r.name}${r.isTemp?'<span style="color:var(--text2);font-size:8px;">(임시)</span>':''}</span>
+        <span style="font-family:\'IBM Plex Mono\',monospace;font-size:10px;font-weight:700;color:${r.color};">${fmtTon(r.val)}</span>
+      </div>`).join('')}
+    </div>` : '';
+    return `<div style="background:var(--bg3);border:1px solid ${borderColor};border-radius:10px;padding:10px 8px;">
+      <div style="font-size:12px;font-weight:700;color:${jj.color};margin-bottom:4px;text-align:center;">${jj.name}</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:700;color:${valColor};line-height:1;text-align:center;">${fmtTon(ton)}</div>
       ${sub}
     </div>`;
   }).join('');
@@ -2603,7 +2625,7 @@ function normalizePcRec(r) {
   // ── PC형식 최우선 판별 ──
   // 구조: [datetime, car, gross(소수톤), tare(소수톤), silo한글]
   // gross/tare는 17~30 범위의 소수, silo는 한글 저장조명
-  const SILO_KR = ['광주','전남','나주','순천','S1','S2','S3','S4'];
+  const SILO_KR = ['광주','전남','나주','순천','광주 ST','전남 ST','나주 ST','순천 ST','S1','S2','S3','S4'];
   let r2 = parseFloat(r[2]), r3 = parseFloat(r[3]);
 
   // PC rawdb는 kg 정수(21340)로 저장 → 톤으로 변환
@@ -3242,10 +3264,10 @@ let _csvRows = [];
 let _csvSummary = null; // 합계행
 
 const SILO_MAP = {
-  's1':'S1','광주':'S1','1':'S1',
-  's2':'S2','전남':'S2','2':'S2',
-  's3':'S3','순천':'S3','3':'S3',
-  's4':'S4','나주':'S4','4':'S4',
+  's1':'S1','광주':'S1','광주 st':'S1','1':'S1',
+  's2':'S2','전남':'S2','전남 st':'S2','2':'S2',
+  's3':'S3','순천':'S3','순천 st':'S3','3':'S3',
+  's4':'S4','나주':'S4','나주 st':'S4','4':'S4',
 };
 
 function normSilo(v) {
