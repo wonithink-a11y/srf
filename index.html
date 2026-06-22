@@ -138,6 +138,20 @@
   }
   .form-select:focus, .form-input:focus { border-color: var(--accent); }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  /* ── OCR 검토 카드 전용 컴팩트 스타일 ── */
+  .ocr-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 5px; }
+  .ocr-field { position: relative; }
+  .ocr-field .ocr-label {
+    position: absolute; top: 3px; left: 8px; font-size: 9px; color: var(--text2); line-height: 1; pointer-events: none;
+  }
+  .ocr-input, .ocr-select {
+    width: 100%; background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-family: 'Noto Sans KR', sans-serif;
+    padding: 14px 7px 4px 7px; font-size: 12.5px; outline: none; -webkit-appearance: none;
+  }
+  .ocr-input:focus, .ocr-select:focus { border-color: var(--accent); }
+  .ocr-input[readonly] { background: var(--bg3); color: var(--accent); font-weight: 700; }
   .btn-primary {
     width: 100%; padding: 13px; border: none; border-radius: 10px;
     background: var(--accent); color: #0d1117; font-size: 15px; font-weight: 700;
@@ -355,6 +369,88 @@
   <!-- ② 입고 등록 (CSV 일괄 등록) -->
   <div id="page-input" class="page">
 
+    <!-- 📸 계근표 사진 인식 (OCR) -->
+    <div class="card">
+      <div class="card-title">📸 계근표 사진 인식 (OCR)</div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.7;margin-bottom:10px;">
+        계근표 사진을 촬영/선택하면 AI가 날짜·차량번호·중량을 자동으로 읽어줍니다.<br>
+        <span style="color:var(--yellow);">· 인식 후 내용을 확인하고 등록하세요</span>
+      </div>
+
+      <!-- Gemini Key 설정 -->
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px;">🔑 Gemini API Key (최초 1회 설정)</div>
+        <div style="display:flex;gap:6px;">
+          <input type="password" id="ocr-gemini-key" placeholder="AIza... (aistudio.google.com/apikey 무료 발급)"
+            style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:11px;">
+          <button onclick="ocrSaveGeminiKey()" style="background:var(--accent);border:none;color:#0d1117;border-radius:6px;padding:7px 12px;font-size:11px;font-weight:700;white-space:nowrap;">저장</button>
+        </div>
+        <div id="ocr-key-status" style="font-size:10px;color:var(--text2);margin-top:5px;"></div>
+        <div id="ocr-usage-status" style="font-size:10px;color:var(--text2);margin-top:3px;"></div>
+        <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:11px;color:var(--text2);white-space:nowrap;">모델:</span>
+          <select id="ocr-gemini-model" style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:11px;" onchange="localStorage.setItem('_geminiModel',this.value)">
+            <option value="gemini-2.5-flash">gemini-2.5-flash — ✅ 권장(균형)</option>
+            <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite — 가볍지만 무료 한도가 들쑥날쑥함</option>
+            <option value="gemini-3-flash">gemini-3-flash — 최신(프리뷰, 계정에 따라 미지원 가능)</option>
+            <option value="gemini-3.5-flash">gemini-3.5-flash — 최신(계정에 따라 미지원 가능)</option>
+          </select>
+        </div>
+        <div style="font-size:9px;color:var(--text2);margin-top:2px;">※ Google이 모델 지원/무료한도를 자주 바꿉니다. "모델을 찾을 수 없음" 오류가 나면 다른 모델로 바꿔보세요. (1.x, 2.0 계열은 2026년 서비스 종료됨)</div>
+      </div>
+
+      <!-- 인식 규칙(프롬프트) 설정 -->
+      <div style="margin-bottom:10px;">
+        <button onclick="ocrTogglePromptPanel()" style="width:100%;text-align:left;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;">
+          ⚙️ 인식 규칙(중량 범위) 설정 <span id="ocr-prompt-arrow" style="float:right;">▼</span>
+        </button>
+        <div id="ocr-prompt-panel" style="display:none;margin-top:6px;">
+          <textarea id="ocr-prompt-text" style="width:100%;height:130px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px;font-size:11px;font-family:'IBM Plex Mono',monospace;line-height:1.6;resize:vertical;"></textarea>
+          <div style="display:flex;gap:6px;margin-top:6px;">
+            <button onclick="ocrSavePrompt()" class="btn-secondary" style="flex:1;">💾 저장</button>
+            <button onclick="ocrResetPrompt()" class="btn-secondary" style="flex:1;">↺ 기본값</button>
+          </div>
+          <div style="font-size:10px;color:var(--text2);margin-top:4px;line-height:1.5;">
+            계근표에 찍히는 실제 중량 범위(kg)와 게이트 번호 규칙입니다. 사업장 차량 사정과 다르면 숫자를 수정 후 저장하세요.<br>
+            인식이 틀린 항목은 아래 검토 카드에서 <b>🔁 재추출</b>을 누르면 이 규칙으로 다시 분석합니다(사진 재촬영 불필요).
+          </div>
+        </div>
+      </div>
+
+
+      <!-- 촬영/선택 버튼 -->
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:14px;border:2px dashed var(--accent);border-radius:10px;cursor:pointer;color:var(--accent);font-size:13px;font-weight:600;">
+          📷 사진 촬영
+          <input type="file" accept="image/*" capture="environment" multiple style="display:none;" onchange="ocrAddFiles(this.files);this.value=''">
+        </label>
+        <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:14px;border:2px dashed var(--border);border-radius:10px;cursor:pointer;color:var(--text2);font-size:13px;font-weight:600;">
+          🖼️ 갤러리 선택
+          <input type="file" accept="image/*" multiple style="display:none;" onchange="ocrAddFiles(this.files);this.value=''">
+        </label>
+      </div>
+
+      <!-- 업로드된 이미지 썸네일 -->
+      <div id="ocr-thumb-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;"></div>
+
+      <button class="btn-primary" id="ocr-run-btn" onclick="ocrProcessAll()" style="display:none;margin-bottom:8px;">
+        <span id="ocr-run-btn-label">🤖 OCR 인식 실행</span>
+      </button>
+      <div id="ocr-progress" style="font-size:11px;color:var(--text2);margin-bottom:8px;"></div>
+
+      <!-- 인식 결과 검토(수정 가능) -->
+      <div id="ocr-review-list"></div>
+
+      <div style="display:flex;gap:8px;margin-top:6px;">
+        <button class="btn-primary" id="ocr-submit-btn" onclick="ocrSubmitAll()" style="display:none;flex:2;margin:0;">
+          ✅ 확인한 항목 일괄 등록
+        </button>
+        <button id="ocr-delete-all-btn" onclick="ocrDeleteAll()" style="display:none;flex:1;padding:13px;border:1px solid var(--red);border-radius:10px;background:none;color:var(--red);font-size:13px;font-weight:700;cursor:pointer;">
+          🗑️ 일괄삭제
+        </button>
+      </div>
+    </div>
+
     <!-- CSV 일괄 등록 -->
     <div class="card">
       <div class="card-title">📋 CSV 일괄 등록</div>
@@ -423,12 +519,18 @@
         </div>
         <div>
           <label class="form-label">구분</label>
-          <select id="rpt-type" class="form-select">
+          <select id="rpt-type" class="form-select" onchange="updateTotalInDefault()">
             <option value="weekly">주간</option>
             <option value="daily">전일</option>
           </select>
         </div>
       </div>
+
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin-bottom:10px;width:fit-content;">
+        <input type="checkbox" id="rpt-chk-totalin" style="accent-color:var(--accent);width:14px;height:14px;">
+        <span style="color:var(--text2);">📊 총입고(기간 합계) 표시</span>
+        <span style="color:var(--text2);font-size:10px;">— 전일은 기본 해제, 주간 4일↑은 자동 체크</span>
+      </label>
 
       <!-- 입고 기간 선택 -->
       <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">📥 입고 집계 기간</div>
@@ -953,6 +1055,21 @@ a.click();</pre>
 </div>
 
 <!-- 삭제 확인 모달 -->
+<!-- OCR 인식 상세보기 -->
+<div id="ocr-detail-overlay" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.88);overflow-y:auto;">
+  <div style="max-width:480px;margin:0 auto;padding:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <span style="font-size:14px;font-weight:700;color:var(--text);">📋 인식 상세보기</span>
+      <button onclick="ocrCloseDetail()" style="background:none;border:none;color:var(--text2);font-size:22px;line-height:1;cursor:pointer;">✕</button>
+    </div>
+    <img id="ocr-detail-img" src="" style="width:100%;border-radius:10px;margin-bottom:14px;border:1px solid var(--border);display:block;">
+    <div class="card-title" style="margin-bottom:6px;">🔎 추출되어 들어간 값</div>
+    <div id="ocr-detail-fields" style="margin-bottom:16px;"></div>
+    <div class="card-title" style="margin-bottom:6px;">📝 사진에서 읽은 원문(OCR 텍스트)</div>
+    <pre id="ocr-detail-raw" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:11px;line-height:1.6;white-space:pre-wrap;word-break:break-all;color:var(--text2);max-height:280px;overflow-y:auto;margin-bottom:20px;"></pre>
+  </div>
+</div>
+
 <div id="del-confirm-overlay" style="display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.7);align-items:flex-end;">
   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:20px 16px calc(20px + var(--safe-bottom));width:100%;">
     <div style="font-size:15px;font-weight:700;margin-bottom:8px;">🗑️ 입고 데이터 삭제</div>
@@ -1485,6 +1602,16 @@ function loadCurrentStock(manual = false) {
 
 // 보고문 생성
 // ── 기간 내 입고 자동 집계 ──
+// 총입고(기간 합계) 표시 여부 자동 기본값: 전일=항상 해제, 주간은 4일↑일 때만 자동 체크
+function updateTotalInDefault() {
+  const type = document.getElementById('rpt-type')?.value;
+  const chk  = document.getElementById('rpt-chk-totalin');
+  if (!chk) return;
+  const dateSet = new Set();
+  document.querySelectorAll('[id^="rpt-in-date-"]').forEach(el => { if (el.value) dateSet.add(el.value); });
+  chk.checked = (type === 'weekly' && dateSet.size >= 4);
+}
+
 function autoLoadInbound() {
   const from = document.getElementById('rpt-from').value;
   const to   = document.getElementById('rpt-to').value;
@@ -1594,6 +1721,7 @@ function autoLoadInbound() {
   }
 
   showToast(`✅ ${recs.length}건 집계 완료`);
+  updateTotalInDefault();
 }
 
 function generateReport() {
@@ -1774,11 +1902,12 @@ function generateReport() {
   });
 
   // ── 보고문 조합 ──
+  const showTotalIn = document.getElementById('rpt-chk-totalin')?.checked;
   const dateKo = fmtDateKo(date);
   let text = `-${dateKo} 연료관리현황-\n\n`;
   text += `1. 입고량\n`;
   if (totalIn > 0) {
-    text += `총입고 : ${totalInStr}\n`;
+    if (showTotalIn) text += `총입고 : ${totalInStr}\n`;
     if (inDetail) text += inDetail + '\n';
   } else {
     text += `- 입고 없음\n`;
@@ -3298,6 +3427,9 @@ document.getElementById('modal-overlay').addEventListener('click', function(e) {
 document.getElementById('del-confirm-overlay').addEventListener('click', function(e) {
   if (e.target === this) closeDelConfirm();
 });
+document.getElementById('ocr-detail-overlay').addEventListener('click', function(e) {
+  if (e.target === this) ocrCloseDetail();
+});
 
 document.getElementById('hist-silo').addEventListener('change', renderHistory);
 document.getElementById('hist-month-common').addEventListener('change', renderHistory);
@@ -3377,6 +3509,845 @@ function setCsvTab(tab) {
 }
 
 let _xlsxWorkbook = null; // 엑셀 워크북 캐시
+
+// ══════════════════════════════════════════
+// 📸 OCR 계근표 사진 인식 (Gemini Vision API)
+// ══════════════════════════════════════════
+let ocrItems = [];       // {id, file, dataUrl, status, parsed, errs, rawText, error}
+let _ocrSeq  = 0;
+let _geminiKey = localStorage.getItem('_geminiApiKey') || '';
+const OCR_DAILY_LIMIT = 1000;
+const OCR_USAGE_KEY   = '_geminiOcrUsageDate';
+const OCR_DRAFT_KEY   = '_ocrDraftItems_v1';
+
+// ── 임시 자동저장: 등록 전 작업 내용을 새로고침/탭종료에도 보존 ──
+function ocrSaveDraft() {
+  try {
+    if (!ocrItems.length) { localStorage.removeItem(OCR_DRAFT_KEY); return; }
+    const draft = ocrItems.map(it => ({
+      id: it.id, dataUrl: it.dataUrl,
+      status: it.status === 'busy' ? 'pending' : it.status, // 처리중이던 항목은 대기상태로 복원
+      parsed: it.parsed, errs: it.errs, rawText: it.rawText, error: it.error
+    }));
+    localStorage.setItem(OCR_DRAFT_KEY, JSON.stringify(draft));
+  } catch (e) { console.warn('OCR 임시저장 실패(용량 초과 가능):', e); }
+}
+function ocrClearDraft() { localStorage.removeItem(OCR_DRAFT_KEY); }
+
+async function ocrLoadDraft() {
+  let draft;
+  try { draft = JSON.parse(localStorage.getItem(OCR_DRAFT_KEY) || 'null'); } catch (e) { draft = null; }
+  if (!draft || !draft.length) return;
+  for (const d of draft) {
+    let file = null;
+    try { file = await (await fetch(d.dataUrl)).blob(); } catch (e) { /* 복원 실패해도 검토는 가능 */ }
+    ocrItems.push({ id: d.id, file, dataUrl: d.dataUrl, status: d.status, parsed: d.parsed, errs: d.errs || [], rawText: d.rawText, error: d.error });
+    if (parseInt((d.id||'').replace('ocr','')) > _ocrSeq) _ocrSeq = parseInt(d.id.replace('ocr',''));
+  }
+  ocrMergeDisplayPairs();
+  ocrRenderThumbs();
+  ocrRenderReview();
+  showToast(`📥 임시저장된 OCR 작업 ${draft.length}건을 복원했습니다`);
+}
+
+function ocrSaveGeminiKey() {
+  const v = (document.getElementById('ocr-gemini-key')||{}).value || '';
+  if (!v.trim()) { showToast('API Key를 입력하세요', '#e3b341'); return; }
+  _geminiKey = v.trim();
+  localStorage.setItem('_geminiApiKey', _geminiKey);
+  document.getElementById('ocr-gemini-key').value = '';
+  ocrUpdateKeyStatus();
+  showToast('✅ Gemini Key 저장됨');
+}
+function ocrClearGeminiKey() {
+  _geminiKey = '';
+  localStorage.removeItem('_geminiApiKey');
+  ocrUpdateKeyStatus();
+}
+function ocrUpdateKeyStatus() {
+  const el = document.getElementById('ocr-key-status');
+  if (el) el.innerHTML = _geminiKey
+    ? `<span style="color:var(--green);">✅ 등록됨 (${_geminiKey.slice(0,6)}...${_geminiKey.slice(-4)})</span> · <a href="#" onclick="ocrClearGeminiKey();return false;" style="color:var(--red);">삭제</a>`
+    : `<span style="color:var(--text2);">미설정 — <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent);">무료 발급</a> 후 입력하세요</span>`;
+  const u = document.getElementById('ocr-usage-status');
+  if (u) {
+    const cnt = ocrGetUsageToday();
+    u.textContent = `오늘 호출 ${cnt}건 — 실제 무료 한도는 모델별로 다름(아래 모델 선택 참고)`;
+    u.style.color = 'var(--text2)';
+  }
+  const modelSel = document.getElementById('ocr-gemini-model');
+  if (modelSel) {
+    const savedModel = localStorage.getItem('_geminiModel');
+    if (savedModel) modelSel.value = savedModel;
+  }
+}
+function ocrGetUsageToday() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(OCR_USAGE_KEY) || '{}');
+    const today2 = new Date().toISOString().slice(0,10);
+    return stored.date === today2 ? (stored.count || 0) : 0;
+  } catch(e) { return 0; }
+}
+function ocrIncUsage() {
+  const today2 = new Date().toISOString().slice(0,10);
+  localStorage.setItem(OCR_USAGE_KEY, JSON.stringify({ date: today2, count: ocrGetUsageToday() + 1 }));
+  ocrUpdateKeyStatus();
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function ocrAddFiles(files) {
+  const list = Array.from(files).filter(f => f.type.startsWith('image/'));
+  const items = [];
+  list.forEach(f => {
+    if (ocrItems.length + items.length >= 30) return;
+    const id = 'ocr' + (++_ocrSeq);
+    const tempItem = { id, file: null, dataUrl: '', status: 'resizing', parsed: null, errs: [] };
+    items.push(tempItem);
+    ocrItems.push(tempItem);
+  });
+  if (list.length > items.length) showToast('⚠️ 한 번에 최대 30장까지 가능합니다', '#e3b341');
+  ocrRenderThumbs();
+
+  // 한꺼번에 다 압축하면 폰이 느려지므로, 3장씩 순서대로 처리
+  let idx = 0;
+  async function runNext() {
+    const batch = [];
+    while (idx < items.length && batch.length < 3) { batch.push({ item: items[idx], file: list[idx] }); idx++; }
+    if (!batch.length) { ocrSaveDraft(); return; }
+    await Promise.all(batch.map(async ({ item, file }) => {
+      try {
+        const { blob, dataUrl } = await ocrResizeImage(file);
+        item.file = blob; item.dataUrl = dataUrl; item.status = 'pending';
+      } catch (e) {
+        item.file = file;
+        item.dataUrl = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file); });
+        item.status = 'pending';
+      }
+    }));
+    ocrRenderThumbs();
+    runNext();
+  }
+  runNext();
+}
+
+// ── 사진 리사이즈/압축: 카메라 원본(수 MB)을 OCR에 충분한 해상도로 줄여 업로드·인식 속도 개선 ──
+function ocrResizeImage(file, maxDim = 1600, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        const scale = Math.min(maxDim / width, maxDim / height);
+        width  = Math.round(width  * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => {
+        if (!blob) { reject(new Error('이미지 변환 실패')); return; }
+        resolve({ blob, dataUrl: canvas.toDataURL('image/jpeg', quality) });
+      }, 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('이미지 로드 실패')); };
+    img.src = url;
+  });
+}
+
+function ocrRemoveItem(id) {
+  ocrItems = ocrItems.filter(it => it.id !== id);
+  ocrRenderThumbs();
+  ocrRenderReview();
+  ocrSaveDraft();
+}
+
+function ocrDeleteAll() {
+  if (!ocrItems.length) return;
+  if (!confirm(`사진 ${ocrItems.length}장과 인식 결과를 모두 삭제할까요?\n(등록 전 상태라 삭제하면 복구할 수 없습니다)`)) return;
+  _ocrRunToken++; // 진행 중이던 OCR 루프가 있다면 다음 반복에서 스스로 멈추게 함
+  _ocrRunning = false;
+  if (_ocrWakeLock) { try { _ocrWakeLock.release(); } catch(e){} _ocrWakeLock = null; }
+  const runBtn = document.getElementById('ocr-run-btn');
+  if (runBtn) runBtn.disabled = false;
+  ocrItems = [];
+  ocrRenderThumbs();
+  ocrRenderReview();
+  ocrClearDraft();
+  const prog = document.getElementById('ocr-progress');
+  if (prog) prog.textContent = '';
+  showToast('🗑️ OCR 작업 전체 삭제됨');
+}
+
+function ocrRenderThumbs() {
+  const wrap = document.getElementById('ocr-thumb-list');
+  if (!wrap) return;
+  wrap.innerHTML = ocrItems.map(it => {
+    const badge = it.status === 'done' ? '✅' : it.status === 'error' ? '❌' : it.status === 'busy' ? '⏳' : it.status === 'resizing' ? '🗜️' : '🕓';
+    const imgTag = it.dataUrl
+      ? `<img src="${it.dataUrl}" onclick="ocrShowDetail('${it.id}')" style="width:100%;height:100%;object-fit:cover;display:block;cursor:pointer;">`
+      : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg2);font-size:10px;color:var(--text2);">압축중</div>`;
+    return `<div style="position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;border:1px solid var(--border);flex-shrink:0;">
+      ${imgTag}
+      <span style="position:absolute;top:2px;left:2px;font-size:11px;background:rgba(0,0,0,.55);border-radius:4px;padding:0 3px;">${badge}</span>
+      <button onclick="ocrRemoveItem('${it.id}')" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border:none;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:11px;line-height:18px;cursor:pointer;padding:0;">✕</button>
+    </div>`;
+  }).join('');
+  const btn = document.getElementById('ocr-run-btn');
+  const pendingCnt = ocrItems.filter(it => it.status === 'pending').length;
+  const errorCnt   = ocrItems.filter(it => it.status === 'error').length;
+  if (btn) btn.style.display = (pendingCnt + errorCnt) > 0 ? 'block' : 'none';
+  const lbl = document.getElementById('ocr-run-btn-label');
+  if (lbl) {
+    lbl.textContent = (pendingCnt === 0 && errorCnt > 0)
+      ? `🔁 실패 항목 재시도 (${errorCnt}건) — 위 모델 선택 확인`
+      : (errorCnt > 0 ? `🤖 OCR 인식 실행 (대기 ${pendingCnt}건 · 실패 ${errorCnt}건 포함)` : '🤖 OCR 인식 실행');
+  }
+  const delBtn = document.getElementById('ocr-delete-all-btn');
+  if (delBtn) delBtn.style.display = ocrItems.length ? 'block' : 'none';
+}
+
+// ── Gemini Vision 호출 ──
+async function ocrCallGemini(file, onWait) {
+  if (!_geminiKey) throw new Error('Gemini API Key가 설정되지 않았습니다.');
+  const base64   = await fileToBase64(file);
+  const mimeType = file.type || 'image/jpeg';
+  const model    = localStorage.getItem('_geminiModel') || 'gemini-2.5-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${_geminiKey}`;
+  const body = JSON.stringify({
+    contents: [{
+      parts: [
+        { text: '이 사진을 분석해 텍스트를 정확하게 추출해주세요.\n\n만약 종이로 인쇄된 계근표(계량증명서)라면: 날짜, 차량번호, 총중량, 공차중량, 실중량(kg), ID-NO, 상호명, 구분(출고/입고) 등을 빠짐없이 원문 그대로 출력하세요.\n\n만약 저울 본체의 디지털 LED 화면(예: "SWS-5000S WEIGHING SYSTEM" 같은 계근대 단말기)을 찍은 사진이라면: 키패드 버튼 숫자(1~9), 차번/소속/품명 라벨, 입차시/출차시 안내문구, CARD/계근표배출구 같은 인쇄된 고정 라벨은 전부 무시하고, 오직 LED로 켜진 빨간/주황색 숫자인 "WEIGHT" 값과 "ID-NO" 값만 정확히 읽어서 다음 두 줄로만 출력하세요:\nWEIGHT: [숫자] kg\nID-NO: [숫자]\nLED 숫자가 깨지거나 일부 안 보이면 보이는 자릿수 그대로 출력하고 추측하지 마세요.\n\n형식 변경이나 요약, 설명 없이 순수 텍스트만 출력합니다.' },
+        { inline_data: { mime_type: mimeType, data: base64 } }
+      ]
+    }],
+    generationConfig: { temperature: 0, maxOutputTokens: 2048 }
+  });
+
+  // ── 분당/일일 한도 초과(429) · 서버 과부하(503) 시 자동 재시도 (최대 2회) ──
+  let res, retryCount = 0;
+  while (retryCount <= 2) {
+    res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+    if (res.ok) break;
+    const err = await res.clone().json().catch(() => ({}));
+    const msg = err?.error?.message || `HTTP ${res.status}`;
+    const isQuota   = msg.includes('quota') || msg.includes('exceeded') || res.status === 429;
+    const isOverload = msg.includes('high demand') || msg.includes('overloaded') || res.status === 503;
+    if ((isQuota || isOverload) && retryCount < 2) {
+      retryCount++;
+      let waitSec;
+      if (isQuota) {
+        const m = msg.match(/retry in ([\d.]+)s/i);
+        waitSec = m ? Math.ceil(parseFloat(m[1])) + 3 : 35;
+      } else {
+        waitSec = 15;
+      }
+      if (onWait) onWait(`⏳ ${isQuota ? '분당 호출 한도 초과' : '서버 혼잡'} — ${waitSec}초 후 재시도...`);
+      await new Promise(r => setTimeout(r, waitSec * 1000));
+      continue;
+    }
+    if (msg.includes('API_KEY') || msg.includes('invalid')) throw new Error('API Key가 올바르지 않습니다. aistudio.google.com/apikey 에서 확인해주세요.');
+    if (msg.includes('not found') || msg.includes('not supported')) throw new Error('이 모델은 더 이상 지원되지 않습니다. ⚙️ 모델 선택에서 다른 모델로 바꿔주세요.');
+    throw new Error('Gemini 오류: ' + msg);
+  }
+  ocrIncUsage();
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+// ── 계근표 텍스트 파싱 (PC버전 parseKaeguneyo_v3 동일 로직 포팅) ──
+function parseWeighSlip(rawText) {
+  var text = rawText || '';
+  var toInt = function(s) { return parseInt((s||'').replace(/[,\s]/g,'')) || 0; };
+
+  function extractDate(t) {
+    var m = t.match(/(\d{4})-(\d{2})-(\d{2})(?:-\d+)?/);
+    return m ? m[1]+'-'+m[2]+'-'+m[3] : '';
+  }
+  function extractTime(t) {
+    var m = t.match(/총\s*중\s*량[^0-9]*(\d{2}):(\d{2})/);
+    return m ? m[1]+':'+m[2] : '00:00';
+  }
+  function extractVehicle(t) {
+    var m1 = t.match(/[가-힣]{2}\d{2}[가-힣]\d{4}/);
+    if (m1) return m1[0].replace(/\s/g,'');
+    var m2 = t.match(/차\s*번\s*호\s*[:：]\s*([가-힣0-9]+)/);
+    if (m2) return m2[1].trim();
+    var m3 = t.match(/차\s*량\s*번\s*호\s*[:：]\s*([가-힣0-9]+)/);
+    if (m3) return m3[1].trim();
+    return '';
+  }
+  function extractWeights(t) {
+    var gross = 0, tare = 0, netKg = 0;
+    var tlines = t.split(/[\n\r]+/);
+    tlines.forEach(function(line) {
+      var cl = line.replace(/\s+/g, ' ').trim();
+      var nm = cl.match(/(\d[\d,]+)\s*kg\s*$/i) || cl.match(/(\d[\d,]+)\s*kg/i);
+      if (!nm) return;
+      var val = toInt(nm[1]);
+      if (val < 100) return;
+      if (/총.?중.?량/.test(cl) && !gross) gross = val;
+      else if (/차.?중.?량|공.?차/.test(cl) && !tare) tare = val;
+      else if (/실.?중.?량/.test(cl) && !netKg) netKg = val;
+    });
+    if (gross > 0 && tare > 0) netKg = gross - tare;
+    var net = parseFloat((netKg / 1000).toFixed(3));
+    return { gross: gross, tare: tare, net: net, netKg: netKg };
+  }
+  function extractIdNo(t) {
+    var m = t.match(/ID-?NO\s*[:：]?\s*(\d+)/i);
+    return m ? m[1].trim() : '';
+  }
+
+  var refText = '', cmpText = '';
+  var hasJungmyeong = /계\s*량\s*증\s*명\s*서/.test(text);
+  var has007 = /007073/.test(text);
+  var has033_750 = /033750/.test(text);
+
+  if (hasJungmyeong) {
+    var certStart = text.search(/계\s*량\s*증\s*명\s*서/);
+    var certEnd   = text.search(/광\s*주\s*환\s*경\s*공\s*단/);
+    if (certStart !== -1 && certEnd !== -1) {
+      refText = text.slice(certStart, certEnd + 10);
+      cmpText = text.slice(0, certStart) + text.slice(certEnd + 10);
+    } else { refText = text; cmpText = ''; }
+  } else if (has007 && has033_750) {
+    var idx007 = text.indexOf('007073');
+    var idx033 = text.indexOf('033750');
+    var boundary = Math.floor((Math.min(idx007,idx033) + Math.max(idx007,idx033)) / 2);
+    if (idx033 < idx007) { cmpText = text.slice(0, boundary); refText = text.slice(boundary); }
+    else { refText = text.slice(0, boundary); cmpText = text.slice(boundary); }
+  } else if (has007) {
+    refText = text; cmpText = '';
+  } else {
+    var markers = [];
+    var re = /\*\s*계\s*근\s*표\s*\*/g, m2;
+    while ((m2 = re.exec(text)) !== null) markers.push(m2.index);
+    if (markers.length >= 2) { cmpText = text.slice(markers[0], markers[1]); refText = text.slice(markers[1]); }
+    else { cmpText = text; refText = ''; }
+  }
+
+  var ref = refText ? {
+    date: extractDate(refText), time: extractTime(refText),
+    vehicle: extractVehicle(refText), weights: extractWeights(refText), idno: extractIdNo(refText)
+  } : null;
+  var cmp = cmpText ? {
+    date: extractDate(cmpText), time: extractTime(cmpText),
+    vehicle: extractVehicle(cmpText), weights: extractWeights(cmpText), idno: extractIdNo(cmpText)
+  } : null;
+
+  var primary = ref || cmp;
+  if (!primary) return { datetime: new Date().toISOString().slice(0,10)+'T00:00', vehicle:'', gross:0, tare:0, net:0, gate:'' };
+
+  var date = primary.date || new Date().toISOString().slice(0,10);
+  var time = primary.time || '00:00';
+  var datetime = date + 'T' + time;
+
+  var gate = '';
+  var gM = text.match(/G\s*(\d{1,2})/i);
+  if (gM) {
+    var gn = parseInt(gM[1]);
+    if (gn>=2 && gn<=7) gate='광주';
+    else if (gn>=11 && gn<=12) gate='나주';
+    else if (gn>=13 && gn<=14) gate='순천';
+    else if (gn>=15 && gn<=18) gate='전남';
+  }
+  if (!gate) {
+    var hwM = text.match(/\b(\d{1,2})\s*[-–]\s*(\d{1,2})[.\s]/);
+    if (hwM) {
+      var gn2 = parseInt(hwM[2]);
+      if (gn2>=2 && gn2<=7) gate='광주';
+      else if (gn2>=11 && gn2<=12) gate='나주';
+      else if (gn2>=13 && gn2<=14) gate='순천';
+      else if (gn2>=15 && gn2<=18) gate='전남';
+    }
+  }
+  if (!gate && /SRF열병합/.test(text)) gate = '나주';
+  if (!gate && /광주환경공단/.test(text)) {
+    var dow = new Date(date).getDay();
+    gate = [1,3,5].includes(dow) ? '광주' : '전남';
+  }
+  if (!gate && has007) gate = '나주';
+
+  var w = primary.weights;
+  return { datetime: datetime, vehicle: primary.vehicle || '', gross: w.gross, tare: w.tare, net: w.net, gate: gate };
+}
+
+// ══════════════════════════════════════════
+// 인식 규칙(프롬프트) — 중량 범위 기반 추출
+// PC버전 reExtractByPrompt() 로직 포팅: OCR 라벨이 깨져도
+// "총중량은 19,500~40,000kg 사이"처럼 값의 범위로 식별해 정확도를 높임
+// ══════════════════════════════════════════
+const OCR_PROMPT_KEY = '_ocrParsePrompt_v3'; // PC와 동일 키 사용 (향후 동기화 호환)
+const OCR_PROMPT_DEFAULT = [
+  "# 계근표 중량 범위 (kg) — 사업장 차량 사정에 맞게 수정하세요",
+  "총중량: 19500kg~40000kg",
+  "공차중량: 16000kg~19000kg",
+  "실중량: 1000kg~15000kg",
+  "",
+  "# 입고게이트 판별 우선순위",
+  "1순위: 필기체 번호 ([2~7]=광주 / [11~12]=나주 / [13~14]=순천 / [15~18]=전남)",
+  "2순위: 광주환경공단(월·수·금=광주 / 화·목·토=전남), SRF열병합=나주, ID-NO 007073=나주"
+].join('\n');
+
+function getOcrPrompt() {
+  const stored = localStorage.getItem(OCR_PROMPT_KEY);
+  return (stored && stored.trim()) ? stored : OCR_PROMPT_DEFAULT;
+}
+function ocrTogglePromptPanel() {
+  const panel = document.getElementById('ocr-prompt-panel');
+  const arrow = document.getElementById('ocr-prompt-arrow');
+  const el    = document.getElementById('ocr-prompt-text');
+  if (!panel) return;
+  const open = panel.style.display === 'none';
+  panel.style.display = open ? 'block' : 'none';
+  if (arrow) arrow.textContent = open ? '▲' : '▼';
+  if (open && el) el.value = getOcrPrompt();
+}
+function ocrSavePrompt() {
+  const val = (document.getElementById('ocr-prompt-text')||{}).value || '';
+  if (!val.trim()) { showToast('내용을 입력하세요', '#e3b341'); return; }
+  localStorage.setItem(OCR_PROMPT_KEY, val);
+  showToast('✅ 인식 규칙 저장됨');
+}
+function ocrResetPrompt() {
+  localStorage.removeItem(OCR_PROMPT_KEY);
+  const el = document.getElementById('ocr-prompt-text');
+  if (el) el.value = OCR_PROMPT_DEFAULT;
+  showToast('↺ 기본값으로 복원됨');
+}
+
+function parseWeighSlipByPrompt(rawText) {
+  var text = rawText || '';
+  var toInt0 = function(s) { return parseInt((s||'').replace(/[,\s]/g,'')) || 0; };
+
+  // ── 0순위: 인쇄된 계근표가 아니라 "계근대 저울 화면(LED)" 자체를 찍은 사진인지 판별 ──
+  // 계근대 화면은 항상 영문 "WEIGHT"와 "ID-NO"만 표시되고, "계근표/구분/차번호" 같은 인쇄 항목이 없음
+  var isDisplayShot = /WEIGHT/i.test(text) && /ID[\s-]?NO/i.test(text) && !/구\s*분\s*[:：]/.test(text);
+  if (isDisplayShot) {
+    var wM  = text.match(/WEIGHT[^\d]*(\d[\d,]*)\s*kg/i) || text.match(/WEIGHT[\s\S]{0,15}?(\d[\d,]{3,})/i);
+    var idM = text.match(/ID[\s-]?NO[^\d]*(\d{3,})/i);
+    if (wM && idM) {
+      return {
+        isDisplay: true, displayWeight: toInt0(wM[1]), displayIdno: idM[1].replace(/^0+/, '') || idM[1],
+        datetime: new Date().toISOString().slice(0,10) + 'T00:00', vehicle: '', gross: 0, tare: 0, net: 0, gate: '', cmp: null, diff: null
+      };
+    }
+  }
+
+  var prompt = getOcrPrompt();
+  var toInt = function(s) { return parseInt((s||'').replace(/[,\s]/g,'')) || 0; };
+
+  function getRange(label, def) {
+    var m = prompt.match(new RegExp(label + '[^:]*:\\s*([\\d,]+)\\s*kg\\s*[~～]\\s*([\\d,]+)\\s*kg'));
+    if (m) return [toInt(m[1]), toInt(m[2])];
+    return def;
+  }
+  var grossRange = getRange('총중량', [19500,40000]);
+  var tareRange  = getRange('공차중량', [16000,19000]);
+  var netRange   = getRange('실중량', [1000,15000]);
+
+  function extractDate(t) { var m = t.match(/(\d{4})-(\d{2})-(\d{2})(?:-\d+)?/); return m ? m[1]+'-'+m[2]+'-'+m[3] : ''; }
+  function extractTime(t) { var m = t.match(/총\s*중\s*량[^0-9]*(\d{2}):(\d{2})/); return m ? m[1]+':'+m[2] : ''; }
+  function extractVehicle(t) {
+    var m1 = t.match(/[가-힣]{2}\d{2}[가-힣]\d{4}/); if (m1) return m1[0].replace(/\s/g,'');
+    var m2 = t.match(/차\s*번\s*호\s*[:：]\s*([가-힣0-9]+)/); if (m2) return m2[1].trim();
+    var m3 = t.match(/차\s*량\s*번\s*호\s*[:：]\s*([가-힣0-9]+)/); if (m3) return m3[1].trim();
+    return '';
+  }
+  function numsInRange(t, range) {
+    return Array.from(t.matchAll(/(\d[\d,]+)\s*kg/gi)).map(function(m){ return toInt(m[1]); })
+      .filter(function(n){ return n >= range[0] && n <= range[1]; });
+  }
+  function pickWeights(t) {
+    var g  = numsInRange(t, grossRange);
+    var ta = numsInRange(t, tareRange);
+    var ne = numsInRange(t, netRange);
+    var gross = g[0] || 0, tare = ta[0] || 0;
+    var netKg = (gross > 0 && tare > 0) ? (gross - tare) : (ne[0] || 0);
+    return { gross: gross, tare: tare, net: parseFloat((netKg/1000).toFixed(3)) };
+  }
+  // 같은 차량번호가 사진 한 장에 2번(기준 슬립·비교 슬립) 찍히는 것을 이용해 두 영역으로 분리
+  function splitByRepeatedVehicle(t) {
+    var vRe = /[가-힣]{2}\d{2}[가-힣]\d{4}/g, idxs = [], vm;
+    while ((vm = vRe.exec(t)) !== null) idxs.push(vm.index);
+    if (idxs.length < 2) return null;
+    var idx2 = idxs[1];
+    var headStart = t.lastIndexOf('날', idx2);
+    if (headStart === -1 || idx2 - headStart > 150) headStart = Math.max(0, idx2 - 80);
+    return [t.slice(0, headStart), t.slice(headStart)];
+  }
+
+  // ── 기준/비교 구역 분리 + 지자체별 정확한 판별 ──
+  // 주의: 지자체마다 "기준"이 다른 쪽입니다. 출고=기준이 아니라, 사례마다 다릅니다.
+  //  · 광주/전남: 계량증명서(광주환경공단) = 기준 / 계근표(ID-NO 6자리, 입고) = 비교
+  //  · 나주     : SRF열병합발전소(00시작 6자리, 출고) = 기준 / 옥천영농조합법인(03시작 6자리, 입고) = 비교
+  //  · 순천     : 남천운수·옥천영농조합법인(03시작 6자리, 입고) = 기준 / 나주난방공사(8자리 ID, 출고) = 비교  ※나주와 반대!
+  var refText = '', cmpText = '';
+  var split = splitByRepeatedVehicle(text);
+  var seg1 = split ? split[0] : text;
+  var seg2 = split ? split[1] : '';
+
+  var CERT_RE      = /계\s*량\s*증\s*명\s*서/;                 // 광주/전남 기준
+  var SRF_RE        = /SRF\s*열\s*병\s*합\s*발\s*전\s*소/;       // 나주 기준
+  var NAJU_HEAT_RE  = /나\s*주\s*난\s*방\s*공\s*사/;             // 순천 비교(나주 발송분)
+  var IN_RE         = /구\s*분\s*[:：]?\s*입\s*고/;
+
+  if (CERT_RE.test(seg1) && !CERT_RE.test(seg2))          { refText = seg1; cmpText = seg2; }
+  else if (CERT_RE.test(seg2) && !CERT_RE.test(seg1))     { refText = seg2; cmpText = seg1; }
+  else if (SRF_RE.test(seg1) && !SRF_RE.test(seg2))       { refText = seg1; cmpText = seg2; }
+  else if (SRF_RE.test(seg2) && !SRF_RE.test(seg1))       { refText = seg2; cmpText = seg1; }
+  else if (NAJU_HEAT_RE.test(seg1) && !NAJU_HEAT_RE.test(seg2)) { refText = seg2; cmpText = seg1; } // 나주난방공사=비교
+  else if (NAJU_HEAT_RE.test(seg2) && !NAJU_HEAT_RE.test(seg1)) { refText = seg1; cmpText = seg2; }
+  else if (IN_RE.test(seg1) && !IN_RE.test(seg2))         { refText = seg1; cmpText = seg2; } // 위 케이스에 안 걸리면 입고측을 기준으로
+  else if (IN_RE.test(seg2) && !IN_RE.test(seg1))         { refText = seg2; cmpText = seg1; }
+  else if (!seg2) { refText = text; cmpText = ''; } // 슬립 1장만 인식된 경우
+  else { refText = seg1; cmpText = seg2; } // 모든 규칙 불일치 시 기본값
+  var mainText = refText || cmpText || text;
+
+  var date = extractDate(mainText) || extractDate(text) || new Date().toISOString().slice(0,10);
+  var time = extractTime(mainText) || extractTime(text) || '00:00';
+  var vehicle = extractVehicle(mainText) || extractVehicle(text);
+
+  // ── 범위 기반 중량 추출: 기준/비교 영역을 분리해서 각각 따로 계산 ──
+  var refW = pickWeights(refText || text);
+  var cmpW = cmpText ? pickWeights(cmpText) : null;
+  var gross = refW.gross, tare = refW.tare, net = refW.net;
+  var diff  = cmpW ? parseFloat((net - cmpW.net).toFixed(3)) : null;
+
+  // ── 게이트 판별 ──
+  var gate = '';
+  var gM = text.match(/G\s*(\d{1,2})/i);
+  if (gM) {
+    var gn = parseInt(gM[1]);
+    if (gn>=2&&gn<=7) gate='광주'; else if (gn>=11&&gn<=12) gate='나주'; else if (gn>=13&&gn<=14) gate='순천'; else if (gn>=15&&gn<=18) gate='전남';
+  }
+  if (!gate) {
+    var hwM = text.match(/\b(\d{1,2})\s*[-–]\s*(\d{1,2})[.\s]/);
+    if (hwM) {
+      var gn2 = parseInt(hwM[2]);
+      if (gn2>=2&&gn2<=7) gate='광주'; else if (gn2>=11&&gn2<=12) gate='나주'; else if (gn2>=13&&gn2<=14) gate='순천'; else if (gn2>=15&&gn2<=18) gate='전남';
+    }
+  }
+  if (!gate && /SRF열병합/.test(text)) gate = '나주';
+  if (!gate && /광주환경공단/.test(text)) { var dow = new Date(date).getDay(); gate = [1,3,5].includes(dow) ? '광주' : '전남'; }
+  if (!gate && /007073/.test(text)) gate = '나주';
+  if (!gate && /순천자원순환센터|순천SRF비성형/.test(text)) gate = '순천';
+  if (!gate) { var gm2 = text.match(/(광주|전남|나주|순천)/); gate = gm2 ? gm2[1] : ''; }
+
+  return {
+    datetime: date + 'T' + time, vehicle: vehicle || '', gross: gross, tare: tare, net: net, gate: gate,
+    cmp: cmpW, diff: diff,
+    debug: { allKg: Array.from(text.matchAll(/(\d[\d,]+)\s*kg/gi)).map(function(m){return toInt(m[1]);}), grossRange: grossRange, tareRange: tareRange, netRange: netRange }
+  };
+}
+
+let _ocrWakeLock = null;
+let _ocrRunning = false;
+let _ocrRunToken = 0; // 일괄삭제/취소 시 증가시켜 진행 중인 루프를 중단시킴
+
+// ── 인쇄 계근표 대신 "계근대 화면"만 찍은 사진들을 ID-NO 기준으로 짝지어 1건으로 합치기 ──
+// 같은 ID-NO가 찍힌 화면사진 중 더 큰 값=총중량, 작은 값=공차중량으로 계산
+function ocrMergeDisplayPairs() {
+  const displayItems = ocrItems.filter(it => it.parsed && it.parsed.isDisplay);
+  if (!displayItems.length) return;
+  const groups = {};
+  displayItems.forEach(it => {
+    const key = it.parsed.displayIdno;
+    (groups[key] = groups[key] || []).push(it);
+  });
+  let mergedCount = 0;
+  Object.values(groups).forEach(group => {
+    if (group.length < 2) return; // 짝이 없으면 다음 사진이 올 때까지 그대로 둠
+    const weights = group.map(it => it.parsed.displayWeight).sort((a,b) => b - a);
+    const gross = weights[0], tare = weights[weights.length - 1];
+    const net = parseFloat(((gross - tare) / 1000).toFixed(3));
+    const newItem = {
+      id: 'ocr' + (++_ocrSeq), file: null, dataUrl: group[0].dataUrl,
+      status: net > 0 ? 'done' : 'error',
+      parsed: {
+        datetime: new Date().toISOString().slice(0,10) + 'T00:00', vehicle: '',
+        gross: gross, tare: tare, net: net, gate: '', cmp: null, diff: null,
+        fromDisplay: true, displayIdno: group[0].parsed.displayIdno
+      },
+      errs: [], rawText: group.map(it => it.rawText).join('\n---\n'), error: null
+    };
+    ocrItems = ocrItems.filter(it => !group.includes(it));
+    ocrItems.push(newItem);
+    mergedCount++;
+  });
+  if (mergedCount) {
+    showToast(`🔗 계근대 화면 사진을 ${mergedCount}건으로 합쳤습니다 — 날짜·차량번호·게이트를 직접 입력해주세요`);
+  }
+}
+
+async function ocrProcessAll() {
+  const pending = ocrItems.filter(it => it.status === 'pending' || it.status === 'error');
+  if (!pending.length) return;
+  if (!_geminiKey) { showToast('⚠️ Gemini API Key를 먼저 설정하세요', '#e3b341'); return; }
+  const myToken = ++_ocrRunToken; // 이 실행 회차를 식별 — 도중에 토큰이 바뀌면(삭제 등) 즉시 중단
+  const btn  = document.getElementById('ocr-run-btn');
+  const prog = document.getElementById('ocr-progress');
+  btn.disabled = true;
+  _ocrRunning = true;
+  // 화면이 꺼지면 모바일 브라우저가 처리를 일시중단할 수 있어, 처리 중엔 화면이 꺼지지 않게 함
+  try { if ('wakeLock' in navigator) _ocrWakeLock = await navigator.wakeLock.request('screen'); } catch(e) { /* 지원 안 하면 무시 */ }
+
+  for (let i = 0; i < pending.length; i++) {
+    if (myToken !== _ocrRunToken) return; // 작업이 취소됨(일괄삭제 등) — 더 이상 진행하지 않고 즉시 종료
+    const it = pending[i];
+    it.status = 'busy';
+    ocrRenderThumbs();
+    if (prog) prog.textContent = `🤖 인식 중... (${i+1}/${pending.length})`;
+    const t0 = Date.now();
+    try {
+      const text = await ocrCallGemini(it.file, (waitMsg) => { if (myToken === _ocrRunToken && prog) prog.textContent = waitMsg; });
+      if (myToken !== _ocrRunToken) return; // 대기 중에 취소됐으면 결과를 반영하지 않고 종료
+      const parsed = parseWeighSlipByPrompt(text);
+      it.parsed  = parsed;
+      it.rawText = text;
+      it.status  = (parsed.gross > 0 || parsed.tare > 0 || parsed.net > 0) ? 'done' : 'error';
+    } catch(e) {
+      it.status = 'error';
+      it.error  = e.message;
+    }
+    if (myToken !== _ocrRunToken) return; // 처리 중 취소됨 — UI를 더 이상 건드리지 않음
+    const sec = ((Date.now() - t0) / 1000).toFixed(1);
+    ocrRenderThumbs();
+    ocrSaveDraft();
+    if (prog) prog.textContent = it.status === 'error'
+      ? `⚠️ (${i+1}/${pending.length}) 인식 실패 — ${it.error || ''}`
+      : `🤖 인식 완료 (${i+1}/${pending.length}) · ${sec}초 소요`;
+    if (i < pending.length - 1) await new Promise(r => setTimeout(r, 5000)); // 무료 한도(분당 호출) 보호용 대기
+  }
+  if (myToken !== _ocrRunToken) return;
+  btn.disabled = false;
+  _ocrRunning = false;
+  if (_ocrWakeLock) { try { await _ocrWakeLock.release(); } catch(e){} _ocrWakeLock = null; }
+  ocrMergeDisplayPairs();
+  if (prog) prog.textContent = `✅ 인식 완료 — 아래에서 내용을 확인 후 등록하세요.`;
+  ocrRenderThumbs();
+  ocrRenderReview();
+  ocrSaveDraft();
+}
+
+// 다른 탭/앱으로 전환되었다가 돌아왔을 때, 처리 중이었다면 화면을 다시 켜놓도록 재요청
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && _ocrRunning) {
+    try { if ('wakeLock' in navigator) _ocrWakeLock = await navigator.wakeLock.request('screen'); } catch(e) {}
+    const prog = document.getElementById('ocr-progress');
+    if (prog && !prog.textContent.includes('재시도')) prog.textContent = '🔄 화면으로 돌아왔습니다 — 이어서 진행 중...';
+  }
+});
+
+// ── 사진을 다시 보내지 않고, 저장된 원문을 현재 인식 규칙으로 재분석 ──
+function ocrReExtract(id) {
+  const it = ocrItems.find(x => x.id === id);
+  if (!it || !it.rawText) { showToast('원문이 없습니다. OCR을 먼저 실행하세요', '#e3b341'); return; }
+  it.parsed = parseWeighSlipByPrompt(it.rawText);
+  it.status = (it.parsed.gross > 0 || it.parsed.tare > 0 || it.parsed.net > 0) ? 'done' : 'error';
+  ocrRenderThumbs();
+  ocrRenderReview();
+  ocrSaveDraft();
+  showToast('🔁 재추출 완료');
+}
+
+// ── 사진 클릭 → 추출 데이터 상세보기 ──
+function ocrShowDetail(id) {
+  const it = ocrItems.find(x => x.id === id);
+  if (!it) return;
+  document.getElementById('ocr-detail-img').src = it.dataUrl;
+  const fieldsEl = document.getElementById('ocr-detail-fields');
+  if (it.parsed) {
+    const p = it.parsed;
+    const net  = ocrComputeNet(it);
+    const silo = normSilo(p.gate);
+    fieldsEl.innerHTML = `
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12px;line-height:2;">
+        <div>📅 날짜 → <b style="color:var(--accent);">${(p.datetime||'').slice(0,10) || '미인식'}</b></div>
+        <div>🚚 차량번호 → <b style="color:var(--accent);">${p.vehicle || '미인식'}</b></div>
+        <div>🚪 게이트/저장조 → <b style="color:var(--accent);">${p.gate || '미인식'}${silo? ' ('+(SILO_INFO[silo]?.name||silo)+')' : ''}</b></div>
+        <div>⚖️ 총중량[기준] → <b style="color:var(--accent);">${(p.gross||0).toLocaleString()} kg</b></div>
+        <div>⚖️ 공차중량[기준] → <b style="color:var(--accent);">${(p.tare||0).toLocaleString()} kg</b></div>
+        <div>✅ 실중량[기준](저장값) → <b style="color:var(--green);">${net.toFixed(3)} 톤</b></div>
+        ${p.cmp ? `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);">
+          🔁 실중량[비교] → <b style="color:${Math.abs(p.diff)>0.1?'var(--red)':'var(--text2)'};">${p.cmp.net.toFixed(3)} 톤</b>
+          (총 ${(p.cmp.gross||0).toLocaleString()}kg / 공차 ${(p.cmp.tare||0).toLocaleString()}kg)<br>
+          기준-비교 차이 → <b style="color:${Math.abs(p.diff)>0.1?'var(--red)':'var(--green)'};">${p.diff>0?'+':''}${p.diff}톤</b>
+        </div>` : '<div style="margin-top:6px;color:var(--text2);">🔁 비교 슬립이 사진에서 함께 인식되지 않았습니다(한 장만 있는 경우 정상).</div>'}
+      </div>`;
+  } else {
+    const msg = it.status === 'busy' ? '⏳ 인식 진행 중입니다...'
+      : it.status === 'error' ? ('❌ 인식 실패: ' + (it.error || '데이터를 찾지 못했습니다. 재추출 또는 직접 입력하세요.'))
+      : '아직 OCR을 실행하지 않았습니다.';
+    fieldsEl.innerHTML = `<div style="font-size:12px;color:var(--text2);">${msg}</div>`;
+  }
+  document.getElementById('ocr-detail-raw').textContent = it.rawText || '(아직 인식된 원문이 없습니다)';
+  document.getElementById('ocr-detail-overlay').style.display = 'block';
+}
+function ocrCloseDetail() {
+  document.getElementById('ocr-detail-overlay').style.display = 'none';
+}
+
+
+function ocrComputeNet(it) {
+  const p = it.parsed; if (!p) return 0;
+  const gross = parseFloat(p.gross)||0, tare = parseFloat(p.tare)||0;
+  return gross > 0 && tare > 0 ? (gross - tare)/1000 : (parseFloat(p.net)||0);
+}
+
+function ocrValidate(it) {
+  const p = it.parsed || {}; const errs = [];
+  if (!p.datetime || !/^\d{4}-\d{2}-\d{2}/.test(p.datetime)) errs.push('날짜');
+  if (!p.vehicle) errs.push('차량번호');
+  if (!normSilo(p.gate)) errs.push('게이트');
+  if (ocrComputeNet(it) <= 0) errs.push('실중량=0');
+  if (p.cmp && p.cmp.net > 0 && Math.abs(p.diff) > 0.1) errs.push(`기준·비교 차이 ${p.diff>0?'+':''}${p.diff}톤`);
+  it.errs = errs;
+  return errs;
+}
+
+function ocrRenderReview() {
+  const wrap = document.getElementById('ocr-review-list');
+  if (!wrap) return;
+  const items = ocrItems.filter(it => it.parsed);
+  if (!items.length) { wrap.innerHTML = ''; const sb=document.getElementById('ocr-submit-btn'); if(sb) sb.style.display='none'; return; }
+
+  wrap.innerHTML = items.map(it => {
+    ocrValidate(it);
+    const p = it.parsed;
+    const net = ocrComputeNet(it);
+    const dateVal = (p.datetime||'').slice(0,10);
+    const silo = normSilo(p.gate) || '';
+    const ok = it.errs.length === 0;
+    return `<div style="background:var(--bg3);border:1px solid ${ok?'rgba(63,185,80,.3)':'rgba(248,81,73,.3)'};border-radius:8px;padding:7px 9px;margin-bottom:6px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+        <span style="font-size:10.5px;font-weight:700;color:${ok?'var(--green)':'var(--red)'};">${ok ? '✅ 확인됨' : '⚠️ ' + it.errs.join(', ')}${p.fromDisplay ? ' · 🖥️화면사진 추정' : ''}</span>
+        <div style="display:flex;gap:8px;">
+          <button onclick="ocrShowDetail('${it.id}')" style="background:none;border:none;color:var(--accent);font-size:10.5px;cursor:pointer;padding:0;">🔍원문</button>
+          <button onclick="ocrReExtract('${it.id}')" style="background:none;border:none;color:var(--yellow);font-size:10.5px;cursor:pointer;padding:0;">🔁재추출</button>
+          <button onclick="ocrRemoveItem('${it.id}')" style="background:none;border:none;color:var(--text2);font-size:10.5px;cursor:pointer;padding:0;">삭제</button>
+        </div>
+      </div>
+      <div class="ocr-row">
+        <div class="ocr-field"><span class="ocr-label">날짜</span>
+          <input type="date" class="ocr-input" value="${dateVal}" onchange="ocrEditField('${it.id}','date',this.value)"></div>
+        <div class="ocr-field"><span class="ocr-label">차량번호</span>
+          <input type="text" class="ocr-input" value="${p.vehicle||''}" onchange="ocrEditField('${it.id}','vehicle',this.value)"></div>
+      </div>
+      <div class="ocr-row">
+        <div class="ocr-field"><span class="ocr-label">총중량(kg)</span>
+          <input type="number" class="ocr-input" value="${p.gross||0}" onchange="ocrEditField('${it.id}','gross',this.value)"></div>
+        <div class="ocr-field"><span class="ocr-label">공차중량(kg)</span>
+          <input type="number" class="ocr-input" value="${p.tare||0}" onchange="ocrEditField('${it.id}','tare',this.value)"></div>
+      </div>
+      <div class="ocr-row" style="margin-bottom:0;">
+        <div class="ocr-field"><span class="ocr-label">게이트</span>
+          <select class="ocr-select" onchange="ocrEditField('${it.id}','gate',this.value)">
+            ${['광주','전남','나주','순천'].map(g=>`<option value="${g}" ${normSilo(g)===silo?'selected':''}>${g}</option>`).join('')}
+          </select></div>
+        <div class="ocr-field"><span class="ocr-label">실중량[기준]톤</span>
+          <input type="text" class="ocr-input" value="${net.toFixed(3)}" readonly></div>
+      </div>
+      ${p.cmp ? `<div style="margin-top:5px;padding:4px 8px;border-radius:6px;background:${Math.abs(p.diff)>0.1?'rgba(248,81,73,.12)':'rgba(63,185,80,.1)'};font-size:10px;color:var(--text2);line-height:1.5;">
+        🔁비교 <b style="color:${Math.abs(p.diff)>0.1?'var(--red)':'var(--green)'};">${p.cmp.net.toFixed(3)}톤</b>
+        · 차이 <b style="color:${Math.abs(p.diff)>0.1?'var(--red)':'var(--green)'};">${p.diff>0?'+':''}${p.diff}톤</b>
+        ${Math.abs(p.diff)>0.1 ? ' ⚠️확인필요' : ' ✅일치'}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+
+  const anyOk = items.some(it => it.errs.length === 0);
+  const sb = document.getElementById('ocr-submit-btn');
+  if (sb) sb.style.display = anyOk ? 'block' : 'none';
+}
+
+function ocrEditField(id, field, value) {
+  const it = ocrItems.find(x => x.id === id);
+  if (!it || !it.parsed) return;
+  if (field === 'date') {
+    const time = (it.parsed.datetime || 'T00:00').split('T')[1] || '00:00';
+    it.parsed.datetime = value + 'T' + time;
+  } else if (field === 'vehicle') it.parsed.vehicle = value;
+  else if (field === 'gross') it.parsed.gross = parseFloat(value) || 0;
+  else if (field === 'tare')  it.parsed.tare  = parseFloat(value) || 0;
+  else if (field === 'gate')  it.parsed.gate  = value;
+  ocrRenderReview();
+  ocrSaveDraft();
+}
+
+function ocrSubmitAll() {
+  const items = ocrItems.filter(it => it.parsed);
+  items.forEach(ocrValidate);
+  const ok = items.filter(it => it.errs.length === 0);
+  if (!ok.length) { showToast('등록할 항목이 없습니다', '#f85149'); return; }
+
+  // 중복 체크 (CSV 등록과 동일 로직 — date|car|silo|ton)
+  const existingKeys = new Set();
+  Object.keys(localStorage).filter(k => /^_rawdb_\d{4}$/.test(k)).forEach(key => {
+    let db = [];
+    try { db = JSON.parse(localStorage.getItem(key)) || []; } catch(e) {}
+    db.forEach(r => {
+      const nr = normalizePcRec(r);
+      const ton = parseFloat(nr.ton||0).toFixed(2);
+      existingKeys.add(`${nr.date}|${nr.car}|${nr.silo}|${ton}`);
+    });
+  });
+
+  const stock   = getStock();
+  const siloTon = {};
+  const byYear  = {};
+  let savedCount = 0, dupCount = 0;
+  const savedItems = [];
+
+  ok.forEach(it => {
+    const p = it.parsed;
+    const date = (p.datetime || '').slice(0, 10);
+    const car  = p.vehicle;
+    const silo = normSilo(p.gate);
+    const grossTon = (parseFloat(p.gross) || 0) / 1000;
+    const tareTon  = (parseFloat(p.tare)  || 0) / 1000;
+    const ton  = ocrComputeNet(it);
+    const dk   = `${date}|${car}|${silo}|${ton.toFixed(2)}`;
+    if (existingKeys.has(dk)) { dupCount++; return; }
+
+    const yr = date.slice(0, 4);
+    if (!byYear[yr]) byYear[yr] = [];
+    byYear[yr].push([date + ' 00:00', car, Math.round(grossTon * 100) / 100, Math.round(tareTon * 100) / 100, silo]);
+    siloTon[silo] = (siloTon[silo] || 0) + ton;
+    savedCount++;
+    savedItems.push(it);
+  });
+
+  Object.entries(byYear).forEach(([yr, recs]) => {
+    const existing = getDB(parseInt(yr));
+    saveDB([...existing, ...recs], parseInt(yr));
+  });
+  Object.entries(siloTon).forEach(([k, v]) => { stock[k] = (stock[k] || 0) + v; });
+  localStorage.setItem(KEY_STOCK, JSON.stringify(stock));
+
+  showToast(`✅ ${savedCount}건 등록 완료${dupCount ? ` (중복 ${dupCount}건 제외)` : ''}`);
+
+  ocrItems = ocrItems.filter(it => !savedItems.includes(it));
+  ocrRenderThumbs();
+  ocrRenderReview();
+  ocrSaveDraft();
+  renderDash();
+  renderTodayRecs();
+}
+
+ocrUpdateKeyStatus();
+ocrLoadDraft();
+
 
 // ── 파일 로드 (CSV + 엑셀 통합) ──
 function loadFile(input) {
