@@ -11,6 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <title>SRF 수급관리</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
@@ -179,6 +180,19 @@
     background:var(--accent); color:#fff; border-color:var(--accent);
   }
   .hseg-btn:active { opacity:0.8; }
+
+  /* ── 입고량 내부 서브탭 (입력/입고이력/보고문) ── */
+  .subtab-btn {
+    flex:1; padding:10px 6px; border-radius:9px;
+    border:1px solid var(--border); background:var(--bg3);
+    color:var(--text2); font-size:12.5px; font-weight:700;
+    font-family:'Noto Sans KR',sans-serif; cursor:pointer;
+    transition: all 0.15s;
+  }
+  .subtab-btn.active {
+    background:var(--accent); color:#0d1117; border-color:var(--accent);
+  }
+  .subtab-btn:active { opacity:0.8; }
 
   /* ── 일별 아코디언 ── */
   .day-group { border-bottom:1px solid var(--border); }
@@ -367,265 +381,6 @@
   </div>
 
   <!-- ② 입고 등록 (CSV 일괄 등록) -->
-  <div id="page-input" class="page">
-
-    <!-- 📸 계근표 사진 인식 (OCR) -->
-    <div class="card">
-      <div class="card-title">📸 계근표 사진 인식 (OCR)</div>
-      <div style="font-size:11px;color:var(--text2);line-height:1.7;margin-bottom:10px;">
-        계근표 사진을 촬영/선택하면 AI가 날짜·차량번호·중량을 자동으로 읽어줍니다.<br>
-        <span style="color:var(--yellow);">· 인식 후 내용을 확인하고 등록하세요</span>
-      </div>
-
-      <!-- Gemini Key 설정 -->
-      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;">
-        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px;">🔑 Gemini API Key (최초 1회 설정)</div>
-        <div style="display:flex;gap:6px;">
-          <input type="password" id="ocr-gemini-key" placeholder="AIza... (aistudio.google.com/apikey 무료 발급)"
-            style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:11px;">
-          <button onclick="ocrSaveGeminiKey()" style="background:var(--accent);border:none;color:#0d1117;border-radius:6px;padding:7px 12px;font-size:11px;font-weight:700;white-space:nowrap;">저장</button>
-        </div>
-        <div id="ocr-key-status" style="font-size:10px;color:var(--text2);margin-top:5px;"></div>
-        <div id="ocr-usage-status" style="font-size:10px;color:var(--text2);margin-top:3px;"></div>
-        <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
-          <span style="font-size:11px;color:var(--text2);white-space:nowrap;">모델:</span>
-          <select id="ocr-gemini-model" style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:11px;" onchange="localStorage.setItem('_geminiModel',this.value)">
-            <option value="gemini-2.5-flash">gemini-2.5-flash — ✅ 권장(균형)</option>
-            <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite — 가볍지만 무료 한도가 들쑥날쑥함</option>
-            <option value="gemini-3-flash">gemini-3-flash — 최신(프리뷰, 계정에 따라 미지원 가능)</option>
-            <option value="gemini-3.5-flash">gemini-3.5-flash — 최신(계정에 따라 미지원 가능)</option>
-          </select>
-        </div>
-        <div style="font-size:9px;color:var(--text2);margin-top:2px;">※ Google이 모델 지원/무료한도를 자주 바꿉니다. "모델을 찾을 수 없음" 오류가 나면 다른 모델로 바꿔보세요. (1.x, 2.0 계열은 2026년 서비스 종료됨)</div>
-      </div>
-
-      <!-- 인식 규칙(프롬프트) 설정 -->
-      <div style="margin-bottom:10px;">
-        <button onclick="ocrTogglePromptPanel()" style="width:100%;text-align:left;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;">
-          ⚙️ 인식 규칙(중량 범위) 설정 <span id="ocr-prompt-arrow" style="float:right;">▼</span>
-        </button>
-        <div id="ocr-prompt-panel" style="display:none;margin-top:6px;">
-          <textarea id="ocr-prompt-text" style="width:100%;height:130px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px;font-size:11px;font-family:'IBM Plex Mono',monospace;line-height:1.6;resize:vertical;"></textarea>
-          <div style="display:flex;gap:6px;margin-top:6px;">
-            <button onclick="ocrSavePrompt()" class="btn-secondary" style="flex:1;">💾 저장</button>
-            <button onclick="ocrResetPrompt()" class="btn-secondary" style="flex:1;">↺ 기본값</button>
-          </div>
-          <div style="font-size:10px;color:var(--text2);margin-top:4px;line-height:1.5;">
-            계근표에 찍히는 실제 중량 범위(kg)와 게이트 번호 규칙입니다. 사업장 차량 사정과 다르면 숫자를 수정 후 저장하세요.<br>
-            인식이 틀린 항목은 아래 검토 카드에서 <b>🔁 재추출</b>을 누르면 이 규칙으로 다시 분석합니다(사진 재촬영 불필요).
-          </div>
-        </div>
-      </div>
-
-
-      <!-- 촬영/선택 버튼 -->
-      <div style="display:flex;gap:8px;margin-bottom:10px;">
-        <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:14px;border:2px dashed var(--accent);border-radius:10px;cursor:pointer;color:var(--accent);font-size:13px;font-weight:600;">
-          📷 사진 촬영
-          <input type="file" accept="image/*" capture="environment" multiple style="display:none;" onchange="ocrAddFiles(this.files);this.value=''">
-        </label>
-        <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:14px;border:2px dashed var(--border);border-radius:10px;cursor:pointer;color:var(--text2);font-size:13px;font-weight:600;">
-          🖼️ 갤러리 선택
-          <input type="file" accept="image/*" multiple style="display:none;" onchange="ocrAddFiles(this.files);this.value=''">
-        </label>
-      </div>
-
-      <!-- 업로드된 이미지 썸네일 -->
-      <div id="ocr-thumb-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;"></div>
-
-      <button class="btn-primary" id="ocr-run-btn" onclick="ocrProcessAll()" style="display:none;margin-bottom:8px;">
-        <span id="ocr-run-btn-label">🤖 OCR 인식 실행</span>
-      </button>
-      <div id="ocr-progress" style="font-size:11px;color:var(--text2);margin-bottom:8px;"></div>
-
-      <!-- 인식 결과 검토(수정 가능) -->
-      <div id="ocr-review-list"></div>
-
-      <div style="display:flex;gap:8px;margin-top:6px;">
-        <button class="btn-primary" id="ocr-submit-btn" onclick="ocrSubmitAll()" style="display:none;flex:2;margin:0;">
-          ✅ 확인한 항목 일괄 등록
-        </button>
-        <button id="ocr-delete-all-btn" onclick="ocrDeleteAll()" style="display:none;flex:1;padding:13px;border:1px solid var(--red);border-radius:10px;background:none;color:var(--red);font-size:13px;font-weight:700;cursor:pointer;">
-          🗑️ 일괄삭제
-        </button>
-      </div>
-    </div>
-
-    <!-- CSV 일괄 등록 -->
-    <div class="card">
-      <div class="card-title">📋 CSV 일괄 등록</div>
-      <div style="font-size:11px;color:var(--text2);line-height:1.8;margin-bottom:10px;">
-        <b style="color:var(--text);">컬럼 순서 (헤더 자동 인식)</b><br>
-        <code style="background:var(--bg3);padding:2px 6px;border-radius:4px;font-size:10px;color:var(--accent);">순번, 입고일자, 차량번호, 총중량[기준], 공차중량[기준], 실중량[기준], 입고게이트, ...</code><br>
-        <span style="color:var(--yellow);">· 중량 단위 톤/kg 자동 감지 &nbsp;·&nbsp; 합계행 자동 분리 저장</span><br>
-        <span style="color:var(--text2);">· 게이트: 나주·S4·4 / 광주·S1·1 / 전남·S2·2 / 순천·S3·3</span>
-      </div>
-
-      <!-- 탭 전환 -->
-      <div style="display:flex;gap:6px;margin-bottom:10px;">
-        <button id="csv-tab-paste" onclick="setCsvTab('paste')"
-          style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#0d1117;font-size:12px;font-weight:700;cursor:pointer;">
-          클립보드 붙여넣기
-        </button>
-        <button id="csv-tab-file" onclick="setCsvTab('file')"
-          style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text2);font-size:12px;cursor:pointer;">
-          파일 선택
-        </button>
-      </div>
-
-      <!-- 붙여넣기 영역 -->
-      <div id="csv-paste-area">
-        <textarea id="csv-text" placeholder="여기에 CSV 내용을 붙여넣으세요&#10;2026-06-05,001,12가3456,24500,12300,12.20,S1,12.20,3500&#10;2026-06-05,002,34나5678,25000,12800,,광주,,"
-          style="width:100%;height:120px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:11px;font-family:'IBM Plex Mono',monospace;line-height:1.6;resize:vertical;outline:none;"
-          oninput="previewCSV()"></textarea>
-      </div>
-
-      <!-- 파일 선택 영역 -->
-      <div id="csv-file-area" style="display:none;">
-        <label style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:16px;border:2px dashed var(--border);border-radius:10px;cursor:pointer;color:var(--text2);font-size:13px;">
-          📁 CSV 또는 엑셀(.xlsx) 파일 선택
-          <input type="file" id="csv-file-input" accept=".csv,.txt,.xlsx,.xls" style="display:none;" onchange="loadFile(this)">
-        </label>
-        <!-- 시트 선택 (엑셀 전용) -->
-        <div id="sheet-select-wrap" style="display:none;margin-top:10px;">
-          <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">📑 시트 선택</div>
-          <div id="sheet-btn-list" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-        </div>
-      </div>
-
-      <!-- 미리보기 -->
-      <div id="csv-preview" style="margin-top:10px;"></div>
-
-      <button class="btn-primary" onclick="submitCSV()" style="margin-top:10px;display:none;" id="csv-submit-btn">
-        ✅ 일괄 등록
-      </button>
-    </div>
-
-    <!-- 오늘 입고 이력 -->
-    <div class="card">
-      <div class="card-title">오늘 입고 이력</div>
-      <div id="today-recs"></div>
-    </div>
-
-<!-- 현황 보고문 생성 -->
-    <div class="card">
-      <div class="card-title">📢 현황 보고문 생성</div>
-
-      <!-- 기준일 + 구분 -->
-      <div class="form-row">
-        <div>
-          <label class="form-label">기준일 (보고서 제목)</label>
-          <input type="date" id="rpt-date" class="form-input">
-        </div>
-        <div>
-          <label class="form-label">구분</label>
-          <select id="rpt-type" class="form-select" onchange="updateTotalInDefault()">
-            <option value="weekly">주간</option>
-            <option value="daily">전일</option>
-          </select>
-        </div>
-      </div>
-
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin-bottom:10px;width:fit-content;">
-        <input type="checkbox" id="rpt-chk-totalin" style="accent-color:var(--accent);width:14px;height:14px;">
-        <span style="color:var(--text2);">📊 총입고(기간 합계) 표시</span>
-        <span style="color:var(--text2);font-size:10px;">— 전일은 기본 해제, 주간 4일↑은 자동 체크</span>
-      </label>
-
-      <!-- 입고 기간 선택 -->
-      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">📥 입고 집계 기간</div>
-      <div class="form-row" style="margin-bottom:6px;">
-        <div>
-          <label class="form-label">시작일</label>
-          <input type="date" id="rpt-from" class="form-input" onchange="autoLoadInbound()">
-        </div>
-        <div>
-          <label class="form-label">종료일</label>
-          <input type="date" id="rpt-to" class="form-input" onchange="autoLoadInbound()">
-        </div>
-      </div>
-      <button onclick="autoLoadInbound()" class="btn-secondary" style="margin-bottom:8px;">
-        🔍 기간 내 입고 데이터 자동 불러오기
-      </button>
-
-      <!-- 자동 집계 미리보기 -->
-      <div id="rpt-auto-preview" style="margin-bottom:10px;"></div>
-
-      <!-- 입고 행 (수동 추가/수정) -->
-      <div id="rpt-inbound-rows"></div>
-      <button onclick="addRptInRow()" class="btn-secondary" style="margin-bottom:12px;">+ 입고 행 수동 추가</button>
-
-      <!-- 사용량 집계 기간 -->
-      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">🔥 사용량</div>
-      <div id="rpt-use-auto-preview" style="margin-bottom:6px;"></div>
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
-        <input type="number" id="rpt-use-ton" class="form-input" placeholder="311 (수동입력 or 자동계산)" style="margin-bottom:0;flex:1.5;">
-        <span style="font-size:12px;color:var(--text2);white-space:nowrap;">톤</span>
-        <select id="rpt-use-silo" class="form-select" style="margin-bottom:0;flex:1;">
-          <option value="">설비 정지중</option>
-          <option value="S1">광주</option>
-          <option value="S2">전남</option>
-          <option value="S4">나주</option>
-          <option value="S3">순천</option>
-          <option value="ALL">전체</option>
-        </select>
-      </div>
-
-      <!-- 수분 -->
-      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">💧 수분 (선택)</div>
-      <div id="rpt-moist-rows"></div>
-      <button onclick="addRptMoistRow()" class="btn-secondary" style="margin-bottom:12px;">+ 수분 행 추가</button>
-
-      <!-- 재고 -->
-      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">📦 재고량 (00시 기준)</div>
-      <!-- 재고 유형 선택 -->
-      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;">
-          <input type="checkbox" id="rpt-chk-jijache" checked onchange="updateRptStockMode()"
-            style="accent-color:var(--accent);width:14px;height:14px;">
-          <span style="color:var(--accent);font-weight:600;">지자체별</span>
-          <span style="color:var(--text2);font-size:10px;">(광주/나주/순천)</span>
-        </label>
-        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;">
-          <input type="checkbox" id="rpt-chk-silo" onchange="updateRptStockMode()"
-            style="accent-color:var(--accent);width:14px;height:14px;">
-          <span style="color:var(--accent);font-weight:600;">저장조별</span>
-          <span style="color:var(--text2);font-size:10px;">(광주/전남/나주/순천 ST)</span>
-        </label>
-      </div>
-      <div class="form-row">
-        <div>
-          <label class="form-label">광주 ST (톤)</label>
-          <input type="number" id="rpt-s1" class="form-input" placeholder="257">
-        </div>
-        <div>
-          <label class="form-label">전남 ST (톤)</label>
-          <input type="number" id="rpt-s2" class="form-input" placeholder="959">
-        </div>
-      </div>
-      <div class="form-row">
-        <div>
-          <label class="form-label">나주 ST (톤)</label>
-          <input type="number" id="rpt-s4" class="form-input" placeholder="701">
-        </div>
-        <div>
-          <label class="form-label">순천 ST (톤)</label>
-          <input type="number" id="rpt-s3" class="form-input" placeholder="0">
-        </div>
-      </div>
-      <button onclick="loadCurrentStock(true)" class="btn-secondary" style="margin-bottom:12px;">🔄 현재 재고 불러오기</button>
-
-      <button class="btn-primary" onclick="generateReport()">📋 보고문 생성</button>
-
-      <!-- 출력 결과 -->
-      <div id="rpt-output" style="display:none;margin-top:14px;">
-        <div style="font-size:11px;color:var(--text2);margin-bottom:6px;">📄 복사해서 사용하세요</div>
-        <pre id="rpt-text" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:'Noto Sans KR',sans-serif;font-size:13px;line-height:1.8;white-space:pre-wrap;word-break:break-all;color:var(--text);"></pre>
-        <button onclick="copyReport()" class="btn-primary" style="margin-top:8px;" id="rpt-copy-btn">📋 복사</button>
-      </div>
-    </div>
-
-  </div>
 
   <!-- ③ 사용량/입고량 -->
   <div id="page-usage" class="page">
@@ -846,6 +601,166 @@
 
   <!-- ④ 이력 조회 -->
   <div id="page-history" class="page">
+
+    <!-- 입고량 내부 서브탭 -->
+    <div class="subtab-bar" style="display:flex;gap:6px;margin-bottom:12px;">
+      <button id="histtab-btn-input" class="subtab-btn active" onclick="setHistMainTab('input')">📋 입력</button>
+      <button id="histtab-btn-list" class="subtab-btn" onclick="setHistMainTab('list')">📥 입고이력</button>
+      <button id="histtab-btn-report" class="subtab-btn" onclick="setHistMainTab('report')">📢 보고문</button>
+    </div>
+
+    <!-- 서브탭① 입력 (OCR + CSV + 오늘 입고이력) -->
+    <div id="histtab-input" class="subtab-pane active">
+    <!-- CSV 일괄 등록 -->
+    <div class="card">
+      <div class="card-title">📋 CSV 일괄 등록</div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.8;margin-bottom:10px;">
+        <b style="color:var(--text);">컬럼 순서 (헤더 자동 인식)</b><br>
+        <code style="background:var(--bg3);padding:2px 6px;border-radius:4px;font-size:10px;color:var(--accent);">순번, 입고일자, 차량번호, 총중량[기준], 공차중량[기준], 실중량[기준], 입고게이트, ...</code><br>
+        <span style="color:var(--yellow);">· 중량 단위 톤/kg 자동 감지 &nbsp;·&nbsp; 합계행 자동 분리 저장</span><br>
+        <span style="color:var(--text2);">· 게이트: 나주·S4·4 / 광주·S1·1 / 전남·S2·2 / 순천·S3·3</span>
+      </div>
+
+      <!-- 탭 전환 -->
+      <div style="display:flex;gap:6px;margin-bottom:10px;">
+        <button id="csv-tab-paste" onclick="setCsvTab('paste')"
+          style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#0d1117;font-size:12px;font-weight:700;cursor:pointer;">
+          클립보드 붙여넣기
+        </button>
+        <button id="csv-tab-file" onclick="setCsvTab('file')"
+          style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text2);font-size:12px;cursor:pointer;">
+          파일 선택
+        </button>
+      </div>
+
+      <!-- 붙여넣기 영역 -->
+      <div id="csv-paste-area">
+        <textarea id="csv-text" placeholder="여기에 CSV 내용을 붙여넣으세요&#10;2026-06-05,001,12가3456,24500,12300,12.20,S1,12.20,3500&#10;2026-06-05,002,34나5678,25000,12800,,광주,,"
+          style="width:100%;height:120px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:11px;font-family:'IBM Plex Mono',monospace;line-height:1.6;resize:vertical;outline:none;"
+          oninput="previewCSV()"></textarea>
+      </div>
+
+      <!-- 파일 선택 영역 -->
+      <div id="csv-file-area" style="display:none;">
+        <label style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:16px;border:2px dashed var(--border);border-radius:10px;cursor:pointer;color:var(--text2);font-size:13px;">
+          📁 CSV 또는 엑셀(.xlsx) 파일 선택
+          <input type="file" id="csv-file-input" accept=".csv,.txt,.xlsx,.xls" style="display:none;" onchange="loadFile(this)">
+        </label>
+        <!-- 시트 선택 (엑셀 전용) -->
+        <div id="sheet-select-wrap" style="display:none;margin-top:10px;">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">📑 시트 선택</div>
+          <div id="sheet-btn-list" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        </div>
+      </div>
+
+      <!-- 미리보기 -->
+      <div id="csv-preview" style="margin-top:10px;"></div>
+
+      <button class="btn-primary" onclick="submitCSV()" style="margin-top:10px;display:none;" id="csv-submit-btn">
+        ✅ 일괄 등록
+      </button>
+    </div>
+
+    <!-- 📸 계근표 사진 인식 (OCR) -->
+    <div class="card">
+      <div class="card-title">📸 계근표 사진 인식 (OCR)</div>
+
+      <!-- 선택 버튼 -->
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:14px;border:2px dashed var(--accent);border-radius:10px;cursor:pointer;color:var(--accent);font-size:13px;font-weight:600;">
+          🖼️ 갤러리 선택
+          <input type="file" accept="image/*" multiple style="display:none;" onchange="ocrAddFiles(this.files);this.value=''">
+        </label>
+        <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:14px;border:2px dashed var(--border);border-radius:10px;cursor:pointer;color:var(--text2);font-size:13px;font-weight:600;">
+          📄 파일 선택(PDF)
+          <input type="file" accept="application/pdf,image/*" multiple style="display:none;" onchange="ocrAddFiles(this.files);this.value=''">
+        </label>
+      </div>
+
+      <div style="font-size:11px;color:var(--text2);line-height:1.7;margin-bottom:10px;">
+        계근표 사진 또는 PDF를 선택하면 AI가 날짜·차량번호·중량을 자동으로 읽어줍니다.<br>
+        <span style="color:var(--yellow);">· 인식 후 내용을 확인하고 등록하세요</span>
+      </div>
+
+      <!-- Gemini Key 설정 (접고 펴기) -->
+      <div style="margin-bottom:10px;">
+        <button onclick="ocrToggleKeyPanel()" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;">
+          <span>🔑 API Key / 모델 설정</span>
+          <span style="display:flex;align-items:center;gap:6px;">
+            <span id="ocr-key-summary" style="font-size:10px;font-weight:700;"></span>
+            <span id="ocr-key-arrow">▼</span>
+          </span>
+        </button>
+        <div id="ocr-key-panel" style="display:none;margin-top:6px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+          <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px;">🔑 Gemini API Key (최초 1회 설정)</div>
+          <div style="display:flex;gap:6px;">
+            <input type="password" id="ocr-gemini-key" placeholder="AIza... (aistudio.google.com/apikey 무료 발급)"
+              style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:11px;">
+            <button onclick="ocrSaveGeminiKey()" style="background:var(--accent);border:none;color:#0d1117;border-radius:6px;padding:7px 12px;font-size:11px;font-weight:700;white-space:nowrap;">저장</button>
+          </div>
+          <div id="ocr-key-status" style="font-size:10px;color:var(--text2);margin-top:5px;"></div>
+          <div id="ocr-usage-status" style="font-size:10px;color:var(--text2);margin-top:3px;"></div>
+          <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+            <span style="font-size:11px;color:var(--text2);white-space:nowrap;">모델:</span>
+            <select id="ocr-gemini-model" style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:11px;" onchange="localStorage.setItem('_geminiModel',this.value)">
+              <option value="gemini-2.5-flash">gemini-2.5-flash — ✅ 권장(균형)</option>
+              <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite — 가볍지만 무료 한도가 들쑥날쑥함</option>
+              <option value="gemini-3-flash">gemini-3-flash — 최신(프리뷰, 계정에 따라 미지원 가능)</option>
+              <option value="gemini-3.5-flash">gemini-3.5-flash — 최신(계정에 따라 미지원 가능)</option>
+            </select>
+          </div>
+          <div style="font-size:9px;color:var(--text2);margin-top:2px;">※ Google이 모델 지원/무료한도를 자주 바꿉니다. "모델을 찾을 수 없음" 오류가 나면 다른 모델로 바꿔보세요. (1.x, 2.0 계열은 2026년 서비스 종료됨)</div>
+        </div>
+      </div>
+
+      <!-- 인식 규칙(프롬프트) 설정 -->
+      <div style="margin-bottom:10px;">
+        <button onclick="ocrTogglePromptPanel()" style="width:100%;text-align:left;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;">
+          ⚙️ 인식 규칙(중량 범위) 설정 <span id="ocr-prompt-arrow" style="float:right;">▼</span>
+        </button>
+        <div id="ocr-prompt-panel" style="display:none;margin-top:6px;">
+          <textarea id="ocr-prompt-text" style="width:100%;height:130px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px;font-size:11px;font-family:'IBM Plex Mono',monospace;line-height:1.6;resize:vertical;"></textarea>
+          <div style="display:flex;gap:6px;margin-top:6px;">
+            <button onclick="ocrSavePrompt()" class="btn-secondary" style="flex:1;">💾 저장</button>
+            <button onclick="ocrResetPrompt()" class="btn-secondary" style="flex:1;">↺ 기본값</button>
+          </div>
+          <div style="font-size:10px;color:var(--text2);margin-top:4px;line-height:1.5;">
+            계근표에 찍히는 실제 중량 범위(kg)와 게이트 번호 규칙입니다. 사업장 차량 사정과 다르면 숫자를 수정 후 저장하세요.<br>
+            인식이 틀린 항목은 아래 검토 카드에서 <b>🔁 재추출</b>을 누르면 이 규칙으로 다시 분석합니다(사진 재촬영 불필요).
+          </div>
+        </div>
+      </div>
+
+      <!-- 업로드된 이미지 썸네일 -->
+      <div id="ocr-thumb-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;"></div>
+
+      <button class="btn-primary" id="ocr-run-btn" onclick="ocrProcessAll()" style="display:none;margin-bottom:8px;">
+        <span id="ocr-run-btn-label">🤖 OCR 인식 실행</span>
+      </button>
+      <div id="ocr-progress" style="font-size:11px;color:var(--text2);margin-bottom:8px;"></div>
+
+      <!-- 인식 결과 검토(수정 가능) -->
+      <div id="ocr-review-list"></div>
+
+      <div style="display:flex;gap:8px;margin-top:6px;">
+        <button class="btn-primary" id="ocr-submit-btn" onclick="ocrSubmitAll()" style="display:none;flex:2;margin:0;">
+          ✅ 확인한 항목 일괄 등록
+        </button>
+        <button id="ocr-delete-all-btn" onclick="ocrDeleteAll()" style="display:none;flex:1;padding:13px;border:1px solid var(--red);border-radius:10px;background:none;color:var(--red);font-size:13px;font-weight:700;cursor:pointer;">
+          🗑️ 일괄삭제
+        </button>
+      </div>
+    </div>
+
+    <!-- 오늘 입고 이력 -->
+    <div class="card">
+      <div class="card-title">오늘 입고 이력</div>
+      <div id="today-recs"></div>
+    </div>
+    </div>
+
+    <!-- 서브탭② 입고이력 -->
+    <div id="histtab-list" class="subtab-pane" style="display:none;">
     <div class="card">
       <div class="card-title">입고 이력</div>
 
@@ -888,6 +803,132 @@
 
       <div id="hist-list"></div>
     </div>
+    </div>
+
+    <!-- 서브탭③ 보고문 생성 -->
+    <div id="histtab-report" class="subtab-pane" style="display:none;">
+<!-- 현황 보고문 생성 -->
+    <div class="card">
+      <div class="card-title">📢 현황 보고문 생성</div>
+
+      <!-- 기준일 + 구분 -->
+      <div class="form-row">
+        <div>
+          <label class="form-label">기준일 (보고서 제목)</label>
+          <input type="date" id="rpt-date" class="form-input">
+        </div>
+        <div>
+          <label class="form-label">구분</label>
+          <input type="hidden" id="rpt-type" value="daily">
+          <div style="display:flex;gap:6px;">
+            <button type="button" id="rpt-type-btn-weekly" onclick="setRptType('weekly')"
+              style="flex:1;padding:9px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;">주간</button>
+            <button type="button" id="rpt-type-btn-daily" onclick="setRptType('daily')"
+              style="flex:1;padding:9px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#0d1117;font-size:13px;font-weight:700;cursor:pointer;">전일</button>
+          </div>
+        </div>
+      </div>
+
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin-bottom:10px;width:fit-content;">
+        <input type="checkbox" id="rpt-chk-totalin" style="accent-color:var(--accent);width:14px;height:14px;">
+        <span style="color:var(--text2);">📊 총입고(기간 합계) 표시</span>
+      </label>
+
+      <!-- 입고 기간 선택 -->
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">📥 입고 집계 기간</div>
+      <div class="form-row" style="margin-bottom:6px;">
+        <div>
+          <label class="form-label">시작일</label>
+          <input type="date" id="rpt-from" class="form-input" onchange="rptPeriodChanged('from')">
+        </div>
+        <div>
+          <label class="form-label">종료일</label>
+          <input type="date" id="rpt-to" class="form-input" onchange="rptPeriodChanged('to')">
+        </div>
+      </div>
+      <button onclick="autoLoadInbound()" class="btn-secondary" style="margin-bottom:8px;">
+        🔍 기간 내 입고 데이터 자동 불러오기
+      </button>
+
+      <!-- 자동 집계 미리보기 -->
+      <div id="rpt-auto-preview" style="margin-bottom:10px;"></div>
+
+      <!-- 입고 행 (수동 추가/수정) -->
+      <div id="rpt-inbound-rows"></div>
+      <button onclick="addRptInRow()" class="btn-secondary" style="margin-bottom:12px;">+ 입고 행 수동 추가</button>
+
+      <!-- 사용량 집계 기간 -->
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">🔥 사용량</div>
+      <div id="rpt-use-auto-preview" style="margin-bottom:6px;"></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+        <input type="number" id="rpt-use-ton" class="form-input" placeholder="311 (수동입력 or 자동계산)" style="margin-bottom:0;flex:1.5;">
+        <span style="font-size:12px;color:var(--text2);white-space:nowrap;">톤</span>
+        <select id="rpt-use-silo" class="form-select" style="margin-bottom:0;flex:1;">
+          <option value="">설비 정지중</option>
+          <option value="S1">광주</option>
+          <option value="S2">전남</option>
+          <option value="S4">나주</option>
+          <option value="S3">순천</option>
+          <option value="ALL">전체</option>
+        </select>
+      </div>
+
+      <!-- 수분 -->
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">💧 수분 (선택)</div>
+      <div id="rpt-moist-rows"></div>
+      <button onclick="addRptMoistRow()" class="btn-secondary" style="margin-bottom:12px;">+ 수분 행 추가</button>
+
+      <!-- 재고 -->
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">📦 재고량 (00시 기준)</div>
+      <!-- 재고 유형 선택 -->
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;">
+          <input type="checkbox" id="rpt-chk-jijache" checked onchange="updateRptStockMode()"
+            style="accent-color:var(--accent);width:14px;height:14px;">
+          <span style="color:var(--accent);font-weight:600;">지자체별</span>
+          <span style="color:var(--text2);font-size:10px;">(광주/나주/순천)</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;">
+          <input type="checkbox" id="rpt-chk-silo" onchange="updateRptStockMode()"
+            style="accent-color:var(--accent);width:14px;height:14px;">
+          <span style="color:var(--accent);font-weight:600;">저장조별</span>
+          <span style="color:var(--text2);font-size:10px;">(광주/전남/나주/순천 ST)</span>
+        </label>
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="form-label">광주 ST (톤)</label>
+          <input type="number" id="rpt-s1" class="form-input" placeholder="257">
+        </div>
+        <div>
+          <label class="form-label">전남 ST (톤)</label>
+          <input type="number" id="rpt-s2" class="form-input" placeholder="959">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="form-label">나주 ST (톤)</label>
+          <input type="number" id="rpt-s4" class="form-input" placeholder="701">
+        </div>
+        <div>
+          <label class="form-label">순천 ST (톤)</label>
+          <input type="number" id="rpt-s3" class="form-input" placeholder="0">
+        </div>
+      </div>
+      <button onclick="loadCurrentStock(true)" class="btn-secondary" style="margin-bottom:12px;">🔄 현재 재고 불러오기</button>
+
+      <button class="btn-primary" onclick="generateReport()">📋 보고문 생성</button>
+
+      <!-- 출력 결과 -->
+      <div id="rpt-output" style="display:none;margin-top:14px;">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:6px;">📄 복사해서 사용하세요</div>
+        <pre id="rpt-text" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:'Noto Sans KR',sans-serif;font-size:13px;line-height:1.8;white-space:pre-wrap;word-break:break-all;color:var(--text);"></pre>
+        <button onclick="copyReport()" class="btn-primary" style="margin-top:8px;" id="rpt-copy-btn">📋 복사</button>
+      </div>
+    </div>
+
+    </div>
+
   </div>
 
   <!-- ⑤ 동기화 -->
@@ -1015,9 +1056,6 @@ a.click();</pre>
   </button>
   <button class="tab-btn" onclick="showPage('usage',this)">
     <span class="ico">🔥</span><span>사용량</span>
-  </button>
-  <button class="tab-btn" onclick="showPage('input',this)">
-    <span class="ico">📋</span><span>계근등록</span>
   </button>
   <button class="tab-btn" onclick="showPage('sync',this)">
     <span class="ico">🔄</span><span>동기화</span>
@@ -1182,7 +1220,15 @@ function fmt(n) {
   return Math.round(n).toLocaleString('ko-KR');
 }
 function today() {
-  return new Date().toISOString().slice(0,10);
+  return ymd(new Date());
+}
+// 로컬(기기) 타임존 기준 YYYY-MM-DD 문자열 — toISOString()은 UTC라 자정~오전9시(KST) 사이에
+// 날짜가 하루 어긋나는 버그가 있어, 달력 날짜가 필요한 곳은 항상 이 함수를 사용한다.
+function ymd(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
 }
 function showToast(msg, color='#238636') {
   const t = document.getElementById('toast');
@@ -1193,6 +1239,26 @@ function showToast(msg, color='#238636') {
 }
 
 // ── 탭 전환 ──
+function setHistMainTab(tab) {
+  ['input','list','report'].forEach(t => {
+    const pane = document.getElementById('histtab-'+t);
+    const btn  = document.getElementById('histtab-btn-'+t);
+    if (pane) pane.style.display = (t === tab) ? '' : 'none';
+    if (btn)  btn.classList.toggle('active', t === tab);
+  });
+  if (tab === 'list') {
+    const d = document.getElementById('hist-del-date');
+    if (d && !d.value) d.value = today();
+    const ctrl = document.getElementById('hist-detail-ctrl');
+    if (ctrl) ctrl.style.display = (_histView === 'detail') ? '' : 'none';
+    renderHistory();
+  }
+  if (tab === 'input') {
+    renderTodayRecs();
+  }
+  document.getElementById('content').scrollTop = 0;
+}
+
 function showPage(id, btn) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1200,12 +1266,7 @@ function showPage(id, btn) {
   btn.classList.add('active');
   document.getElementById('content').scrollTop = 0;
   if (id === 'history') {
-    const d = document.getElementById('hist-del-date');
-    if (d && !d.value) d.value = today();
-    // 건별 컨트롤 표시 상태 동기화
-    const ctrl = document.getElementById('hist-detail-ctrl');
-    if (ctrl) ctrl.style.display = (_histView === 'detail') ? '' : 'none';
-    renderHistory();
+    setHistMainTab('input');
   }
   if (id === 'usage') renderUsageStats();
   if (id === 'sync') { renderSyncStats(); }
@@ -1602,6 +1663,32 @@ function loadCurrentStock(manual = false) {
 
 // 보고문 생성
 // ── 기간 내 입고 자동 집계 ──
+// 구분(주간/전일) 버튼 토글
+function setRptType(type) {
+  document.getElementById('rpt-type').value = type;
+  const weeklyBtn = document.getElementById('rpt-type-btn-weekly');
+  const dailyBtn  = document.getElementById('rpt-type-btn-daily');
+  const activeStyle   = 'background:var(--accent);border-color:var(--accent);color:#0d1117;font-weight:700;';
+  const inactiveStyle = 'background:var(--bg2);border-color:var(--border);color:var(--text2);font-weight:600;';
+  weeklyBtn.style.cssText = weeklyBtn.style.cssText.replace(/background:[^;]+;|border-color:[^;]+;|color:[^;]+;|font-weight:[^;]+;/g, '') + (type === 'weekly' ? activeStyle : inactiveStyle);
+  dailyBtn.style.cssText  = dailyBtn.style.cssText.replace(/background:[^;]+;|border-color:[^;]+;|color:[^;]+;|font-weight:[^;]+;/g, '') + (type === 'daily' ? activeStyle : inactiveStyle);
+  applyRptPeriodDefaults(type);
+  autoLoadInbound();
+  updateTotalInDefault();
+}
+
+// 입고 집계 기간(시작일/종료일) 수동 변경 시 — 전일(daily) 모드에서는 시작일=종료일을 강제로 동일하게 유지
+function rptPeriodChanged(which) {
+  const type  = document.getElementById('rpt-type')?.value;
+  const fromEl = document.getElementById('rpt-from');
+  const toEl   = document.getElementById('rpt-to');
+  if (type === 'daily') {
+    if (which === 'from' && fromEl && toEl) toEl.value = fromEl.value;
+    if (which === 'to'   && fromEl && toEl) fromEl.value = toEl.value;
+  }
+  autoLoadInbound();
+}
+
 // 총입고(기간 합계) 표시 여부 자동 기본값: 전일=항상 해제, 주간은 4일↑일 때만 자동 체크
 function updateTotalInDefault() {
   const type = document.getElementById('rpt-type')?.value;
@@ -1963,24 +2050,41 @@ function fallbackCopy(text, btn) {
 }
 
 function initRptForm() {
-  const d = document.getElementById('rpt-date');
-  if (d) d.value = today();
-  // 기간 기본값: 이번주 월~오늘
-  const now  = new Date();
-  const mon  = new Date(now);
-  mon.setDate(now.getDate() - ((now.getDay()+6)%7));
-  const toEl   = document.getElementById('rpt-to');
-  const fromEl = document.getElementById('rpt-from');
-  if (fromEl) fromEl.value = mon.toISOString().slice(0,10);
-  if (toEl)   toEl.value   = today();
+  // 기준일/기간 기본값은 현재 선택된 구분(전일/주간)에 맞춰 applyRptPeriodDefaults()가 계산
+  applyRptPeriodDefaults(document.getElementById('rpt-type')?.value || 'daily');
   addRptInRow();
   // 수분 행: 전날 날짜로 기본 1개
+  const now = new Date();
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-  const yLabel = fmtDateKo(yesterday.toISOString().slice(0,10));
+  const yLabel = fmtDateKo(ymd(yesterday));
   addRptMoistRow(yLabel, '');
   // 재고 자동 불러오기
   loadCurrentStock();
+}
+
+// 구분(전일/주간)에 맞춰 기준일/시작일/종료일 기본값 계산
+// 전일: 시작일=종료일=어제(하루) / 주간: 시작일=이번주 월요일, 종료일=오늘
+function applyRptPeriodDefaults(type) {
+  const now = new Date();
+  const dateEl = document.getElementById('rpt-date');
+  const fromEl = document.getElementById('rpt-from');
+  const toEl   = document.getElementById('rpt-to');
+  // 기준일(보고서 제목)은 보고서를 작성하는 날짜 = 항상 오늘
+  if (dateEl) dateEl.value = today();
+  if (type === 'daily') {
+    // 전일: 집계 기간은 어제 하루만
+    const y = new Date(now);
+    y.setDate(now.getDate() - 1);
+    const yStr = ymd(y);
+    if (fromEl) fromEl.value = yStr;
+    if (toEl)   toEl.value   = yStr;
+  } else { // weekly
+    const mon = new Date(now);
+    mon.setDate(now.getDate() - ((now.getDay()+6)%7));
+    if (fromEl) fromEl.value = ymd(mon);
+    if (toEl)   toEl.value   = today();
+  }
 }
 
 // ════════════════════════════════════════
@@ -3564,7 +3668,21 @@ function ocrClearGeminiKey() {
   localStorage.removeItem('_geminiApiKey');
   ocrUpdateKeyStatus();
 }
+function ocrToggleKeyPanel() {
+  const panel = document.getElementById('ocr-key-panel');
+  const arrow = document.getElementById('ocr-key-arrow');
+  if (!panel) return;
+  const show = panel.style.display === 'none';
+  panel.style.display = show ? '' : 'none';
+  if (arrow) arrow.textContent = show ? '▲' : '▼';
+}
 function ocrUpdateKeyStatus() {
+  const summary = document.getElementById('ocr-key-summary');
+  if (summary) {
+    summary.innerHTML = _geminiKey
+      ? '<span style="color:var(--green);">✅ 등록됨</span>'
+      : '<span style="color:var(--yellow);">❌ 미설정</span>';
+  }
   const el = document.getElementById('ocr-key-status');
   if (el) el.innerHTML = _geminiKey
     ? `<span style="color:var(--green);">✅ 등록됨 (${_geminiKey.slice(0,6)}...${_geminiKey.slice(-4)})</span> · <a href="#" onclick="ocrClearGeminiKey();return false;" style="color:var(--red);">삭제</a>`
@@ -3584,12 +3702,12 @@ function ocrUpdateKeyStatus() {
 function ocrGetUsageToday() {
   try {
     const stored = JSON.parse(localStorage.getItem(OCR_USAGE_KEY) || '{}');
-    const today2 = new Date().toISOString().slice(0,10);
+    const today2 = today();
     return stored.date === today2 ? (stored.count || 0) : 0;
   } catch(e) { return 0; }
 }
 function ocrIncUsage() {
-  const today2 = new Date().toISOString().slice(0,10);
+  const today2 = today();
   localStorage.setItem(OCR_USAGE_KEY, JSON.stringify({ date: today2, count: ocrGetUsageToday() + 1 }));
   ocrUpdateKeyStatus();
 }
@@ -3603,8 +3721,59 @@ function fileToBase64(file) {
   });
 }
 
-function ocrAddFiles(files) {
-  const list = Array.from(files).filter(f => f.type.startsWith('image/'));
+// PDF 파일을 페이지별 이미지(File)로 변환 — OCR 파이프라인은 이미지만 처리하므로 PDF는 여기서 미리 변환
+async function ocrPdfToImageFiles(file) {
+  if (!window.pdfjsLib) { throw new Error('pdf.js 로드 실패'); }
+  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const baseName = file.name.replace(/\.pdf$/i, '');
+  const out = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const targetWidth = 1600;
+    const vp0 = page.getViewport({ scale: 1 });
+    const scale = targetWidth / vp0.width;
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(viewport.width);
+    canvas.height = Math.round(viewport.height);
+    const ctx = canvas.getContext('2d');
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.85));
+    if (blob) {
+      out.push(new File([blob], `${baseName}_p${p}.jpg`, { type: 'image/jpeg' }));
+    }
+  }
+  return out;
+}
+
+// 선택된 파일들(이미지/PDF 혼합 가능)을 모두 이미지 File 배열로 정리
+async function ocrExpandFiles(fileList) {
+  const out = [];
+  for (const f of Array.from(fileList)) {
+    if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
+      try {
+        const pages = await ocrPdfToImageFiles(f);
+        out.push(...pages);
+      } catch (e) {
+        showToast(`⚠️ PDF 변환 실패: ${f.name}`, '#f85149');
+      }
+    } else if (f.type.startsWith('image/')) {
+      out.push(f);
+    }
+  }
+  return out;
+}
+
+async function ocrAddFiles(filesRaw) {
+  const hasPdf = Array.from(filesRaw).some(f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
+  if (hasPdf) showToast('📄 PDF 변환중...', '#58a6ff');
+  const files = await ocrExpandFiles(filesRaw);
+  if (!files.length) { showToast('⚠️ 인식 가능한 이미지/PDF가 없습니다', '#e3b341'); return; }
+  const list = files;
   const items = [];
   list.forEach(f => {
     if (ocrItems.length + items.length >= 30) return;
@@ -3846,9 +4015,9 @@ function parseWeighSlip(rawText) {
   } : null;
 
   var primary = ref || cmp;
-  if (!primary) return { datetime: new Date().toISOString().slice(0,10)+'T00:00', vehicle:'', gross:0, tare:0, net:0, gate:'' };
+  if (!primary) return { datetime: today()+'T00:00', vehicle:'', gross:0, tare:0, net:0, gate:'' };
 
-  var date = primary.date || new Date().toISOString().slice(0,10);
+  var date = primary.date || today();
   var time = primary.time || '00:00';
   var datetime = date + 'T' + time;
 
@@ -3939,7 +4108,7 @@ function parseWeighSlipByPrompt(rawText) {
     if (wM && idM) {
       return {
         isDisplay: true, displayWeight: toInt0(wM[1]), displayIdno: idM[1].replace(/^0+/, '') || idM[1],
-        datetime: new Date().toISOString().slice(0,10) + 'T00:00', vehicle: '', gross: 0, tare: 0, net: 0, gate: '', cmp: null, diff: null
+        datetime: today() + 'T00:00', vehicle: '', gross: 0, tare: 0, net: 0, gate: '', cmp: null, diff: null
       };
     }
   }
@@ -4014,7 +4183,7 @@ function parseWeighSlipByPrompt(rawText) {
   else { refText = seg1; cmpText = seg2; } // 모든 규칙 불일치 시 기본값
   var mainText = refText || cmpText || text;
 
-  var date = extractDate(mainText) || extractDate(text) || new Date().toISOString().slice(0,10);
+  var date = extractDate(mainText) || extractDate(text) || today();
   var time = extractTime(mainText) || extractTime(text) || '00:00';
   var vehicle = extractVehicle(mainText) || extractVehicle(text);
 
@@ -4075,7 +4244,7 @@ function ocrMergeDisplayPairs() {
       id: 'ocr' + (++_ocrSeq), file: null, dataUrl: group[0].dataUrl,
       status: net > 0 ? 'done' : 'error',
       parsed: {
-        datetime: new Date().toISOString().slice(0,10) + 'T00:00', vehicle: '',
+        datetime: today() + 'T00:00', vehicle: '',
         gross: gross, tare: tare, net: net, gate: '', cmp: null, diff: null,
         fromDisplay: true, displayIdno: group[0].parsed.displayIdno
       },
@@ -5334,7 +5503,7 @@ async function backupToDrive() {
       if (v) { try { out[k] = JSON.parse(v); } catch(e) {} }
     });
 
-    const ts   = new Date().toISOString().slice(0,10);
+    const ts   = today();
     const fileName = `srf_backup_${ts}.json`;
     const content  = JSON.stringify(out, null, 2);
 
@@ -5408,15 +5577,16 @@ async function loadFromDrive(mode) {
     } else {
       // CSV/엑셀 → 입고 미리보기
       parseAndPreviewCSV(text);
-      // 입고등록 탭으로 이동
+      // 입고량 탭(입력 서브탭)으로 이동
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-      document.getElementById('page-input').classList.add('active');
-      document.querySelectorAll('.tab-btn')[3].classList.add('active');
+      document.getElementById('page-history').classList.add('active');
+      document.querySelectorAll('.tab-btn')[1].classList.add('active');
+      setHistMainTab('input');
       document.getElementById('content').scrollTop = 0;
       resultEl.innerHTML = `
         <div style="background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--green);">
-          ✅ 파일 로드 완료 → 입고등록 탭에서 미리보기 확인
+          ✅ 파일 로드 완료 → 입고량 탭(입력)에서 미리보기 확인
         </div>`;
       showToast('✅ Drive 파일 로드 완료');
       // 파일 탭으로 전환
@@ -5493,7 +5663,7 @@ function exportJSON() {
 
   // 파일 다운로드
   const a = document.createElement('a');
-  const ts = new Date().toISOString().slice(0,10);
+  const ts = today();
   a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(jsonStr);
   a.download = `srf_export_${ts}.json`;
   a.click();
