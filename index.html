@@ -347,35 +347,69 @@
   <!-- ① 대시보드 -->
   <div id="page-dash" class="page active">
 
-    <!-- 저장조별 현재고 현황 -->
-    <div class="card">
-      <div class="card-title">저장조별 현재고 현황</div>
-      <div id="silo-bars"></div>
+    <!-- 대시보드 내부 서브탭 -->
+    <div class="subtab-bar" style="display:flex;gap:6px;margin-bottom:12px;">
+      <button id="dashtab-btn-stock" class="subtab-btn active" onclick="setDashMainTab('stock')">📦 전체재고</button>
+      <button id="dashtab-btn-flow" class="subtab-btn" onclick="setDashMainTab('flow')">📊 입고·사용량</button>
+      <button id="dashtab-btn-sched" class="subtab-btn" onclick="setDashMainTab('sched')">🏭 기동스케쥴</button>
     </div>
 
-    <!-- 지자체별 전체재고 -->
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <span class="card-title" style="margin-bottom:0;">지자체별 전체재고</span>
-        <button id="btn-decimal-toggle" onclick="toggleDecimal()"
-          style="padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:11px;cursor:pointer;">
-          소수점 .00
-        </button>
+    <!-- 서브탭① 전체재고 -->
+    <div id="dashtab-stock" class="subtab-pane active">
+      <!-- 저장조별 현재고 현황 -->
+      <div class="card">
+        <div class="card-title">저장조별 현재고 현황</div>
+        <div id="silo-bars"></div>
       </div>
-      <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:2px;">
-        <span style="font-size:11px;color:var(--text2);">합계</span>
-        <span class="total-val" id="d-total">—</span>
-        <span class="total-unit">톤</span>
+
+      <!-- 지자체별 전체재고 -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span class="card-title" style="margin-bottom:0;">지자체별 전체재고</span>
+          <button id="btn-decimal-toggle" onclick="toggleDecimal()"
+            style="padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:11px;cursor:pointer;">
+            소수점 .00
+          </button>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:2px;">
+          <span style="font-size:11px;color:var(--text2);">합계</span>
+          <span class="total-val" id="d-total">—</span>
+          <span class="total-unit">톤</span>
+        </div>
+        <div class="total-sub" id="d-days" style="margin-bottom:12px;">잔여 가동일 계산 중...</div>
+        <div id="kpi-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;"></div>
+        <button class="btn-secondary" onclick="openStockModal()">✏️ 재고 직접 수정</button>
       </div>
-      <div class="total-sub" id="d-days" style="margin-bottom:12px;">잔여 가동일 계산 중...</div>
-      <div id="kpi-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;"></div>
-      <button class="btn-secondary" onclick="openStockModal()">✏️ 재고 직접 수정</button>
+
+      <!-- 알림 -->
+      <div class="card">
+        <div class="card-title">알림</div>
+        <div id="alert-list"></div>
+      </div>
     </div>
 
-    <!-- 알림 -->
-    <div class="card">
-      <div class="card-title">알림</div>
-      <div id="alert-list"></div>
+    <!-- 서브탭② 입고량·사용량 -->
+    <div id="dashtab-flow" class="subtab-pane" style="display:none;">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <span class="card-title" style="margin-bottom:0;">올해 입고량 / 사용량</span>
+          <select id="dash-flow-year" class="form-select" style="margin-bottom:0;width:auto;padding:4px 8px;font-size:12px;" onchange="renderDashFlow()"></select>
+        </div>
+        <div id="dash-flow-summary"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 월별 입고량 추이</div>
+        <div id="dash-flow-monthly"></div>
+      </div>
+    </div>
+
+    <!-- 서브탭③ 기동스케쥴 -->
+    <div id="dashtab-sched" class="subtab-pane" style="display:none;">
+      <div class="card">
+        <div class="card-title">📅 예상 가동 / 정지 스케쥴</div>
+        <div id="dash-sched-list"></div>
+        <div id="dash-sched-note" style="font-size:10px;color:var(--text2);text-align:right;margin-top:8px;"></div>
+      </div>
     </div>
 
   </div>
@@ -1239,6 +1273,226 @@ function showToast(msg, color='#238636') {
 }
 
 // ── 탭 전환 ──
+function setDashMainTab(tab) {
+  ['stock','flow','sched'].forEach(t => {
+    const pane = document.getElementById('dashtab-'+t);
+    const btn  = document.getElementById('dashtab-btn-'+t);
+    if (pane) pane.style.display = (t === tab) ? '' : 'none';
+    if (btn)  btn.classList.toggle('active', t === tab);
+  });
+  if (tab === 'flow')  renderDashFlow();
+  if (tab === 'sched') renderDashSched();
+  document.getElementById('content').scrollTop = 0;
+}
+
+// 대시보드 ② 입고량·사용량 탭
+function renderDashFlow() {
+  const sel = document.getElementById('dash-flow-year');
+  if (sel && !sel.options.length) {
+    const curYear = new Date().getFullYear();
+    for (let y = curYear; y >= curYear - 4; y--) {
+      const opt = document.createElement('option');
+      opt.value = y; opt.textContent = y + '년';
+      sel.appendChild(opt);
+    }
+    sel.value = curYear;
+  }
+  const year = sel ? parseInt(sel.value) : new Date().getFullYear();
+
+  const monthly    = getMonthlyData(year);
+  const monthlyIn  = Object.values(monthly).reduce((s,r) => s + (r.inbound||0), 0);
+  const monthlyUse = Object.values(monthly).reduce((s,r) => s + (r.usage||0), 0);
+  const db = getDB(year);
+  const dbTotal = db.reduce((s,r) => {
+    const ton = Array.isArray(r) ? (r[7]||0) : (r.ton||0);
+    return s + Math.abs(ton);
+  }, 0);
+  const inTotal  = monthlyIn || dbTotal;
+  const useTotal = monthlyUse;
+  const diff = inTotal - useTotal;
+
+  const sumEl = document.getElementById('dash-flow-summary');
+  if (sumEl) {
+    sumEl.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+      <div style="background:var(--bg3);border-radius:8px;padding:10px 6px;text-align:center;">
+        <div style="font-size:10px;color:var(--text2);margin-bottom:4px;">입고량</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;color:var(--green);">${fmt(inTotal)}</div>
+        <div style="font-size:9px;color:var(--text2);">톤</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:8px;padding:10px 6px;text-align:center;">
+        <div style="font-size:10px;color:var(--text2);margin-bottom:4px;">사용량</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;color:var(--red);">${fmt(useTotal)}</div>
+        <div style="font-size:9px;color:var(--text2);">톤</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:8px;padding:10px 6px;text-align:center;">
+        <div style="font-size:10px;color:var(--text2);margin-bottom:4px;">수급차</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;color:${diff>=0?'var(--accent)':'var(--yellow)'};">${diff>=0?'+':''}${fmt(diff)}</div>
+        <div style="font-size:9px;color:var(--text2);">톤</div>
+      </div>
+    </div>`;
+  }
+
+  const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  const monEl = document.getElementById('dash-flow-monthly');
+  if (monEl) {
+    if (Object.keys(monthly).length === 0) {
+      monEl.innerHTML = `<div style="font-size:11px;color:var(--text2);text-align:center;padding:10px 0;">월별 데이터 없음 (월간관리대장에서 입력)</div>`;
+    } else {
+      monEl.innerHTML = `<div style="overflow-x:auto;"><table class="mon-grid">
+        <thead><tr><th>월</th><th>입고(톤)</th><th>사용(톤)</th></tr></thead>
+        <tbody>${MONTHS.map((m,i) => {
+          const r = monthly[i+1] || {};
+          if (!r.inbound && !r.usage) return '';
+          return `<tr><td>${m}</td><td style="color:var(--green);">${fmt(r.inbound||0)}</td><td style="color:var(--red);">${fmt(r.usage||0)}</td></tr>`;
+        }).join('')}</tbody>
+      </table></div>`;
+    }
+  }
+}
+
+// 대시보드 ③ 기동스케쥴 탭 — 간이 추정(현재 재고 기준 잔여일/소진예정일)
+function renderDashSched() {
+  const listEl = document.getElementById('dash-sched-list');
+  if (!listEl) return;
+
+  let forecast = null;
+  try {
+    const raw = localStorage.getItem('_scheduleForecast');
+    if (raw) forecast = JSON.parse(raw);
+  } catch(e) {}
+
+  if (forecast && Array.isArray(forecast.transitions) && forecast.transitions.length > 0) {
+    renderDashSchedFromPC(forecast);
+  } else {
+    renderDashSchedFallback();
+  }
+}
+
+// PC가 계산해 올린 기동/정지 예정 스케쥴을 그대로 표시 (모니터링 전용)
+function renderDashSchedFromPC(forecast) {
+  const listEl = document.getElementById('dash-sched-list');
+  const noteEl = document.getElementById('dash-sched-note');
+  const DOW = ['일','월','화','수','목','금','토'];
+
+  const statusLabel = forecast.currentStatus === 'on' ? '🟢 기동중'
+                     : forecast.currentStatus === 'maint' ? '🔧 점검중'
+                     : '🔴 정지중';
+
+  const tList = forecast.transitions.slice(0, 5);
+  let onSeq = 0;
+  const rows = tList.map((t, i) => {
+    const isOn = t.type === 'on';
+    if (isOn) onSeq++;
+    const color  = isOn ? 'var(--green)' : 'var(--red)';
+    const bg     = isOn ? 'rgba(34,197,94,.06)' : 'rgba(239,68,68,.06)';
+    const border = isOn ? 'rgba(34,197,94,.25)' : 'rgba(239,68,68,.25)';
+    const label  = isOn ? '🟢 기동 예정' : '🔴 정지 예정';
+    const seqTxt = isOn && onSeq <= 2 ? (onSeq === 1 ? '1차' : '2차') : '';
+    const seq    = seqTxt ? `<span style="font-size:9px;background:rgba(255,255,255,.1);border-radius:3px;padding:1px 4px;margin-right:4px;">${seqTxt}</span>` : '';
+    const daysLabel = t.daysFromNow === 0 ? '오늘' : (t.daysFromNow === 1 ? '내일' : `${t.daysFromNow}일 후`);
+    const dateObj = new Date(t.date + 'T00:00:00');
+    const dow = DOW[dateObj.getDay()];
+
+    let sepHtml = '';
+    if (i < tList.length - 1) {
+      const next = tList[i+1];
+      const d1 = new Date(t.date + 'T00:00:00');
+      const d2 = new Date(next.date + 'T00:00:00');
+      const diffDays = Math.round((d2 - d1) / 86400000);
+      const sepLabel = isOn && next.type !== 'on' ? `⬇ ${diffDays}일 기동`
+                     : (!isOn && next.type === 'on') ? `⬇ 정지 ${diffDays}일` : '';
+      if (sepLabel) {
+        const sepColor = isOn ? 'var(--green)' : 'var(--red)';
+        sepHtml = `<div style="text-align:center;padding:3px 0;font-size:11px;color:${sepColor};font-weight:600;">${sepLabel}</div>`;
+      }
+    }
+
+    return `<div style="background:${bg};border:1px solid ${border};border-radius:8px;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:10px;color:var(--text2);margin-bottom:2px;">${seq}${label}</div>
+        <div style="font-size:16px;font-weight:800;color:${color};">${t.date} <span style="font-size:12px;font-weight:600;opacity:.8;">(${dow})</span></div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:12px;font-weight:700;color:${color};">${daysLabel}</div>
+        <div style="font-size:10px;color:var(--text2);">${fmt(t.stock||0)}톤</div>
+      </div>
+    </div>${sepHtml}`;
+  }).join('');
+
+  listEl.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+      <span style="font-size:10px;padding:3px 8px;border-radius:6px;background:var(--bg3);color:var(--text2);">현재 ${statusLabel}</span>
+    </div>
+    ${rows}
+  `;
+  if (noteEl) {
+    const updated = forecast.updatedAt ? new Date(forecast.updatedAt) : null;
+    noteEl.innerHTML = updated
+      ? `PC 계산결과 (마지막 업로드: ${updated.toLocaleString('ko-KR')})`
+      : 'PC 계산결과 (모니터링 전용)';
+  }
+}
+
+// PC 동기화 데이터가 없을 때 — 현재 재고 단순 추정 (폴백)
+function renderDashSchedFallback() {
+  const stock = getStock();
+  let total = 0;
+  SILO_ORDER.forEach(k => { total += (stock[k]||0); });
+
+  const days = DAILY_USE > 0 ? Math.floor(total / DAILY_USE) : 0;
+  const stopDate = new Date();
+  stopDate.setDate(stopDate.getDate() + days);
+  const stopStr = ymd(stopDate);
+  const weekday = ['일','월','화','수','목','금','토'][stopDate.getDay()];
+
+  const isUrgent = days < 10;
+  const color = isUrgent ? 'var(--red)' : 'var(--green)';
+  const bg     = isUrgent ? 'rgba(239,68,68,.06)' : 'rgba(34,197,94,.06)';
+  const border = isUrgent ? 'rgba(239,68,68,.25)' : 'rgba(34,197,94,.25)';
+  const icon   = isUrgent ? '🔴' : '🟢';
+
+  const listEl = document.getElementById('dash-sched-list');
+  const noteEl = document.getElementById('dash-sched-note');
+  if (listEl) {
+    listEl.innerHTML = `
+      <div style="background:${bg};border:1px solid ${border};border-radius:8px;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div>
+          <div style="font-size:10px;color:var(--text2);margin-bottom:2px;">${icon} 현재고 기준 소진(정지) 예정일</div>
+          <div style="font-size:16px;font-weight:800;color:${color};">${stopStr} <span style="font-size:12px;font-weight:600;opacity:.8;">(${weekday})</span></div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:12px;font-weight:700;color:${color};">${days}일 후</div>
+          <div style="font-size:10px;color:var(--text2);">${fmt(total)}톤 보유</div>
+        </div>
+      </div>
+    `;
+  }
+  if (noteEl) noteEl.innerHTML = `PC 동기화 전 — 현재 재고 ÷ 일 ${DAILY_USE}톤 단순 추정 (동기화 탭에서 PC 데이터를 받아오면 PC 계산결과로 자동 전환됩니다)`;
+}
+
+// 대시보드 좌우 스와이프로 서브탭 전환
+(function initDashSwipe() {
+  let startX = 0, startY = 0;
+  document.addEventListener('touchstart', e => {
+    const dash = document.getElementById('page-dash');
+    if (!dash || !dash.classList.contains('active')) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  document.addEventListener('touchend', e => {
+    const dash = document.getElementById('page-dash');
+    if (!dash || !dash.classList.contains('active')) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const order = ['stock','flow','sched'];
+    const cur = order.find(t => document.getElementById('dashtab-'+t)?.style.display !== 'none');
+    const idx = order.indexOf(cur);
+    if (dx < 0 && idx < order.length - 1) setDashMainTab(order[idx+1]);   // 왼쪽으로 스와이프 → 다음 탭
+    if (dx > 0 && idx > 0) setDashMainTab(order[idx-1]);                  // 오른쪽으로 스와이프 → 이전 탭
+  }, { passive: true });
+})();
+
 function setHistMainTab(tab) {
   ['input','list','report'].forEach(t => {
     const pane = document.getElementById('histtab-'+t);
@@ -1468,24 +1722,27 @@ function renderDash() {
     const tonColor = (isNeg || isOver) ? 'var(--red)' : info.color;
     const pctColor = (isNeg || isOver) ? 'var(--red)' : 'var(--text2)';
 
-    // 임시입고 HTML
+    // 우측 박스: 자체연료(첫줄) + 임시보관중인 타지역 연료(아랫줄들)
+    const selfName = info.name.replace(' ST','');
+    const selfVal  = selfStock[k] || 0;
+    const selfRowHtml = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+      <span style="font-size:10px;color:${hex};font-weight:700;">${selfName}</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:${hex};">${selfVal.toFixed(1)}t</span>
+    </div>`;
     const td = tempData[k];
     const tempItems = td ? Object.entries(td.items) : [];
-    let tempInnerHtml;
-    if (tempItems.length === 0) {
-      tempInnerHtml = `<div style="font-size:11px;color:var(--text2);text-align:center;padding:6px 0;">없음</div>`;
-    } else {
-      tempInnerHtml = tempItems.map(([name, amt]) => {
-        const nc = name.includes('나주') ? 'var(--s4)'
-                 : name.includes('순천') ? 'var(--s3)'
-                 : (name.includes('광주')||name.includes('전남')) ? 'var(--s1)'
-                 : 'var(--text2)';
-        return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
-          <span style="font-size:10px;color:${nc};font-weight:600;">${name}</span>
-          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:${nc};">${amt.toFixed(1)}t</span>
-        </div>`;
-      }).join('');
-    }
+    const tempRowsHtml = tempItems.map(([name, amt]) => {
+      const nc = name.includes('나주') ? 'var(--s4)'
+               : name.includes('순천') ? 'var(--s3)'
+               : (name.includes('광주')||name.includes('전남')) ? 'var(--s1)'
+               : 'var(--text2)';
+      const shortName = name.replace(' ST연료','').replace('연료','');
+      return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+        <span style="font-size:10px;color:${nc};font-weight:600;">${shortName}</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:${nc};">${amt.toFixed(1)}t</span>
+      </div>`;
+    }).join('');
+    const tempInnerHtml = selfRowHtml + tempRowsHtml;
 
     barsEl.innerHTML += `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;align-items:start;">
@@ -1503,7 +1760,6 @@ function renderDash() {
           </div>
         </div>
         <div style="background:${hex}12;border:1px solid ${hex}30;border-radius:8px;padding:7px 8px;min-height:58px;">
-          <div style="font-size:9px;color:var(--text2);font-weight:700;letter-spacing:0.5px;margin-bottom:5px;">📦 임시입고</div>
           ${tempInnerHtml}
         </div>
       </div>
@@ -5392,6 +5648,14 @@ async function fbPull() {
           localStorage.setItem('_tempStorage', JSON.stringify(data.bySilo));
           preview.push('임시보관 복원');
         }
+      } else if (id === 'schedule_forecast') {
+        // PC 계산 기동/정지 예정 스케쥴 → 모바일은 그대로 모니터링 표시
+        localStorage.setItem('_scheduleForecast', JSON.stringify({
+          currentStatus: data.currentStatus || null,
+          transitions: data.transitions || [],
+          updatedAt: data.updatedAt && data.updatedAt.toDate ? data.updatedAt.toDate().toISOString() : null
+        }));
+        preview.push('기동스케쥴 복원');
       } else if (id.startsWith('monthly_')) {
         const year = id.replace('monthly_','');
         if (data.data) {
