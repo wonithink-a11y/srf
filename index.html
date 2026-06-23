@@ -180,6 +180,10 @@
     background:var(--accent); color:#fff; border-color:var(--accent);
   }
   .hseg-btn:active { opacity:0.8; }
+  /* ── 모니터링(사용자) 모드: 입력 비활성 ── */
+  body.view-only input:not(#app-lock-input):not(#recentDayInput),
+  body.view-only textarea { pointer-events:none !important; opacity:.55; }
+  body.view-only select:not(#hist-year):not(#hist-month-common):not(#hist-silo):not(#dash-flow-year):not(#usage-year-sel):not(#mon-year):not(#mon-silo) { pointer-events:none !important; opacity:.55; }
 
   /* ── 입고량 내부 서브탭 (입력/입고이력/보고문) ── */
   .subtab-btn {
@@ -341,7 +345,10 @@
     style="width:min(260px,80vw);text-align:center;font-size:20px;letter-spacing:4px;background:#161b22;border:1px solid #30363d;border-radius:10px;color:#e6edf3;padding:12px;outline:none;">
   <button onclick="appUnlock()" style="width:min(260px,80vw);background:#238636;border:none;color:#fff;border-radius:10px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;">확인</button>
   <div id="app-lock-msg" style="font-size:12px;color:#f85149;height:16px;"></div>
+  <div style="font-size:11px;color:#6e7681;margin-top:6px;">관리자는 관리자 비번을 입력하면 편집 모드로 들어갑니다</div>
 </div>
+<button id="admin-gear" onclick="adminManagePw()" title="접속 비번 관리(관리자)" style="display:none;position:fixed;left:14px;bottom:78px;z-index:99998;width:48px;height:48px;border-radius:50%;background:#161b22;border:1px solid #30363d;color:#e6edf3;font-size:20px;cursor:pointer;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.5);">🔧</button>
+<button id="lock-btn" onclick="_lockNow()" title="잠금 / 다른 계정으로 전환" style="display:none;position:fixed;right:14px;bottom:78px;z-index:99998;width:44px;height:44px;border-radius:50%;background:#161b22;border:1px solid #30363d;color:#8b949e;font-size:17px;cursor:pointer;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.5);">🔒</button>
 
 <!-- 헤더 -->
 <div id="header">
@@ -1171,28 +1178,114 @@ a.click();</pre>
 <div id="toast"></div>
 
 <script>
-// ═══════════════════════════════════════════════
-//  접속 코드 (관리자 지정) — 배포 전 아래 값을 원하는 코드로 변경하세요.
-// ═══════════════════════════════════════════════
-const APP_ACCESS_CODE = '1234';
+// ═══ 접속/관리자 비번 + 역할(편집/모니터링) — Firebase 공용 관리 ═══
+//  최초 기본값(문서 없을 때 생성용). 배포 후엔 관리자 패널(🔧)에서 변경.
+const DEFAULT_ACCESS_CODE = '1234';
+const DEFAULT_ADMIN_CODE  = 'admin0000';
+var _authCfg = {
+  accessCode: (function(){ try{return localStorage.getItem('_authAccess')||DEFAULT_ACCESS_CODE;}catch(e){return DEFAULT_ACCESS_CODE;} })(),
+  adminCode:  (function(){ try{return localStorage.getItem('_authAdmin')||DEFAULT_ADMIN_CODE;}catch(e){return DEFAULT_ADMIN_CODE;} })()
+};
+var _appRole = null; // 'admin' | 'user'
 function appUnlock(){
   var inp=document.getElementById('app-lock-input');
   var msg=document.getElementById('app-lock-msg');
   var v=((inp&&inp.value)||'').trim();
-  if(v===String(APP_ACCESS_CODE)){
-    try{ localStorage.setItem('_appUnlocked', String(APP_ACCESS_CODE)); }catch(e){}
-    var ov=document.getElementById('app-lock'); if(ov) ov.style.display='none';
+  if(v && v===String(_authCfg.adminCode)) _setRole('admin');
+  else if(v && v===String(_authCfg.accessCode)) _setRole('user');
+  else { if(msg) msg.textContent='코드가 올바르지 않습니다'; if(inp){inp.value='';inp.focus();} }
+}
+function _setRole(role){
+  _appRole=role;
+  try{ localStorage.setItem('_appSessRole',role); localStorage.setItem('_appSessCode', role==='admin'?String(_authCfg.adminCode):String(_authCfg.accessCode)); }catch(e){}
+  var ov=document.getElementById('app-lock'); if(ov) ov.style.display='none';
+  applyRoleUI();
+}
+function _lockNow(){
+  _appRole=null;
+  try{ localStorage.removeItem('_appSessRole'); localStorage.removeItem('_appSessCode'); }catch(e){}
+  document.body.classList.remove('view-only');
+  var g=document.getElementById('admin-gear'); if(g) g.style.display='none';
+  var lb=document.getElementById('lock-btn'); if(lb) lb.style.display='none';
+  var ov=document.getElementById('app-lock'); if(ov){ ov.style.display='flex'; var inp=document.getElementById('app-lock-input'); if(inp){ inp.value=''; setTimeout(function(){inp.focus();},100); } }
+}
+function _revalidateSession(){
+  if(!_appRole) return;
+  var sc=''; try{ sc=localStorage.getItem('_appSessCode')||''; }catch(e){}
+  var ok=(_appRole==='admin' && sc===String(_authCfg.adminCode)) || (_appRole==='user' && sc===String(_authCfg.accessCode));
+  if(!ok) _lockNow();
+}
+function applyRoleUI(){
+  var lb=document.getElementById('lock-btn'); if(lb) lb.style.display='flex';
+  if(_appRole==='admin'){
+    document.body.classList.remove('view-only');
+    var g=document.getElementById('admin-gear'); if(g) g.style.display='flex';
   } else {
-    if(msg) msg.textContent='코드가 올바르지 않습니다';
-    if(inp){ inp.value=''; inp.focus(); }
+    document.body.classList.add('view-only');
+    var g2=document.getElementById('admin-gear'); if(g2) g2.style.display='none';
+    _voHideEdits(document);
+    if(!window._voObserver){
+      window._voObserver=new MutationObserver(function(ms){ ms.forEach(function(m){ (m.addedNodes||[]).forEach(function(n){ if(n.nodeType===1) _voHideEdits(n); }); }); });
+      window._voObserver.observe(document.body,{childList:true,subtree:true});
+    }
   }
+}
+var _VO_EDIT=/저장|삭제|등록|추가|업로드|변경|초기화|입력|적용|delete|save|submit|upload|push|clear|remove|generate|import/i;
+var _VO_NAV=/switchPage|setDashMainTab|setHistMainTab|setUsageTab|setHistView|toggleLedgerYear|setBulkMode|appUnlock|adminManagePw/i;
+function _voHideEdits(root){
+  try{
+    var bs=root.querySelectorAll?root.querySelectorAll('button'):[];
+    for(var i=0;i<bs.length;i++){ var b=bs[i];
+      if(b.getAttribute('data-vo'))continue; b.setAttribute('data-vo','1');
+      var oc=b.getAttribute('onclick')||'';
+      if(_VO_NAV.test(oc))continue;
+      var t=oc+'|'+(b.id||'')+'|'+(b.textContent||'');
+      if(_VO_EDIT.test(t)) b.style.display='none';
+    }
+  }catch(e){}
+}
+function adminManagePw(){
+  if(_appRole!=='admin') return;
+  var na=prompt('새 사용자 접속 비번 (취소 시 유지)', _authCfg.accessCode);
+  if(na===null) return;
+  var nad=prompt('새 관리자 비번 (취소 시 유지)', _authCfg.adminCode);
+  if(nad===null) nad=_authCfg.adminCode;
+  _authCfg.accessCode=String(na||_authCfg.accessCode).trim();
+  _authCfg.adminCode=String(nad||_authCfg.adminCode).trim();
+  try{ localStorage.setItem('_authAccess',_authCfg.accessCode); localStorage.setItem('_authAdmin',_authCfg.adminCode); }catch(e){}
+  _authSaveToFirebase();
+  alert('비번이 변경되었습니다.\n다른 사용자는 앱을 다시 열면 적용됩니다.');
+}
+function _authSaveToFirebase(){
+  try{
+    if(typeof fbInit==='function' && !_db) fbInit();
+    if(_db){ _db.collection(FB_COL).doc('app_auth').set({ accessCode:_authCfg.accessCode, adminCode:_authCfg.adminCode, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }); }
+  }catch(e){ console.warn('auth save fail',e); }
+}
+function _authFetchFromFirebase(tries){
+  tries=tries||0;
+  try{
+    if(typeof fbInit==='function' && !_db) fbInit();
+    if(!_db){ if(tries<8) setTimeout(function(){_authFetchFromFirebase(tries+1);},800); return; }
+    _db.collection(FB_COL).doc('app_auth').get().then(function(doc){
+      if(doc && doc.exists){
+        var d=doc.data()||{};
+        if(d.accessCode!=null) _authCfg.accessCode=String(d.accessCode);
+        if(d.adminCode!=null)  _authCfg.adminCode=String(d.adminCode);
+        try{ localStorage.setItem('_authAccess',_authCfg.accessCode); localStorage.setItem('_authAdmin',_authCfg.adminCode); }catch(e){}
+        _revalidateSession();
+      } else { _authSaveToFirebase(); }
+    }).catch(function(e){ console.warn('auth fetch fail',e); });
+  }catch(e){}
 }
 (function appLockInit(){
   function go(){
     var ov=document.getElementById('app-lock'); if(!ov) return;
-    var saved=''; try{ saved=localStorage.getItem('_appUnlocked')||''; }catch(e){}
-    if(saved===String(APP_ACCESS_CODE)){ ov.style.display='none'; }
-    else { ov.style.display='flex'; var inp=document.getElementById('app-lock-input'); if(inp) setTimeout(function(){inp.focus();},120); }
+    var sr='',sc=''; try{ sr=localStorage.getItem('_appSessRole')||''; sc=localStorage.getItem('_appSessCode')||''; }catch(e){}
+    if(sr==='admin' && sc===String(_authCfg.adminCode)) _setRole('admin');
+    else if(sr==='user' && sc===String(_authCfg.accessCode)) _setRole('user');
+    else { ov.style.display='flex'; var inp=document.getElementById('app-lock-input'); if(inp) setTimeout(function(){inp.focus();},150); }
+    _authFetchFromFirebase();
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',go); else go();
 })();
