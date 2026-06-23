@@ -170,9 +170,9 @@
   /* ── 이력 세그먼트 버튼 ── */
   .hist-seg { display:flex; gap:6px; }
   .hseg-btn {
-    flex:1; padding:7px 4px; border-radius:8px;
+    flex:1; padding:14px 4px; border-radius:8px;
     border:1px solid var(--border); background:var(--bg3);
-    color:var(--text2); font-size:11px; font-weight:600;
+    color:var(--text); font-size:16px; font-weight:800;
     font-family:'Noto Sans KR',sans-serif; cursor:pointer;
     transition: all 0.15s;
   }
@@ -332,6 +332,16 @@
 </style>
 </head>
 <body>
+<!-- ===== 접속 잠금 화면 (관리자 코드) ===== -->
+<div id="app-lock" style="position:fixed;inset:0;z-index:2147483647;background:#0d1117;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px;font-family:'Noto Sans KR',sans-serif;">
+  <div style="font-size:42px;">🔒</div>
+  <div style="font-size:18px;font-weight:800;color:#e6edf3;">SRF 연료관리</div>
+  <div style="font-size:13px;color:#8b949e;">접속 코드를 입력하세요</div>
+  <input type="password" id="app-lock-input" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter')appUnlock()"
+    style="width:min(260px,80vw);text-align:center;font-size:20px;letter-spacing:4px;background:#161b22;border:1px solid #30363d;border-radius:10px;color:#e6edf3;padding:12px;outline:none;">
+  <button onclick="appUnlock()" style="width:min(260px,80vw);background:#238636;border:none;color:#fff;border-radius:10px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;">확인</button>
+  <div id="app-lock-msg" style="font-size:12px;color:#f85149;height:16px;"></div>
+</div>
 
 <!-- 헤더 -->
 <div id="header">
@@ -407,6 +417,12 @@
     <div id="dashtab-sched" class="subtab-pane" style="display:none;">
       <div class="card">
         <div class="card-title">📅 예상 가동 / 정지 스케쥴</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px;padding:8px 10px;background:var(--bg3);border-radius:8px;">
+          <span style="font-size:12px;color:var(--text2);white-space:nowrap;">최근 기동일(수기):</span>
+          <input type="date" id="manualStartInput" style="flex:1;min-width:120px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px;">
+          <button onclick="saveManualStart()" style="background:#238636;border:none;color:#fff;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;">저장</button>
+          <button onclick="clearManualStart()" style="background:var(--bg2);border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;">해제</button>
+        </div>
         <div id="dash-sched-list"></div>
         <div id="dash-sched-note" style="font-size:10px;color:var(--text2);text-align:right;margin-top:8px;"></div>
       </div>
@@ -798,6 +814,14 @@
     <div class="card">
       <div class="card-title">입고 이력</div>
 
+      <!-- 뷰 세그먼트 -->
+      <div class="hist-seg" style="margin-bottom:12px;">
+        <button id="hseg-detail"  class="hseg-btn active" onclick="setHistView('detail')">📋 건별</button>
+        <button id="hseg-daily"   class="hseg-btn"        onclick="setHistView('daily')">📅 일별</button>
+        <button id="hseg-monthly" class="hseg-btn"        onclick="setHistView('monthly')">📆 월별</button>
+        <button id="hseg-yearly"  class="hseg-btn"        onclick="setHistView('yearly')">📊 연간</button>
+      </div>
+
       <!-- 공통 필터 -->
       <div style="display:flex;gap:6px;margin-bottom:10px;">
         <select id="hist-year" class="form-select" style="margin-bottom:0;flex:1;"></select>
@@ -809,14 +833,6 @@
           <option value="S4">나주</option>
           <option value="S3">순천</option>
         </select>
-      </div>
-
-      <!-- 뷰 세그먼트 -->
-      <div class="hist-seg" style="margin-bottom:12px;">
-        <button id="hseg-detail"  class="hseg-btn active" onclick="setHistView('detail')">📋 건별</button>
-        <button id="hseg-daily"   class="hseg-btn"        onclick="setHistView('daily')">📅 일별</button>
-        <button id="hseg-monthly" class="hseg-btn"        onclick="setHistView('monthly')">📆 월별</button>
-        <button id="hseg-yearly"  class="hseg-btn"        onclick="setHistView('yearly')">📊 연간</button>
       </div>
 
       <!-- 건별 전용 컨트롤 -->
@@ -1155,6 +1171,31 @@ a.click();</pre>
 <div id="toast"></div>
 
 <script>
+// ═══════════════════════════════════════════════
+//  접속 코드 (관리자 지정) — 배포 전 아래 값을 원하는 코드로 변경하세요.
+// ═══════════════════════════════════════════════
+const APP_ACCESS_CODE = '1234';
+function appUnlock(){
+  var inp=document.getElementById('app-lock-input');
+  var msg=document.getElementById('app-lock-msg');
+  var v=((inp&&inp.value)||'').trim();
+  if(v===String(APP_ACCESS_CODE)){
+    try{ localStorage.setItem('_appUnlocked', String(APP_ACCESS_CODE)); }catch(e){}
+    var ov=document.getElementById('app-lock'); if(ov) ov.style.display='none';
+  } else {
+    if(msg) msg.textContent='코드가 올바르지 않습니다';
+    if(inp){ inp.value=''; inp.focus(); }
+  }
+}
+(function appLockInit(){
+  function go(){
+    var ov=document.getElementById('app-lock'); if(!ov) return;
+    var saved=''; try{ saved=localStorage.getItem('_appUnlocked')||''; }catch(e){}
+    if(saved===String(APP_ACCESS_CODE)){ ov.style.display='none'; }
+    else { ov.style.display='flex'; var inp=document.getElementById('app-lock-input'); if(inp) setTimeout(function(){inp.focus();},120); }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',go); else go();
+})();
 // ── 상수 ──
 const SILO_INFO = {
   S1: { name: '광주 ST', color: 'var(--s1)', cap: 4000 },
@@ -1285,6 +1326,66 @@ function setDashMainTab(tab) {
   document.getElementById('content').scrollTop = 0;
 }
 
+function _flowJJTable(jj){
+  if(!jj) return '<div style="flex:1;"></div>';
+  var order=[['GJ','광주','#38bdf8'],['NJ','나주','#a78bfa'],['SC','순천','#f59e0b']];
+  var tot=order.reduce(function(a,o){return a+(jj[o[0]]||0);},0);
+  if(tot<0.5) return '<div style="flex:1;"></div>';
+  var names=order.map(function(o,i){return '<div style="text-align:center;padding:2px 3px;font-weight:600;color:'+o[2]+';'+(i>0?'border-left:1px solid var(--border);':'')+'">'+o[1]+'</div>';}).join('');
+  var vals =order.map(function(o,i){return '<div style="text-align:center;padding:2px 3px;font-weight:700;color:'+o[2]+';border-top:1px solid var(--border);'+(i>0?'border-left:1px solid var(--border);':'')+'">'+Math.round(jj[o[0]]||0)+'톤</div>';}).join('');
+  return '<div style="display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--border);border-radius:5px;overflow:hidden;font-size:10px;line-height:1.4;flex:1;">'+names+vals+'</div>';
+}
+function _flowSection(title, color, tot, jj){
+  var periods=[['day','전일'],['week','금주'],['prev','전주'],['curmon','당월'],['prevmon','전월']];
+  var rows=periods.map(function(p){return '<div style="display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:7px;padding:6px 8px;margin-bottom:5px;">'
+    +'<span style="font-size:13px;font-weight:800;color:var(--text);min-width:32px;">'+p[1]+'</span>'
+    +'<span style="font-family:\'IBM Plex Mono\',monospace;font-size:14px;font-weight:700;color:'+color+';min-width:50px;text-align:right;">'+fmt((tot&&tot[p[0]])||0)+'<span style="font-size:9px;color:var(--text2);">톤</span></span>'
+    +_flowJJTable(jj?jj[p[0]]:null)
+    +'</div>';}).join('');
+  return '<div style="font-size:13px;font-weight:700;color:'+color+';margin:4px 0 6px;border-bottom:1px solid '+color+'44;padding-bottom:3px;">'+title+'</div>'+rows;
+}
+function _renderFlowPC(flow){
+  return _flowSection('📥 입고량','var(--green)',flow.in,flow.inJJ)+'<div style="height:10px;"></div>'+_flowSection('🔥 사용량','var(--red)',flow.use,flow.useJJ);
+}
+function _appComputeFlow(){
+  function yl(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  var now=new Date();
+  var yd=new Date(now); yd.setDate(yd.getDate()-1); var yDateStr=yl(yd);
+  var dow=now.getDay(); var off=(dow===0?6:dow-1);
+  var tMon=new Date(now); tMon.setDate(tMon.getDate()-off); var thisMon=yl(tMon);
+  var lMon=new Date(tMon); lMon.setDate(lMon.getDate()-7); var lastMon=yl(lMon);
+  var lSun=new Date(tMon); lSun.setDate(lSun.getDate()-1); var lastSun=yl(lSun);
+  var curMon=yl(now).slice(0,7);
+  var pmd=new Date(now.getFullYear(),now.getMonth()-1,1); var prevMon=yl(pmd).slice(0,7);
+  var SILO2JJ={S1:'GJ',S2:'GJ',S3:'SC',S4:'NJ'};
+  function silOf(r){ var o=r[5]; if(o && /^S[1-4]$/.test(o)) return o;
+    var g=(r[4]||'')+''; if(g.indexOf('광주')>=0)return'S1'; if(g.indexOf('전남')>=0)return'S2';
+    if(g.indexOf('순천')>=0)return'S3'; if(g.indexOf('나주')>=0)return'S4'; return 'S1'; }
+  var recs=[];
+  Object.keys(localStorage).filter(function(k){return /^_rawdb_\d{4}$/.test(k);}).forEach(function(k){
+    try{ var a=JSON.parse(localStorage.getItem(k)); if(!Array.isArray(a)) a=Object.values(a);
+      a.forEach(function(r){ if(Array.isArray(r)) recs.push(r); }); }catch(e){} });
+  function inSum(pred){ var jj={GJ:0,NJ:0,SC:0},tot=0;
+    recs.forEach(function(r){ var dt=(r[0]||'').slice(0,10); if(!pred(dt))return;
+      var net=(parseFloat(r[2])||0)-(parseFloat(r[3])||0); if(net<=0)return;
+      tot+=net; var jk=SILO2JJ[silOf(r)]; if(jk) jj[jk]+=net; });
+    return {tot:tot,jj:jj}; }
+  var ud={},uds={};
+  try{ud=JSON.parse(localStorage.getItem('_usageData_v5')||'{}');}catch(e){}
+  try{uds=JSON.parse(localStorage.getItem('_usageDataBySilo_v5')||'{}');}catch(e){}
+  function useSum(pred){ var jj={GJ:0,NJ:0,SC:0},tot=0;
+    Object.keys(ud).forEach(function(d){ if(pred(d)) tot+=(ud[d]||0); });
+    Object.keys(uds).forEach(function(d){ if(!pred(d))return; var v=uds[d]||{}; jj.GJ+=(v.GJ||0)+(v.JN||0); jj.NJ+=(v.NJ||0); jj.SC+=(v.SC||0); });
+    return {tot:tot,jj:jj}; }
+  var P={day:function(d){return d===yDateStr;},week:function(d){return d>=thisMon&&d<=yDateStr;},
+         prev:function(d){return d>=lastMon&&d<=lastSun;},curmon:function(d){return d.slice(0,7)===curMon;},
+         prevmon:function(d){return d.slice(0,7)===prevMon;}};
+  function pk(fn){var o={};['day','week','prev','curmon','prevmon'].forEach(function(k){o[k]=fn(P[k]);});return o;}
+  var ip=pk(inSum), up=pk(useSum);
+  function T(p){var o={};['day','week','prev','curmon','prevmon'].forEach(function(k){o[k]=p[k].tot;});return o;}
+  function J(p){var o={};['day','week','prev','curmon','prevmon'].forEach(function(k){o[k]=p[k].jj;});return o;}
+  return { in:T(ip), inJJ:J(ip), use:T(up), useJJ:J(up) };
+}
 // 대시보드 ② 입고량·사용량 탭
 function renderDashFlow() {
   const sel = document.getElementById('dash-flow-year');
@@ -1332,6 +1433,8 @@ function renderDashFlow() {
     </div>`;
   }
 
+  // 앱 자체 계산: 입고/사용 기간별(전일~전월 + 지자체별) 표로 표시
+  try { if (sumEl) sumEl.innerHTML = _renderFlowPC(_appComputeFlow()); } catch(e) { console.warn('flow calc err', e); }
   const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
   const monEl = document.getElementById('dash-flow-monthly');
   if (monEl) {
@@ -1351,7 +1454,35 @@ function renderDashFlow() {
 }
 
 // 대시보드 ③ 기동스케쥴 탭 — 간이 추정(현재 재고 기준 잔여일/소진예정일)
+function _manualStart(){ return localStorage.getItem('_manualStartDate') || ''; }
+function _sinceHtml(forecast){
+  var manual=_manualStart();
+  var date=null, status=null;
+  if(manual){ date=manual; status='on'; }
+  else if(forecast && forecast.currentSince){ date=forecast.currentSince; status=forecast.currentStatus; }
+  if(!date) return '';
+  var p=date.split('-'); var ko=p[0]+'년 '+parseInt(p[1],10)+'월 '+parseInt(p[2],10)+'일';
+  var on=status==='on';
+  var txt= on ? ('🟢 기동시작일 '+ko+(manual?' (수기)':'')) : (status==='maint' ? ('🔧 점검시작일 '+ko) : ('🔴 정지일 '+ko+'부터'));
+  var clr= on ? 'var(--green)' : (status==='maint' ? 'var(--yellow)' : 'var(--red)');
+  return '<div style="text-align:right;font-size:12px;font-weight:700;color:'+clr+';margin-bottom:8px;">'+txt+'</div>';
+}
+function saveManualStart(){
+  var v=(document.getElementById('manualStartInput')||{}).value||'';
+  if(!v){ showToast('날짜를 선택하세요','#f85149'); return; }
+  localStorage.setItem('_manualStartDate', v);
+  showToast('최근 기동일 저장: '+v);
+  renderDashSched();
+}
+function clearManualStart(){
+  localStorage.removeItem('_manualStartDate');
+  var el=document.getElementById('manualStartInput'); if(el) el.value='';
+  showToast('수기 기동일 해제');
+  renderDashSched();
+}
 function renderDashSched() {
+  const _mi = document.getElementById('manualStartInput');
+  if (_mi) _mi.value = localStorage.getItem('_manualStartDate') || '';
   const listEl = document.getElementById('dash-sched-list');
   if (!listEl) return;
 
@@ -1419,10 +1550,12 @@ function renderDashSchedFromPC(forecast) {
     </div>${sepHtml}`;
   }).join('');
 
+  let sinceHtml = _sinceHtml(forecast);
   listEl.innerHTML = `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:6px;">
       <span style="font-size:10px;padding:3px 8px;border-radius:6px;background:var(--bg3);color:var(--text2);">현재 ${statusLabel}</span>
     </div>
+    ${sinceHtml}
     ${rows}
   `;
   if (noteEl) {
@@ -1454,7 +1587,7 @@ function renderDashSchedFallback() {
   const listEl = document.getElementById('dash-sched-list');
   const noteEl = document.getElementById('dash-sched-note');
   if (listEl) {
-    listEl.innerHTML = `
+    listEl.innerHTML = _sinceHtml(null) + `
       <div style="background:${bg};border:1px solid ${border};border-radius:8px;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
         <div>
           <div style="font-size:10px;color:var(--text2);margin-bottom:2px;">${icon} 현재고 기준 소진(정지) 예정일</div>
@@ -3242,6 +3375,10 @@ function setHistView(v) {
   });
   // 건별 전용 컨트롤 표시/숨김
   document.getElementById('hist-detail-ctrl').style.display = (v === 'detail') ? '' : 'none';
+  // 뷰별 기간 선택칸 노출: 월별=연도만, 연간=숨김, 건별/일별=연+월
+  var _yEl=document.getElementById('hist-year'), _mEl=document.getElementById('hist-month-common');
+  if (_mEl) _mEl.style.display = (v === 'daily' || v === 'detail') ? '' : 'none';
+  if (_yEl) _yEl.style.display = (v === 'yearly') ? 'none' : '';
   renderHistory();
 }
 
@@ -3252,11 +3389,12 @@ function getHistFilteredDB() {
   const monthCommon = document.getElementById('hist-month-common') ? document.getElementById('hist-month-common').value : '';
   let recs = db.map(r => normalizePcRec(r));
   if (siloFilter) recs = recs.filter(r => {
-    const sk = normSilo(r.silo) || r.silo;
-    return sk === siloFilter || r.silo === siloFilter;
+    const sk = r.origin || normSilo(r.silo) || r.silo;
+    return sk === siloFilter;
   });
-  if (yearFilter)  recs = recs.filter(r => r.date && r.date.slice(0,4) === yearFilter);
-  if (monthCommon) recs = recs.filter(r => r.date && r.date.slice(5,7) === monthCommon);
+  const _v = _histView;
+  if (_v !== 'yearly' && yearFilter) recs = recs.filter(r => r.date && r.date.slice(0,4) === yearFilter);
+  if ((_v === 'daily' || _v === 'detail') && monthCommon) recs = recs.filter(r => r.date && r.date.slice(5,7) === monthCommon);
   return recs;
 }
 
@@ -3270,24 +3408,19 @@ function renderHistory() {
 
 // ── 건별 뷰 ──
 function renderHistDetail() {
-  const siloFilter  = document.getElementById('hist-silo').value;
-  const yearFilter  = document.getElementById('hist-year').value;
-  const monthCommon = document.getElementById('hist-month-common') ? document.getElementById('hist-month-common').value : '';
-  const db = getAllDB();
-  let recs = db.map(r => normalizePcRec(r));
-  if (siloFilter) recs = recs.filter(r => {
-    const sk = normSilo(r.silo) || r.silo;
-    return sk === siloFilter || r.silo === siloFilter;
-  });
-  if (yearFilter)  recs = recs.filter(r => r.date && r.date.slice(0,4) === yearFilter);
-  if (monthCommon) recs = recs.filter(r => r.date && r.date.slice(5,7) === monthCommon);
-  recs = recs.slice().reverse().slice(0, 100);
+  let recs = getHistFilteredDB();
+  // 건별: 최근 입고일 전체 데이터만 표시
+  if (recs.length) {
+    var _maxd = recs.reduce(function(m,r){ return (r.date && r.date > m) ? r.date : m; }, '');
+    if (_maxd) recs = recs.filter(function(r){ return r.date === _maxd; });
+  }
+  recs = recs.slice().reverse().slice(0, 300);
 
   const el = document.getElementById('hist-list');
   if (!recs.length) { el.innerHTML = '<div class="empty-msg">조건에 맞는 이력이 없습니다</div>'; return; }
 
   el.innerHTML = recs.map(r => {
-    const siloKey = normSilo(r.silo) || r.silo;
+    const siloKey = r.origin || normSilo(r.silo) || r.silo;
     const info    = SILO_INFO[siloKey] || { name: r.silo||'?', color:'var(--text2)' };
     const delKey  = encodeURIComponent(`${r.date}|${r.car}|${siloKey}|${parseFloat(r.ton||0).toFixed(2)}`);
     return `<div class="rec-item">
@@ -3343,7 +3476,7 @@ function renderHistDaily() {
     const total = items.reduce((s, r) => s + parseFloat(r.ton||0), 0);
     const siloTotals = { S1:0, S2:0, S3:0, S4:0 };
     items.forEach(r => {
-      const sk = normSilo(r.silo) || r.silo;
+      const sk = r.origin || normSilo(r.silo) || r.silo;
       if (siloTotals[sk] !== undefined) siloTotals[sk] += parseFloat(r.ton||0);
     });
 
@@ -3355,7 +3488,7 @@ function renderHistDaily() {
 
     // 건별 펼침 rows
     const recRows = items.map(r => {
-      const sk = normSilo(r.silo) || r.silo;
+      const sk = r.origin || normSilo(r.silo) || r.silo;
       const info = SILO_INFO[sk] || { name: r.silo||'?', color:'var(--text2)' };
       return `<div class="day-rec">
         <div class="day-rec-dot" style="background:${info.color};"></div>
@@ -3412,7 +3545,6 @@ function toggleDayGroupByDate(date) {
 function renderHistMonthly() {
   const el = document.getElementById('hist-list');
   const recs = getHistFilteredDB();
-  if (!recs.length) { el.innerHTML = '<div class="empty-msg">조건에 맞는 이력이 없습니다</div>'; return; }
 
   // 월별 그룹핑
   const groups = {};
@@ -3420,14 +3552,32 @@ function renderHistMonthly() {
     if (!r.date) return;
     const ym = r.date.slice(0,7);
     if (!groups[ym]) groups[ym] = { total:0, S1:0, S2:0, S3:0, S4:0, cnt:0 };
-    const sk = normSilo(r.silo) || r.silo;
+    const sk = r.origin || normSilo(r.silo) || r.silo;
     const t = parseFloat(r.ton||0);
     groups[ym].total += t;
     if (groups[ym][sk] !== undefined) groups[ym][sk] += t;
     groups[ym].cnt++;
   });
 
+  // 과거(건별 없는 달): 연간 관리대장(_annualLedger_v2) 월별로 지자체별 보완
+  try {
+    var _yf=document.getElementById('hist-year').value;
+    var _sf=document.getElementById('hist-silo').value;
+    var _lg=getLedger();
+    Object.keys(_lg).forEach(function(y){
+      if (!/^\d{4}$/.test(y)) return;
+      if (_yf && y!==_yf) return;
+      var mo=(_lg[y]||{}).months||{};
+      for(var mm=1;mm<=12;mm++){ var mv=mo[mm]||mo[String(mm)]||{};
+        var s1=+mv.inflowS1||0,s4=+mv.inflowS4||0,s3=+mv.inflowS3||0; var tt=s1+s4+s3; if(tt<=0 && +mv.total>0) tt=+mv.total; if(tt<=0)continue;
+        var ym2=y+'-'+String(mm).padStart(2,'0'); if(groups[ym2])continue;
+        if(_sf){ var v=_sf==='S1'?s1:_sf==='S4'?s4:_sf==='S3'?s3:0; if(v<=0)continue; groups[ym2]={total:v,S1:_sf==='S1'?v:0,S2:0,S3:_sf==='S3'?v:0,S4:_sf==='S4'?v:0,cnt:0}; }
+        else { groups[ym2]={total:tt,S1:s1,S2:0,S3:s3,S4:s4,cnt:0}; }
+      }
+    });
+  } catch(e){}
   const months = Object.keys(groups).sort().reverse();
+  if (!months.length) { el.innerHTML = '<div class="empty-msg">조건에 맞는 이력이 없습니다</div>'; return; }
   const grandTotal = months.reduce((s, m) => s + groups[m].total, 0);
 
   const siloFilter = document.getElementById('hist-silo').value;
@@ -3500,24 +3650,41 @@ function renderHistYearly() {
   const siloFilter = document.getElementById('hist-silo').value;
   let recs = db.map(r => normalizePcRec(r));
   if (siloFilter) recs = recs.filter(r => {
-    const sk = normSilo(r.silo) || r.silo;
-    return sk === siloFilter || r.silo === siloFilter;
+    const sk = r.origin || normSilo(r.silo) || r.silo;
+    return sk === siloFilter;
   });
-  if (!recs.length) { el.innerHTML = '<div class="empty-msg">데이터가 없습니다</div>'; return; }
-
   const groups = {};
   recs.forEach(r => {
     if (!r.date) return;
     const y = r.date.slice(0,4);
     if (!groups[y]) groups[y] = { total:0, S1:0, S2:0, S3:0, S4:0, cnt:0 };
-    const sk = normSilo(r.silo) || r.silo;
+    const sk = r.origin || normSilo(r.silo) || r.silo;
     const t = parseFloat(r.ton||0);
     groups[y].total += t;
     if (groups[y][sk] !== undefined) groups[y][sk] += t;
     groups[y].cnt++;
   });
 
+  // 과거(건별 데이터 없는 연도): 연간 관리대장(_annualLedger_v2)으로 지자체별 보완
+  try {
+    var _lg = getLedger();
+    Object.keys(_lg).forEach(function(y){
+      if (!/^\d{4}$/.test(y) || groups[y]) return;
+      var sm = (_lg[y]||{}).summary || {};
+      var s1=+sm.inflowS1||0, s4=+sm.inflowS4||0, s3=+sm.inflowS3||0;
+      var tot=s1+s4+s3; if (tot<=0 && +sm.total>0) tot=+sm.total;
+      if (tot<=0) return;
+      if (siloFilter) {
+        var v = siloFilter==='S1'?s1 : siloFilter==='S4'?s4 : siloFilter==='S3'?s3 : 0;
+        if (v<=0) return;
+        groups[y] = { total:v, S1:siloFilter==='S1'?v:0, S2:0, S3:siloFilter==='S3'?v:0, S4:siloFilter==='S4'?v:0, cnt:0 };
+      } else {
+        groups[y] = { total:tot, S1:s1, S2:0, S3:s3, S4:s4, cnt:0 };
+      }
+    });
+  } catch(e){}
   const years = Object.keys(groups).sort().reverse();
+  if (!years.length) { el.innerHTML = '<div class="empty-msg">데이터가 없습니다</div>'; return; }
   const maxTotal = Math.max(...years.map(y => groups[y].total));
   const grandTotal = years.reduce((s,y) => s+groups[y].total, 0);
   const siloFilter2 = document.getElementById('hist-silo').value;
@@ -3525,21 +3692,20 @@ function renderHistYearly() {
 
   let thead, rows;
   if (showSilos) {
-    // 헤더 6칸: 연도 | 광주 | 전남 | 나주 | 순천 | 합계
+    // 헤더 5칸(연간): 연도 | 광주(광주+전남) | 나주 | 순천 | 합계  — 전남은 광주에 합산
     thead = `<tr>
       <th>연도</th>
       <th style="color:var(--s1);">광주</th>
-      <th style="color:var(--s2);">전남</th>
       <th style="color:var(--s4);">나주</th>
       <th style="color:var(--s3);">순천</th>
       <th style="color:var(--accent);">합계</th>
     </tr>`;
     rows = years.map(y => {
       const g = groups[y];
+      const gj = (g.S1||0) + (g.S2||0);
       return `<tr>
         <td>${y}</td>
-        <td style="color:var(--s1);">${g.S1>0?Math.round(g.S1).toLocaleString():'-'}</td>
-        <td style="color:var(--s2);">${g.S2>0?Math.round(g.S2).toLocaleString():'-'}</td>
+        <td style="color:var(--s1);">${gj>0?Math.round(gj).toLocaleString():'-'}</td>
         <td style="color:var(--s4);">${g.S4>0?Math.round(g.S4).toLocaleString():'-'}</td>
         <td style="color:var(--s3);">${g.S3>0?Math.round(g.S3).toLocaleString():'-'}</td>
         <td style="color:var(--accent);font-weight:700;">${Math.round(g.total).toLocaleString()}</td>
@@ -3547,8 +3713,7 @@ function renderHistYearly() {
     }).join('');
     rows += `<tr class="total-row">
       <td>합계</td>
-      <td>${Math.round(years.reduce((s,y)=>s+groups[y].S1,0)).toLocaleString()}</td>
-      <td>${Math.round(years.reduce((s,y)=>s+groups[y].S2,0)).toLocaleString()}</td>
+      <td>${Math.round(years.reduce((s,y)=>s+(groups[y].S1||0)+(groups[y].S2||0),0)).toLocaleString()}</td>
       <td>${Math.round(years.reduce((s,y)=>s+groups[y].S4,0)).toLocaleString()}</td>
       <td>${Math.round(years.reduce((s,y)=>s+groups[y].S3,0)).toLocaleString()}</td>
       <td><span style="color:var(--accent);font-weight:700;">${Math.round(grandTotal).toLocaleString()}</span></td>
@@ -5652,6 +5817,7 @@ async function fbPull() {
         // PC 계산 기동/정지 예정 스케쥴 → 모바일은 그대로 모니터링 표시
         localStorage.setItem('_scheduleForecast', JSON.stringify({
           currentStatus: data.currentStatus || null,
+          currentSince: data.currentSince || null,
           transitions: data.transitions || [],
           updatedAt: data.updatedAt && data.updatedAt.toDate ? data.updatedAt.toDate().toISOString() : null
         }));
@@ -5666,6 +5832,7 @@ async function fbPull() {
         // PC 연간/월간 관리대장(_annualLedger_v2) → 모바일 _monthlyData_YYYY로 변환
         try {
           const annual = data.json ? JSON.parse(data.json) : null;
+          if (data.json) { try { localStorage.setItem('_annualLedger_v2', data.json); } catch(e){} }
           if (annual) {
             let cnt = 0;
             Object.entries(annual).forEach(([yr, yd]) => {
@@ -6036,3 +6203,4 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
+                                                                                                                     
