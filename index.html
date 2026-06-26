@@ -19507,6 +19507,9 @@ function closeAnnNoteModal() {
         if(sb && !sb._collapseBound){ sb._collapseBound=true;
           sb.addEventListener('click', function(e){ var c=e.target.closest('.silo-card'); if(c) c.classList.toggle('silo-card-open'); });
         }
+        // 발전 달력: 오른쪽 ▲▼ 버튼 숨김 (좌우 스와이프로 대체) → 달력 잘림 방지
+        var _navb=document.querySelector('[onclick*="schedSliderStep(-2)"]');
+        if(_navb && _navb.parentElement) _navb.parentElement.style.display='none';
         // 발전 달력: 좌우 스와이프로 월 이동 (왼쪽=다음/미래, 오른쪽=이전/과거)
         var calC=document.getElementById('calendarContainer');
         if(calC && !calC._swipeBound){ calC._swipeBound=true;
