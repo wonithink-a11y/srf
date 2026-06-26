@@ -388,6 +388,15 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     .data-table th, .data-table td { padding:3px 2px !important; letter-spacing:0 !important; white-space:nowrap; }
     .data-table th { text-transform:none !important; }
     .fc-input { padding:4px 2px !important; font-size:11px !important; }
+    /* 저장조 카드: 세부 접기(탭하면 펼침) */
+    body.is-mobile .silo-card { cursor:pointer; }
+    body.is-mobile .silo-detail { display:none !important; min-height:0 !important; }
+    body.is-mobile .silo-card-open .silo-detail { display:flex !important; }
+    /* 입고·사용량 지자체 세부 접기 */
+    body.is-mobile .jj-detail { display:none !important; }
+    body.is-mobile .jj-detail.open { display:flex !important; }
+    /* 저장조 카드: 앱에서 세로막대·%·최대 숨김 */
+    body.is-mobile .silo-bar, body.is-mobile .silo-pct, body.is-mobile .silo-max { display:none !important; }
   }
 
   </style>
@@ -2082,12 +2091,12 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       </div>
       <!-- ▌월 이동 버튼 (▲과거 / ▼미래) -->
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
-                  align-self:stretch;gap:6px;padding:8px 6px;
+                  align-self:center;gap:6px;padding:4px 4px;
                   background:var(--bg3);border-radius:10px;border:1px solid var(--border);
                   width:48px;flex-shrink:0;">
         <button onclick="schedSliderStep(-2)" title="과거로"
           style="background:rgba(56,189,248,.15);border:1px solid rgba(56,189,248,.35);
-                 color:var(--accent);border-radius:8px;width:36px;height:180px;
+                 color:var(--accent);border-radius:8px;width:38px;height:40px;font-size:16px;
                  font-size:22px;cursor:pointer;display:flex;align-items:center;
                  justify-content:center;padding:0;line-height:1;">▲</button>
         <div id="schedViewLabel" style="font-size:12px;font-weight:700;color:var(--accent);
@@ -2095,7 +2104,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
              width:36px;overflow:hidden;">현재</div>
         <button onclick="schedSliderStep(2)" title="미래로"
           style="background:rgba(56,189,248,.15);border:1px solid rgba(56,189,248,.35);
-                 color:var(--accent);border-radius:8px;width:36px;height:180px;
+                 color:var(--accent);border-radius:8px;width:38px;height:40px;font-size:16px;
                  font-size:22px;cursor:pointer;display:flex;align-items:center;
                  justify-content:center;padding:0;line-height:1;">▼</button>
         <input type="hidden" id="schedViewSlider" value="0">
@@ -7292,12 +7301,12 @@ function makeSiloCardCompact(s, tempData) {
   }
 
   return `
-    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:16px 14px;display:flex;flex-direction:column;align-items:stretch;box-sizing:border-box;height:100%;">
+    <div class="silo-card" style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:16px 14px;display:flex;flex-direction:column;align-items:stretch;box-sizing:border-box;height:100%;">
       <!-- 1. 저장조명 -->
       <div style="font-size:24px;font-weight:800;color:${col};text-align:center;margin-bottom:10px;">${s.name}</div>
       <!-- 2. 세로바 + 수치 -->
       <div style="display:flex;align-items:flex-start;gap:12px;flex:1;">
-        <div style="width:36px;height:140px;flex-shrink:0;background:#1e293b;border-radius:6px;position:relative;overflow:hidden;border:1px solid #475569;">
+        <div class="silo-bar" style="width:36px;height:140px;flex-shrink:0;background:#1e293b;border-radius:6px;position:relative;overflow:hidden;border:1px solid #475569;">
           <div style="position:absolute;bottom:0;width:100%;height:${pct}%;background:linear-gradient(180deg,${col}aa,${col});border-radius:4px 4px 0 0;transition:height .5s;"></div>
         </div>
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;">
@@ -7306,15 +7315,15 @@ function makeSiloCardCompact(s, tempData) {
             <span style="font-size:22px;font-weight:800;color:${col};">${fmtNum(s.cur)}</span><span style="font-size:14px;font-weight:600;color:${col};margin-left:3px;">톤</span>
           </div>
           <!-- % -->
-          <div style="font-size:16px;font-weight:600;color:var(--text2);">${pct}%</div>
+          <div class="silo-pct" style="font-size:16px;font-weight:600;color:var(--text2);">${pct}%</div>
           <!-- 최대 한 줄 -->
-          <div style="font-size:13px;color:var(--text2);white-space:nowrap;">최대 ${fmtNum(s.cap)}톤</div>
+          <div class="silo-max" style="font-size:13px;color:var(--text2);white-space:nowrap;">최대 ${fmtNum(s.cap)}톤</div>
           <!-- 상태 뱃지 -->
           <span class="silo-status ${cls}" style="margin-top:4px;display:inline-block;align-self:flex-start;">${label}</span>
         </div>
       </div>
       <!-- 임시보관: margin-top:auto 으로 항상 카드 하단 고정 -->
-      <div style="margin-top:auto;padding-top:10px;min-height:130px;display:flex;flex-direction:column;justify-content:flex-start;">
+      <div class="silo-detail" style="margin-top:auto;padding-top:10px;min-height:130px;display:flex;flex-direction:column;justify-content:flex-start;">
         <!-- 자체 연료 표시 -->
         <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:${col}18;border:1px solid ${col}44;border-radius:7px;margin-bottom:6px;">
           <span style="font-size:13px;color:${col};font-weight:700;">🏭 ${s.name.replace(' ST','')} 연료</span>
@@ -19485,6 +19494,29 @@ function closeAnnNoteModal() {
     try{ makeSubtabs('tab-schedule',[{label:'📅 발전 달력'},{label:'⚙️ 스케쥴 설정',match:['설정']}]); }catch(e){}
     try{ makeSubtabs('tab-history',[{label:'📋 입고 이력',match:['입고 이력']},{label:'📥 CSV 가져오기',match:['CSV 입고']}]); }catch(e){}
     try{ makeSubtabs('tab-ledger',[{label:'📅 관리대장',match:['관리대장']},{label:'📊 추이·엑셀',match:['추이','엑셀']}]); }catch(e){}
+    try{
+      if(window.innerWidth<=768){
+        document.body.classList.add('is-mobile');
+        // 입고·사용량: 지자체 세부(-jj)는 접고, 행 탭하면 펼침
+        document.querySelectorAll('[id$="-jj"]').forEach(function(jj){
+          jj.classList.add('jj-detail');
+          var row=jj.parentElement; if(row){ row.style.cursor='pointer'; row.addEventListener('click', function(){ jj.classList.toggle('open'); }); }
+        });
+        // 저장조별 현재고 카드: 세부 접기 (위임 클릭, 재렌더에도 유지)
+        var sb=document.getElementById('siloBottom');
+        if(sb && !sb._collapseBound){ sb._collapseBound=true;
+          sb.addEventListener('click', function(e){ var c=e.target.closest('.silo-card'); if(c) c.classList.toggle('silo-card-open'); });
+        }
+        // 발전 달력: 좌우 스와이프로 월 이동 (왼쪽=다음/미래, 오른쪽=이전/과거)
+        var calC=document.getElementById('calendarContainer');
+        if(calC && !calC._swipeBound){ calC._swipeBound=true;
+          var _sx=0,_sy=0;
+          calC.addEventListener('touchstart', function(e){ var t=e.touches[0]; _sx=t.clientX; _sy=t.clientY; }, {passive:true});
+          calC.addEventListener('touchend', function(e){ var t=e.changedTouches[0]; var dx=t.clientX-_sx, dy=t.clientY-_sy;
+            if(Math.abs(dx)>50 && Math.abs(dx)>Math.abs(dy)*1.5 && typeof schedSliderStep==='function'){ schedSliderStep(dx<0?2:-2); } }, {passive:true});
+        }
+      }
+    }catch(e){}
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', function(){ setTimeout(buildAll,80); });
   else setTimeout(buildAll,80);
