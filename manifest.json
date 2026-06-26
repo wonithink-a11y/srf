@@ -1,26 +1,16 @@
 {
-  "name": "SRF 수급관리",
-  "short_name": "SRF수급",
-  "description": "SRF 고형연료 수급관리 앱",
-  "start_url": "/srf/index.html",
-  "scope": "/srf/",
+  "name": "고형연료 수급 관리 시스템",
+  "short_name": "SRF관리",
+  "description": "SRF 고형연료 수급·재고 관리 시스템",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#0d1117",
   "theme_color": "#0d1117",
-  "orientation": "portrait",
-  "lang": "ko",
   "icons": [
-    {
-      "src": "/srf/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/srf/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }
