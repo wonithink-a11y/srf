@@ -364,6 +364,32 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     #recentTable th, #recentTable td { padding: 6px 5px; }
   }
 
+  /* ── 대시보드 서브탭 (재고/입고·사용량/기동스케쥴) ── */
+  .dash-subtab-bar { display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; }
+  .dash-subtab { flex:1 1 auto; min-width:96px; padding:11px 12px; border-radius:9px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; transition:all .12s; }
+  .dash-subtab.active { background:var(--accent); color:#0d1117; border-color:var(--accent); }
+  .dash-pane > * { margin-bottom:14px; }
+  /* 저장조별 현재고: 항상 가로 나열(좁으면 가로 스크롤) */
+  #siloBottom { overflow-x:auto; }
+  @media (max-width: 768px) {
+    #siloBottom { grid-template-columns: repeat(4, minmax(150px,1fr)) !important; }
+    .dash-subtab { font-size:12.5px; padding:10px 8px; min-width:78px; }
+    /* 발전계획 달력: 폰에서 2달 가로 → 1달씩 세로로 쌓기 */
+    .cal-grid { grid-template-columns: 1fr !important; }
+    /* 밀도 ↑ : 전체재고/지자체 글씨·여백 축소 → 한 줄에 */
+    #kpi-total { padding:12px !important; }
+    #kpi-stock-S1, #kpi-stock-S4, #kpi-stock-S3 { font-size:17px !important; }
+    #kpi-total [id$="-detail"] { font-size:10px !important; gap:4px !important; }
+    /* 지자체 세부: 모바일 기본 숨김(JS가 탭으로 토글) */
+    body.is-mobile #kpi-total [id$="-detail"].collapsible { display:none !important; }
+    body.is-mobile #kpi-total [id$="-detail"].collapsible.open { display:flex !important; }
+    /* 표: 칸 줄여 지역 다 보이게 */
+    .data-table { font-size:10px !important; }
+    .data-table th, .data-table td { padding:3px 2px !important; letter-spacing:0 !important; white-space:nowrap; }
+    .data-table th { text-transform:none !important; }
+    .fc-input { padding:4px 2px !important; font-size:11px !important; }
+  }
+
   </style>
 </head>
 <body>
@@ -4804,7 +4830,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       <td style="text-align:center;">9일</td>
       <td style="font-size:11px;color:var(--text2);">실적</td>
     </tr><tr style="opacity:.55;">
-      <td style="font-weight:700;text-align:center;">7월 <span style="font-size:10px;color:var(--text2);">(예정)</span></td>
+      <td style="font-weight:700;text-align:center;">7월</td>
       <td style="text-align:right;color:#38bdf8;">—</td>
       <td style="text-align:right;color:#22c55e;">—</td>
       <td style="text-align:right;color:#a78bfa;">—</td>
@@ -4817,7 +4843,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       <td style="text-align:center;">31일</td>
       <td style="font-size:11px;color:var(--text2);">예측</td>
     </tr><tr style="opacity:.55;">
-      <td style="font-weight:700;text-align:center;">8월 <span style="font-size:10px;color:var(--text2);">(예정)</span></td>
+      <td style="font-weight:700;text-align:center;">8월</td>
       <td style="text-align:right;color:#38bdf8;">—</td>
       <td style="text-align:right;color:#22c55e;">—</td>
       <td style="text-align:right;color:#a78bfa;">—</td>
@@ -4830,7 +4856,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       <td style="text-align:center;">22일</td>
       <td style="font-size:11px;color:var(--text2);">예측</td>
     </tr><tr style="opacity:.55;">
-      <td style="font-weight:700;text-align:center;">9월 <span style="font-size:10px;color:var(--text2);">(예정)</span></td>
+      <td style="font-weight:700;text-align:center;">9월</td>
       <td style="text-align:right;color:#38bdf8;">—</td>
       <td style="text-align:right;color:#22c55e;">—</td>
       <td style="text-align:right;color:#a78bfa;">—</td>
@@ -4843,7 +4869,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       <td style="text-align:center;">29일</td>
       <td style="font-size:11px;color:var(--text2);">예측</td>
     </tr><tr style="opacity:.55;">
-      <td style="font-weight:700;text-align:center;">10월 <span style="font-size:10px;color:var(--text2);">(예정)</span></td>
+      <td style="font-weight:700;text-align:center;">10월</td>
       <td style="text-align:right;color:#38bdf8;">—</td>
       <td style="text-align:right;color:#22c55e;">—</td>
       <td style="text-align:right;color:#a78bfa;">—</td>
@@ -4856,7 +4882,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       <td style="text-align:center;">31일</td>
       <td style="font-size:11px;color:var(--text2);">예측</td>
     </tr><tr style="opacity:.55;">
-      <td style="font-weight:700;text-align:center;">11월 <span style="font-size:10px;color:var(--text2);">(예정)</span></td>
+      <td style="font-weight:700;text-align:center;">11월</td>
       <td style="text-align:right;color:#38bdf8;">—</td>
       <td style="text-align:right;color:#22c55e;">—</td>
       <td style="text-align:right;color:#a78bfa;">—</td>
@@ -4869,7 +4895,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       <td style="text-align:center;">20일</td>
       <td style="font-size:11px;color:var(--text2);">예측</td>
     </tr><tr style="opacity:.55;">
-      <td style="font-weight:700;text-align:center;">12월 <span style="font-size:10px;color:var(--text2);">(예정)</span></td>
+      <td style="font-weight:700;text-align:center;">12월</td>
       <td style="text-align:right;color:#38bdf8;">—</td>
       <td style="text-align:right;color:#22c55e;">—</td>
       <td style="text-align:right;color:#a78bfa;">—</td>
@@ -4974,13 +5000,11 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 <div id="tab-fuelcalc" class="tab-panel">
   <div class="card">
     <div class="section-header" style="margin-bottom:16px;">
-      <div class="section-title">⚗️ 연료사용량 계산 (크레인 쉬프트별)</div>
+      <div class="section-title">⚗️ 연료사용량 계산</div>
       <div class="btn-row">
         <button class="btn btn-primary" onclick="saveFuelCalc()">💾 저장</button>
         <button class="btn btn-secondary" onclick="resetFuelCalc()">🔄 초기화</button>
         <button class="btn btn-secondary" onclick="downloadFuelCalcCSV()">📥 Excel 내보내기</button>
-        <button class="btn btn-secondary" onclick="document.getElementById('usageReimportFile').click()" style="font-size:12px;">📂 사용량 엑셀 재import</button>
-        <input type="file" id="usageReimportFile" accept=".xlsx,.xls" style="display:none" onchange="reimportUsageFromExcel(this)">
         <button class="btn btn-danger" onclick="clearCurrentMonthUsage()" style="font-size:12px;">🗑️ 당월 사용량 초기화</button>
       </div>
     </div>
@@ -11424,7 +11448,7 @@ function renderMonthlyLedger() {
       ? `<span style="color:${yoyDiff>=0?'var(--green)':'var(--red)'}">${yoyDiff>=0?'+':''}${Math.round(yoyDiff).toLocaleString()}t</span>` : '—';
     const bgFuture = isFuture ? 'opacity:.55;' : '';
     const bgPartial = isPartial ? 'background:rgba(245,158,11,.06);' : '';
-    const moLabel = monthNames[idx] + (isFuture ? ' <span style="font-size:10px;color:var(--text2);">(예정)</span>' : '');
+    const moLabel = monthNames[idx] + (isFuture ? '' : '');
     return `<tr style="${bgFuture}${bgPartial}">
       <td style="font-weight:700;text-align:center;">${moLabel}</td>
       <td style="text-align:right;color:#38bdf8;">${inf.S1>0?Math.round(inf.S1).toLocaleString():'—'}</td>
@@ -19361,6 +19385,109 @@ function closeAnnNoteModal() {
       try { srfPush(); } catch(e) {}
     }
   });
+})();
+</script>
+<script>
+/* ── 대시보드 서브탭 재구성 (2026-06-26): 한 화면에 너무 많은 정보 → 재고/입고·사용량/기동스케쥴 탭 분리 ── */
+(function(){
+  function buildDashSubtabs(){
+    var dash=document.getElementById('tab-dashboard');
+    if(!dash || document.getElementById('dashSubTabBar')) return;
+    var kpiTotal=document.getElementById('kpi-total'); if(!kpiTotal) return;
+    var topGrid=kpiTotal.parentElement;
+    var flowDiv=kpiTotal.nextElementSibling;                  // 입고/사용량 통합 블록
+    var kpiOpdate=document.getElementById('kpi-opdate');      // 예상 가동/정지 스케줄
+    var opdaysWrap=(document.getElementById('opDaysDisplay')||{}).parentElement; // 가동일수 섹션
+    var siloAnchor=document.getElementById('siloTop')||document.getElementById('siloBottom');
+    var siloCard=siloAnchor&&siloAnchor.closest?siloAnchor.closest('.card'):null;
+    var alertCard=siloCard?siloCard.nextElementSibling:null;
+    while(alertCard&&alertCard.nodeType!==1) alertCard=alertCard.nextSibling;
+    var leftWrap=siloCard?siloCard.parentElement:null;
+    var bottomGrid=leftWrap?leftWrap.parentElement:null;
+    var recentAnchor=document.getElementById('recentTable');
+    var recentCard=recentAnchor&&recentAnchor.closest?recentAnchor.closest('.card'):null;
+
+    function pane(id){ var d=document.createElement('div'); d.id=id; d.className='dash-pane'; return d; }
+    var pStock=pane('dashPaneStock'), pFlow=pane('dashPaneFlow'), pSched=pane('dashPaneSched');
+    pFlow.style.display='none'; pSched.style.display='none';
+    var bar=document.createElement('div'); bar.id='dashSubTabBar'; bar.className='dash-subtab-bar';
+    bar.innerHTML='<button class="dash-subtab active" data-p="stock">📦 재고</button>'
+                +'<button class="dash-subtab" data-p="flow">📊 입고·사용량</button>'
+                +'<button class="dash-subtab" data-p="sched">🏭 기동스케쥴</button>';
+    dash.insertBefore(pSched, dash.firstChild);
+    dash.insertBefore(pFlow, dash.firstChild);
+    dash.insertBefore(pStock, dash.firstChild);
+    dash.insertBefore(bar, dash.firstChild);
+
+    // ── 블록 이동 (순서 = 표시 순서) ──
+    if(opdaysWrap) pSched.appendChild(opdaysWrap);   // 기동스케쥴 탭: 가동일수 맨 위
+    if(kpiOpdate)  pSched.appendChild(kpiOpdate);     //              + 예상 가동/정지
+    if(flowDiv)    pFlow.appendChild(flowDiv);        // 입고·사용량 탭
+    if(recentCard) pFlow.appendChild(recentCard);     //              + 최근 입고현황
+    if(kpiTotal)   pStock.appendChild(kpiTotal);      // 재고 탭: 전체재고(위)
+    if(siloCard)   pStock.appendChild(siloCard);      //          저장조별 현재고(아래)
+    if(alertCard)  pStock.appendChild(alertCard);     //          + 알림
+
+    // ── 전체재고 지자체(광주/나주/순천)를 세로열 → 가로열 ──
+    var cw=document.getElementById('kpi-stock-S1');
+    while(cw && !(cw.style && cw.style.flexDirection==='column')) cw=cw.parentElement;
+    if(cw){ cw.style.flexDirection='row'; cw.style.flexWrap='wrap'; cw.style.gap='8px'; }
+    // ── 모바일: 지자체 세부(저장조별)는 기본 접힘, 박스 탭 시 펼침 ──
+    var isMob=window.innerWidth<=768;
+    if(isMob) document.body.classList.add('is-mobile');
+    ['S1','S4','S3'].forEach(function(sid){
+      try{
+        var det=document.getElementById('kpi-stock-'+sid+'-detail'); if(!det) return;
+        det.classList.add('collapsible');
+        var box=det.parentElement; if(!box) return;
+        box.style.cursor='pointer';
+        box.addEventListener('click', function(){ det.classList.toggle('open'); });
+      }catch(e){}
+    });
+
+    // ── 빈 컨테이너 정리 ──
+    [topGrid,leftWrap,bottomGrid].forEach(function(g){ try{ if(g && g.children.length===0) g.remove(); }catch(e){} });
+
+    // ── 서브탭 전환 ──
+    bar.addEventListener('click', function(e){
+      var b=e.target.closest('.dash-subtab'); if(!b) return;
+      bar.querySelectorAll('.dash-subtab').forEach(function(x){ x.classList.toggle('active', x===b); });
+      var p=b.getAttribute('data-p');
+      pStock.style.display=(p==='stock')?'':'none';
+      pFlow.style.display =(p==='flow') ?'':'none';
+      pSched.style.display=(p==='sched')?'':'none';
+    });
+  }
+  // ── 범용 서브탭 헬퍼: 탭 내부 섹션들을 제목으로 그룹지어 내부탭으로 분리 ──
+  function _secTitle(sec){ var t=sec.querySelector('.card-title,.section-title'); return t?(t.textContent||'').trim():''; }
+  function makeSubtabs(tabId, groups){
+    var tab=document.getElementById(tabId); if(!tab) return;
+    if(tab.querySelector(':scope > .dash-subtab-bar')) return;
+    var secs=[]; for(var i=0;i<tab.children.length;i++){ if(tab.children[i].nodeType===1) secs.push(tab.children[i]); }
+    if(secs.length<2) return;
+    var bar=document.createElement('div'); bar.className='dash-subtab-bar';
+    var panes=groups.map(function(g,gi){ var pn=document.createElement('div'); pn.className='dash-pane'; if(gi>0) pn.style.display='none'; return pn; });
+    bar.innerHTML=groups.map(function(g,gi){ return '<button class="dash-subtab'+(gi===0?' active':'')+'" data-i="'+gi+'">'+g.label+'</button>'; }).join('');
+    secs.forEach(function(sec){
+      var title=_secTitle(sec); var gi=0;
+      for(var k=0;k<groups.length;k++){ var mm=groups[k].match; if(mm && mm.some(function(x){ return title.indexOf(x)>=0; })){ gi=k; break; } }
+      panes[gi].appendChild(sec);
+    });
+    for(var j=panes.length-1;j>=0;j--) tab.insertBefore(panes[j], tab.firstChild);
+    tab.insertBefore(bar, tab.firstChild);
+    bar.addEventListener('click', function(e){ var b=e.target.closest('.dash-subtab'); if(!b) return;
+      var bs=bar.querySelectorAll('.dash-subtab'); for(var z=0;z<bs.length;z++) bs[z].classList.toggle('active', bs[z]===b);
+      var idx=+b.getAttribute('data-i'); for(var z=0;z<panes.length;z++) panes[z].style.display=(z===idx)?'':'none';
+    });
+  }
+  function buildAll(){
+    try{ buildDashSubtabs(); }catch(e){}
+    try{ makeSubtabs('tab-schedule',[{label:'📅 발전 달력'},{label:'⚙️ 스케쥴 설정',match:['설정']}]); }catch(e){}
+    try{ makeSubtabs('tab-history',[{label:'📋 입고 이력',match:['입고 이력']},{label:'📥 CSV 가져오기',match:['CSV 입고']}]); }catch(e){}
+    try{ makeSubtabs('tab-ledger',[{label:'📅 관리대장',match:['관리대장']},{label:'📊 추이·엑셀',match:['추이','엑셀']}]); }catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', function(){ setTimeout(buildAll,80); });
+  else setTimeout(buildAll,80);
 })();
 </script>
 </body>
