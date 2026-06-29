@@ -1606,7 +1606,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       <div class="section-title">발전설비 기동/정지 스케쥴</div>
       <div class="btn-row">
         <button class="btn btn-primary" onclick="generateSchedule()">⚙️ 스케쥴 재생성</button>
-        <button class="btn btn-secondary" onclick="downloadSchedule()">📥 CSV 내보내기</button>
+        <button class="btn btn-secondary" onclick="downloadSchedule()">📥 엑셀 내보내기</button>
       </div>
     </div>
     <!-- 달력 + 슬라이더 -->
@@ -11122,6 +11122,123 @@ function renderDailyLedger() {
     <td style="text-align:right;color:var(--accent);">${Math.round(totUse).toLocaleString()}</td>
     <td></td>
   </tr>`;
+}
+
+// ══════════════════════════════════════════════════════
+// 발전 달력(스케쥴) 엑셀 내보내기  — 예측관리 방식
+//   · 지자체별(광주·전남·순천·나주) 입고:
+//        실제 입고 데이터가 있으면 '실제입고', 없으면 계획 기반 '예상입고'
+//   · 일 사용량:
+//        실제 사용량이 있으면 '실제사용', 없으면 시뮬 '예상사용'
+//   · 가동상태(가동/정지/점검)·재고: 발전 달력 시뮬레이션(_schedDayMap) 기준
+//   → 실제 데이터가 들어오면 해당 셀이 예상→실제로 자동 전환되어 마감자료로 사용
+// ══════════════════════════════════════════════════════
+function downloadSchedule() {
+  if (typeof XLSX === 'undefined') { toast('red','오류','엑셀 모듈을 불러오지 못했습니다.'); return; }
+  // 스케쥴이 비어있으면 먼저 생성
+  if ((!_schedDayMap || Object.keys(_schedDayMap).length === 0) && typeof generateSchedule === 'function') {
+    try { generateSchedule(); } catch(e) {}
+  }
+  if (!_schedDayMap || Object.keys(_schedDayMap).length === 0) {
+    toast('yellow','데이터 없음','발전 스케쥴을 먼저 생성해 주세요.'); return;
+  }
+
+  const DOW = ['일','월','화','수','목','금','토'];
+  const todayStr = _schedToday ? localDateStr(_schedToday) : localDateStr(new Date());
+  const statusKo = s => s==='on' ? '가동' : s==='maint' ? '점검' : '정지';
+
+  // 날짜별 실제 입고(저장조=지자체별) 집계
+  const actualBySiloByDate = {};
+  const hasActualDate = {};
+  db.forEach(r => {
+    const d = (r.datetime||'').slice(0,10);
+    if (!d) return;
+    if (!actualBySiloByDate[d]) actualBySiloByDate[d] = {S1:0,S2:0,S3:0,S4:0};
+    actualBySiloByDate[d][r.silo] = (actualBySiloByDate[d][r.silo]||0) + (r.net||0);
+    hasActualDate[d] = true;
+  });
+
+  // 계획(예상) 입고 — 저장조별 (시뮬레이션과 동일 로직)
+  function planInflowBySilo(dateStr) {
+    const dow = new Date(dateStr + 'T00:00:00').getDay();
+    const out = {S1:0,S2:0,S3:0,S4:0};
+    DELIVERY_PLAN.forEach(p => {
+      if (!p.days.includes(dow)) return;
+      const amt  = getPlanDaily(p.id);
+      const susp = _suspensions.filter(s => s.planId===p.id || s.planId==='ALL')
+                               .find(s => dateStr>=s.start && dateStr<=s.end);
+      const dayAmt = susp ? (susp.daily||0) : amt;
+      if (dayAmt > 0) {
+        const perSilo = dayAmt / p.silos.length;
+        p.silos.forEach(sid => { out[sid] = (out[sid]||0) + perSilo; });
+      }
+    });
+    return out;
+  }
+  const r1 = n => Math.round((n||0)*10)/10;
+
+  const header = ['날짜','요일','가동상태','입고구분',
+    '광주(톤)','전남(톤)','순천(톤)','나주(톤)','입고합계(톤)',
+    '사용구분','사용량(톤)','재고(톤)'];
+  const rows = [header];
+
+  // 월별요약 누적
+  const monthAgg = {}; // 'YYYY-MM' → {inAct,inFc,use,onDays,maintDays,stockEnd}
+
+  const dates = Object.keys(_schedDayMap).sort();
+  dates.forEach(dateStr => {
+    const info = _schedDayMap[dateStr];
+    if (!info) return;
+    const dow = DOW[new Date(dateStr + 'T00:00:00').getDay()];
+
+    const useActualIn = !!(info.actual || hasActualDate[dateStr]);
+    const inSilo = useActualIn
+      ? (actualBySiloByDate[dateStr] || {S1:0,S2:0,S3:0,S4:0})
+      : planInflowBySilo(dateStr);
+    const s1=r1(inSilo.S1), s2=r1(inSilo.S2), s3=r1(inSilo.S3), s4=r1(inSilo.S4);
+    const inTot = r1(s1+s2+s3+s4);
+    const inKind = useActualIn ? '실제입고' : '예상입고';
+
+    const hasActualUse = info.actual || ((typeof _usageData!=='undefined') && _usageData[dateStr]!=null);
+    const useKind = hasActualUse ? '실제사용' : '예상사용';
+    let useQty = hasActualUse && (typeof _usageData!=='undefined') && _usageData[dateStr]!=null
+      ? _usageData[dateStr]
+      : Math.max(0, (info.inflow||0) - (info.net||0));
+    useQty = r1(useQty);
+    const stock = Math.round(info.stock||0);
+
+    rows.push([dateStr, dow, statusKo(info.status), inKind,
+      s1, s2, s3, s4, inTot, useKind, useQty, stock]);
+
+    // 월별 누적
+    const ym = dateStr.slice(0,7);
+    if (!monthAgg[ym]) monthAgg[ym] = {inAct:0,inFc:0,use:0,onDays:0,maintDays:0,stockEnd:0};
+    const m = monthAgg[ym];
+    if (useActualIn) m.inAct += inTot; else m.inFc += inTot;
+    m.use += useQty;
+    if (info.status==='on') m.onDays++;
+    else if (info.status==='maint') m.maintDays++;
+    m.stockEnd = stock; // 정렬되어 있으므로 마지막이 월말재고
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:12},{wch:5},{wch:8},{wch:9},{wch:9},{wch:9},{wch:9},{wch:9},{wch:11},{wch:9},{wch:10},{wch:9}];
+  XLSX.utils.book_append_sheet(wb, ws, '발전스케쥴');
+
+  // 월별 요약 시트
+  const sumRows = [['월','실제입고(톤)','예상입고(톤)','입고합계(톤)','사용합계(톤)','가동일수','점검일수','월말재고(톤)']];
+  Object.keys(monthAgg).sort().forEach(ym => {
+    const m = monthAgg[ym];
+    sumRows.push([ym, r1(m.inAct), r1(m.inFc), r1(m.inAct+m.inFc), r1(m.use), m.onDays, m.maintDays, m.stockEnd]);
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet(sumRows);
+  ws2['!cols'] = [{wch:9},{wch:12},{wch:12},{wch:12},{wch:12},{wch:8},{wch:8},{wch:11}];
+  XLSX.utils.book_append_sheet(wb, ws2, '월별요약');
+
+  const fn = '발전스케쥴_' + todayStr + '.xlsx';
+  XLSX.writeFile(wb, fn);
+  if (typeof toast === 'function') toast('green','내보내기 완료', fn);
 }
 
 function downloadDailyLedgerCSV() {
