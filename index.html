@@ -2147,7 +2147,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   <div class="card" style="margin-bottom:16px;">
     <div class="section-header" style="margin-bottom:12px;">
       <div class="card-title">⚙️ 발전설비 기동/정지 기준 설정</div>
-      <button class="btn btn-primary" style="font-size:12px;padding:6px 14px;" onclick="generateSchedule()">적용 &amp; 재생성</button>
+      <button class="btn btn-primary" style="font-size:12px;padding:6px 14px;" onclick="applyScheduleAll('발전설비 기동/정지 기준 — 설정 전체 저장·재생성 완료')">적용 &amp; 재생성</button>
     </div>
 
     <!-- ▌평시 설정기준 -->
@@ -2370,7 +2370,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       </table>
     </div>
     <div style="margin-top:10px;text-align:right;">
-      <button class="btn btn-primary" style="font-size:12px;padding:6px 14px;" onclick="generateSchedule()">적용 &amp; 재생성</button>
+      <button class="btn btn-primary" style="font-size:12px;padding:6px 14px;" onclick="applyScheduleAll('입고계획(일 입고량) — 설정 전체 저장·재생성 완료')">적용 &amp; 재생성</button>
     </div>
   </div>
 
@@ -5651,11 +5651,17 @@ function diagDailyInflow(dateStr) {
   });
   console.log("---");
 }
-// 수정 가능한 일일 입고량 읽기 (UI 입력값 우선)
+// 수정 가능한 일일 입고량 읽기
+//  · 설정탭이 DOM과 동기화된 뒤(_schedDomApplied)에는 입력칸 값 우선
+//  · 그 전(초기 로드·대시보드 자동계산)에는 메모리값(DELIVERY_PLAN.daily) 사용
+//    → 저장조·점검기간처럼 복원된 값이 시뮬레이션에 그대로 반영됨
 function getPlanDaily(id) {
-  const el = document.getElementById('plan_daily_' + id);
-  const p  = DELIVERY_PLAN.find(x => x.id === id);
-  return el ? (parseFloat(el.value) || 0) : (p ? p.daily : 0);
+  const p = DELIVERY_PLAN.find(x => x.id === id);
+  if (typeof _schedDomApplied !== 'undefined' && _schedDomApplied) {
+    const el = document.getElementById('plan_daily_' + id);
+    if (el && el.value !== '') return parseFloat(el.value) || 0;
+  }
+  return p ? p.daily : 0;
 }
 const FUEL_TYPES = ['SRF 비성형', 'SRF 파쇄', '우드펠릿', '바이오가스'];
 const COMPANIES  = ['(주)청정연료', '한국SRF물류', '에코트랜스', '그린로지스틱스', '(주)연료수송'];
@@ -6476,9 +6482,45 @@ function updateTransitionConsumptionPreview() {
 function applyTransitionHours() {
   _defaultStartHour = parseInt(document.getElementById('startHourHidden')?.value || 10);
   _defaultStopHour  = parseInt(document.getElementById('stopHourHidden')?.value  || 14);
-  saveScheduleSettings();
-  generateSchedule();
-  toast('green', '시각 설정 적용', '기동 ' + _defaultStartHour + ':00 / 정지 ' + _defaultStopHour + ':00 — 스케쥴 재생성 완료');
+  applyScheduleAll('기동 ' + _defaultStartHour + ':00 / 정지 ' + _defaultStopHour + ':00 — 스케쥴 설정 전체 저장·재생성 완료');
+}
+
+// ══════════════════════════════════════════════════════
+// 통합 "적용 & 재생성" — 어느 버튼을 눌러도 스케쥴 설정탭 전체를
+//   ① DOM 입력값을 메모리에 커밋  ② 전체 저장  ③ 재생성  ④ 피드백
+// ══════════════════════════════════════════════════════
+function applyScheduleAll(msg) {
+  try {
+    _schedDomApplied = true; // 사용자가 명시적으로 적용 → DOM 입력값을 신뢰
+
+    // ① 기동/정지 전환 시각 커밋
+    const sh = document.getElementById('startHourHidden');
+    const eh = document.getElementById('stopHourHidden');
+    if (sh && sh.value !== '') _defaultStartHour = parseInt(sh.value);
+    if (eh && eh.value !== '') _defaultStopHour  = parseInt(eh.value);
+
+    // ② 저장조 최대용량·일일소비량 커밋
+    SILOS.forEach(s => {
+      const capEl  = document.getElementById('silo_cap_'  + s.id);
+      const rateEl = document.getElementById('silo_rate_' + s.id);
+      if (capEl  && capEl.value  !== '') s.cap       = Math.max(100, parseFloat(capEl.value)  || s.cap);
+      if (rateEl && rateEl.value !== '') s.dailyRate = Math.max(0,   parseFloat(rateEl.value) || (s.dailyRate||0));
+    });
+    // (입고계획 톤수, 기동/정지 기준값은 generateSchedule 이 DOM에서 직접 읽어 반영)
+
+    generateSchedule();      // 시뮬 재생성 (내부에서 saveScheduleSettings 호출)
+    saveScheduleSettings();  // 전체 설정 한 번 더 확정 저장
+
+    if (typeof toast === 'function') {
+      const pv = DELIVERY_PLAN.map(p => p.name + ' ' + p.daily + 't').join(' · ');
+      toast('green', '적용·저장 완료', (msg ? msg + ' — ' : '') + '입고계획: ' + pv);
+    }
+  } catch (e) {
+    console.error('[applyScheduleAll]', e);
+    if (typeof toast === 'function') {
+      toast('red', '적용 오류', (e && e.message) || '재생성 중 오류. F12 콘솔을 확인하세요.');
+    }
+  }
 }
 
 function updateDcOverrideHourDefault() {
@@ -6580,6 +6622,7 @@ function onSiloRateInput(siloId, value) {
 
 // ── 저장조 설정 저장 ──
 function saveSiloSettings() {
+  _schedDomApplied = true; // 사용자가 명시적으로 저장 → DOM 입력값 신뢰
   SILOS.forEach(s => {
     const capEl  = document.getElementById('silo_cap_'  + s.id);
     const rateEl = document.getElementById('silo_rate_' + s.id);
@@ -6619,7 +6662,14 @@ function saveScheduleSettings() {
     };
     const startThr = domVal('startThreshold', prev ? prev.startThr : '4000');
     const stopThr  = domVal('stopThreshold',  prev ? prev.stopThr  : '600');
-    const pd = prev && prev.planDaily ? prev.planDaily : {};
+    // 입고계획: 설정탭이 동기화된 상태면 입력칸 → 메모리(DELIVERY_PLAN.daily)로 커밋
+    //   그 후 메모리값을 저장 → 저장조·점검기간과 동일하게 메모리 기준으로 영속화
+    if (domReady) {
+      DELIVERY_PLAN.forEach(p => {
+        const el = document.getElementById('plan_daily_' + p.id);
+        if (el && el.value !== '') p.daily = parseFloat(el.value) || p.daily;
+      });
+    }
     const settings = {
       startThr, stopThr,
       suspensions:        JSON.parse(JSON.stringify(_suspensions)),
@@ -6629,9 +6679,9 @@ function saveScheduleSettings() {
       thresholdOverrides: JSON.parse(JSON.stringify(_thresholdOverrides)),
       thrOverrideIdCounter: _thrOverrideIdCounter,
       planDaily: {
-        D1: domVal('plan_daily_D1', pd.D1 ?? '230'),
-        D2: domVal('plan_daily_D2', pd.D2 ?? '60'),
-        D3: domVal('plan_daily_D3', pd.D3 ?? '35'),
+        D1: String(DELIVERY_PLAN.find(p=>p.id==='D1')?.daily ?? 230),
+        D2: String(DELIVERY_PLAN.find(p=>p.id==='D2')?.daily ?? 60),
+        D3: String(DELIVERY_PLAN.find(p=>p.id==='D3')?.daily ?? 35),
       },
       defaultStartHour: _defaultStartHour,
       defaultStopHour:  _defaultStopHour,
@@ -6674,7 +6724,21 @@ function loadScheduleSettings() {
         }
       });
     }
-    console.log('[schedSettings] 복원 완료 - 휴입고:', _suspensions.length, '건, 점검:', _maintPeriods.length, '건, 날짜별기준:', _thresholdOverrides.length, '건, 소비오버라이드:', _dayConsumptionOverrides.length, '건');
+    // 입고계획 복원 → 메모리(DELIVERY_PLAN.daily) + 정적 입력칸에도 즉시 반영
+    //   (저장조·점검과 동일하게 메모리 기준, 입력칸도 동기화해 어떤 경로로도 일치)
+    if (s.planDaily) {
+      DELIVERY_PLAN.forEach(p => {
+        if (s.planDaily[p.id] !== undefined && s.planDaily[p.id] !== '') {
+          const v = parseFloat(s.planDaily[p.id]);
+          if (!isNaN(v)) {
+            p.daily = v;
+            const el = document.getElementById('plan_daily_' + p.id);
+            if (el) el.value = v;
+          }
+        }
+      });
+    }
+    console.log('[schedSettings] 복원 완료 - 휴입고:', _suspensions.length, '건, 점검:', _maintPeriods.length, '건, 입고계획 D1:', (DELIVERY_PLAN.find(p=>p.id==='D1')||{}).daily, '톤');
   } catch(e) { console.warn('[schedSettings] load error:', e); }
 }
 
@@ -6686,13 +6750,12 @@ function applyScheduleSettingsToDOM() {
   const stopEl  = document.getElementById('stopThreshold');
   if (startEl && s.startThr) startEl.value = s.startThr;
   if (stopEl  && s.stopThr)  stopEl.value  = s.stopThr;
-  if (s.planDaily) {
-    ['D1','D2','D3'].forEach(id => {
-      const el = document.getElementById('plan_daily_' + id);
-      if (el && s.planDaily[id] !== undefined) el.value = s.planDaily[id];
-    });
-    updatePlanTotals && updatePlanTotals();
-  }
+  // 입고계획 입력칸 = 메모리(DELIVERY_PLAN.daily) 기준으로 복원
+  DELIVERY_PLAN.forEach(p => {
+    const el = document.getElementById('plan_daily_' + p.id);
+    if (el) el.value = p.daily;
+  });
+  updatePlanTotals && updatePlanTotals();
   // 기동/정지 시각 슬라이더 복원
   if (s.defaultStartHour !== undefined) {
     const sl = document.getElementById('startHourSlider');
@@ -11140,6 +11203,56 @@ function renderDailyLedger() {
 }
 
 // ══════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
+// 소형 XLSX 생성기 (외부 라이브러리 없이 진짜 .xlsx 생성 — 셀 배경색 지원)
+//   · PC·모바일 어디서나 경고 없이 열림 (HTML .xls 트릭의 모바일 미열림 문제 해결)
+// ══════════════════════════════════════════════════════
+function _crc32(buf) {
+  let crc = -1;
+  for (let i = 0; i < buf.length; i++) {
+    let c = (crc ^ buf[i]) & 0xff;
+    for (let k = 0; k < 8; k++) c = c & 1 ? (c >>> 1) ^ 0xEDB88320 : c >>> 1;
+    crc = (crc >>> 8) ^ c;
+  }
+  return (crc ^ -1) >>> 0;
+}
+// 압축 없이(store) 여러 파일을 zip → Uint8Array  (= 유효한 .xlsx 컨테이너)
+function _zipStore(files) {
+  const enc = new TextEncoder();
+  const u16 = n => [n & 0xff, (n >> 8) & 0xff];
+  const u32 = n => [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff];
+  const local = [], central = []; let offset = 0;
+  files.forEach(f => {
+    const name = enc.encode(f.name);
+    const data = (typeof f.data === 'string') ? enc.encode(f.data) : f.data;
+    const crc = _crc32(data);
+    const lh = [0x50,0x4b,0x03,0x04, ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+      ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(name.length), ...u16(0)];
+    local.push(new Uint8Array(lh), name, data);
+    const ch = [0x50,0x4b,0x01,0x02, ...u16(20), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+      ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(name.length),
+      ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(offset)];
+    central.push(new Uint8Array(ch), name);
+    offset += lh.length + name.length + data.length;
+  });
+  let cenSize = 0; central.forEach(c => cenSize += c.length);
+  const end = new Uint8Array([0x50,0x4b,0x05,0x06, ...u16(0), ...u16(0),
+    ...u16(files.length), ...u16(files.length), ...u32(cenSize), ...u32(offset), ...u16(0)]);
+  const parts = local.concat(central, [end]);
+  let total = 0; parts.forEach(p => total += p.length);
+  const out = new Uint8Array(total); let p = 0;
+  parts.forEach(part => { out.set(part, p); p += part.length; });
+  return out;
+}
+function _xmlEsc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function _colLetter(n) { // 0-based → A,B,...
+  let s = ''; n += 1;
+  while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+
 // 발전 달력(스케쥴) 엑셀 내보내기  — 예측관리 방식
 //   · 지자체별(광주·전남·순천·나주) 입고:
 //        실제 입고 데이터가 있으면 '실제입고', 없으면 계획 기반 '예상입고'
@@ -11148,8 +11261,8 @@ function renderDailyLedger() {
 //   · 가동상태(가동/정지/점검)·재고: 발전 달력 시뮬레이션(_schedDayMap) 기준
 //   → 실제 데이터가 들어오면 해당 셀이 예상→실제로 자동 전환되어 마감자료로 사용
 // ══════════════════════════════════════════════════════
-//   · 음영: 주말·공휴일 → 날짜칸만 회색 / 기동일 줄 → 연초록 / 정지일 줄 → 연빨강 / 점검일 줄 → 연노랑
-//   · Excel이 그대로 여는 스타일 HTML 표(.xls)로 출력 (셀 배경색 보존)
+//   · 음영: 가동=초록 / 정지=빨강 / 점검=파랑 (서로 뚜렷이 구분) / 주말·공휴일=날짜칸만 회색
+//   · 진짜 .xlsx 로 출력 → PC·모바일 모두 경고 없이 열림
 function downloadSchedule() {
   // 스케쥴이 비어있으면 먼저 생성
   if ((!_schedDayMap || Object.keys(_schedDayMap).length === 0) && typeof generateSchedule === 'function') {
@@ -11231,67 +11344,161 @@ function downloadSchedule() {
     m.stockEnd = stock;
   });
 
-  // ── 스타일 HTML 표 생성 ──
-  const bd = 'border:0.5pt solid #BFBFBF;';
-  const numFmt = "mso-number-format:'0.0';";
-  const txtFmt = "mso-number-format:'\\@';"; // 날짜를 텍스트로
-  const th = (t,w) => `<td style="${bd}background:${C.head};font-weight:bold;text-align:center;vertical-align:middle;padding:2px 4px;${w?('width:'+w+'px;'):''}">${t}</td>`;
-  const rowBg = st => st==='on'?C.on : st==='off'?C.off : st==='maint'?C.maint : '#FFFFFF';
+  // ════════ 스타일 정의 (뚜렷이 구분되는 색) ════════
+  // fill: 0 none, 1 gray125, 2 header, 3 가동(초록), 4 정지(빨강), 5 점검(파랑), 6 주말(회색)
+  const FILLS = ['none','gray125','44546A','C6EFCE','FFC7CE','BDD7EE','D9D9D9'];
+  // font: 0 기본, 1 굵게, 2 빨강, 3 파랑, 4 빨강굵게, 5 파랑굵게, 6 헤더(흰굵게), 7 제목
+  const FONTS = [
+    {sz:10,c:'000000'}, {sz:10,c:'000000',b:1}, {sz:10,c:'C00000'}, {sz:10,c:'1F4E79'},
+    {sz:10,c:'C00000',b:1}, {sz:10,c:'1F4E79',b:1}, {sz:10,c:'FFFFFF',b:1}, {sz:13,c:'000000',b:1}
+  ];
+  const NF1 = 164; // "0.0"
+  const xfs = []; const xfKey = {};
+  function XF(fillId, fontId, align, oneDp) {
+    const k = fillId+'|'+fontId+'|'+(align||'c')+'|'+(oneDp?1:0);
+    if (k in xfKey) return xfKey[k];
+    const i = xfs.length;
+    xfs.push({ fillId, fontId, align:(align||'c'), nf:(oneDp?NF1:0) });
+    xfKey[k] = i; return i;
+  }
+  XF(0,0,'l',0); // index 0 = 기본
+  const statusFill = st => st==='on'?3 : st==='off'?4 : st==='maint'?5 : 0;
 
-  let html = '';
-  html += '<table style="border-collapse:collapse;font-family:맑은 고딕,Malgun Gothic,sans-serif;font-size:10pt;">';
-  // 제목
-  html += `<tr><td colspan="12" style="font-size:13pt;font-weight:bold;padding:4px;">발전 스케쥴 (기준일 ${todayStr})</td></tr>`;
-  // 헤더
-  html += '<tr>' + [th('날짜',86),th('요일',38),th('가동상태',64),th('입고구분',70),
-    th('광주(톤)',64),th('전남(톤)',64),th('순천(톤)',64),th('나주(톤)',64),th('입고합계(톤)',82),
-    th('사용구분',70),th('사용량(톤)',74),th('재고(톤)',70)].join('') + '</tr>';
-
+  // ════════ 시트1: 발전스케쥴 셀 구성 ════════
+  // 각 셀 = {v, s, n:true(숫자)}
+  const S1 = [];
+  S1.push([{v:'발전 스케쥴 (기준일 '+todayStr+')', s:XF(0,7,'l',0)}]); // 제목 (A1, 병합)
+  const headers = ['날짜','요일','가동상태','입고구분','광주(톤)','전남(톤)','순천(톤)','나주(톤)','입고합계(톤)','사용구분','사용량(톤)','재고(톤)'];
+  S1.push(headers.map(h => ({ v:h, s:XF(2,6,'c',0) })));
   body.forEach(r => {
-    const bg = rowBg(r.status);
-    const cell = (t, align, extra) => `<td style="${bd}background:${bg};text-align:${align||'center'};padding:2px 4px;${extra||''}">${t}</td>`;
-    const num  = v => cell(r1(v), 'right', numFmt);
-    // 날짜칸: 주말·공휴일이면 회색 음영 (행 상태색보다 우선)
-    const wkBg = (r.isWeekend || r.holName) ? C.weekend : bg;
-    const dTxt = r.holName ? C.sunTxt : (r.dowN===0 ? C.sunTxt : (r.dowN===6 ? C.satTxt : '#000000'));
-    const dateCell = `<td style="${bd}background:${wkBg};text-align:center;padding:2px 4px;${txtFmt}color:${dTxt};font-weight:${(r.isWeekend||r.holName)?'bold':'normal'};">${r.dateStr}</td>`;
-    const dowCell  = `<td style="${bd}background:${wkBg};text-align:center;padding:2px 4px;color:${dTxt};">${r.dow}${r.holName?('<br><span style=\"font-size:8pt;\">'+r.holName+'</span>'):''}</td>`;
-    html += '<tr>' + dateCell + dowCell + cell(statusKo(r.status)) + cell(r.inKind)
-          + num(r.s1) + num(r.s2) + num(r.s3) + num(r.s4) + num(r.inTot)
-          + cell(r.useKind) + num(r.useQty) + cell(Math.round(r.stock), 'right', numFmt) + '</tr>';
+    const sf = statusFill(r.status);
+    const txt = XF(sf,0,'c',0);
+    const numS = XF(sf,0,'r',1);
+    const wkFill = (r.isWeekend || r.holName) ? 6 : sf;
+    const dFont = r.holName ? 4 : (r.dowN===0 ? 4 : (r.dowN===6 ? 5 : (r.isWeekend?1:0)));
+    const dateS = XF(wkFill, dFont, 'c', 0);
+    S1.push([
+      { v:r.dateStr, s:dateS },
+      { v:r.dow + (r.holName?('('+r.holName+')'):''), s:dateS },
+      { v:statusKo(r.status), s:txt },
+      { v:r.inKind, s:txt },
+      { v:r.s1, s:numS, n:true }, { v:r.s2, s:numS, n:true }, { v:r.s3, s:numS, n:true },
+      { v:r.s4, s:numS, n:true }, { v:r.inTot, s:numS, n:true },
+      { v:r.useKind, s:txt },
+      { v:r.useQty, s:numS, n:true }, { v:Math.round(r.stock), s:numS, n:true },
+    ]);
   });
-  html += '</table>';
 
-  // ── 월별 요약 표 ──
-  html += '<br><table style="border-collapse:collapse;font-family:맑은 고딕,Malgun Gothic,sans-serif;font-size:10pt;">';
-  html += '<tr><td colspan="8" style="font-size:12pt;font-weight:bold;padding:4px;">월별 요약</td></tr>';
-  html += '<tr>' + ['월','실제입고(톤)','예상입고(톤)','입고합계(톤)','사용합계(톤)','가동일수','점검일수','월말재고(톤)']
-    .map(t=>th(t)).join('') + '</tr>';
+  // ════════ 시트2: 월별요약 ════════
+  const S2 = [];
+  S2.push(['월','실제입고(톤)','예상입고(톤)','입고합계(톤)','사용합계(톤)','가동일수','점검일수','월말재고(톤)']
+    .map(h => ({ v:h, s:XF(2,6,'c',0) })));
   Object.keys(monthAgg).sort().forEach(ym => {
     const m = monthAgg[ym];
-    const c = (t,align,extra)=>`<td style="${bd}text-align:${align||'center'};padding:2px 4px;${extra||''}">${t}</td>`;
-    html += '<tr>' + c(ym) + c(r1(m.inAct),'right',numFmt) + c(r1(m.inFc),'right',numFmt)
-      + c(r1(m.inAct+m.inFc),'right',numFmt) + c(r1(m.use),'right',numFmt)
-      + c(m.onDays,'right') + c(m.maintDays,'right') + c(m.stockEnd,'right',numFmt) + '</tr>';
+    const t = XF(0,0,'c',0), nS = XF(0,0,'r',1);
+    S2.push([
+      { v:ym, s:t },
+      { v:r1(m.inAct), s:nS, n:true }, { v:r1(m.inFc), s:nS, n:true },
+      { v:r1(m.inAct+m.inFc), s:nS, n:true }, { v:r1(m.use), s:nS, n:true },
+      { v:m.onDays, s:nS, n:true }, { v:m.maintDays, s:nS, n:true }, { v:m.stockEnd, s:nS, n:true },
+    ]);
   });
-  html += '</table>';
 
-  // ── .xls (Excel HTML) 파일로 다운로드 ──
-  const full = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">'
-    + '<head><meta http-equiv="content-type" content="text/plain; charset=UTF-8"/>'
-    + '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>'
-    + '<x:Name>발전스케쥴</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>'
-    + '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>'
-    + '<body>' + html + '</body></html>';
+  // ════════ styles.xml ════════
+  const fontsXml = FONTS.map(f =>
+    '<font><sz val="'+f.sz+'"/>'+(f.b?'<b/>':'')+'<color rgb="FF'+f.c+'"/><name val="맑은 고딕"/></font>'
+  ).join('');
+  const fillsXml = FILLS.map(f => {
+    if (f==='none')    return '<fill><patternFill patternType="none"/></fill>';
+    if (f==='gray125') return '<fill><patternFill patternType="gray125"/></fill>';
+    return '<fill><patternFill patternType="solid"><fgColor rgb="FF'+f+'"/><bgColor indexed="64"/></patternFill></fill>';
+  }).join('');
+  const borderThin = '<border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border>';
+  const xfsXml = xfs.map(x => {
+    const h = x.align==='r'?'right':(x.align==='l'?'left':'center');
+    return '<xf numFmtId="'+x.nf+'" fontId="'+x.fontId+'" fillId="'+x.fillId+'" borderId="1" xfId="0" '
+      + 'applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"'+(x.nf?' applyNumberFormat="1"':'')+'>'
+      + '<alignment horizontal="'+h+'" vertical="center"/></xf>';
+  }).join('');
+  const stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+    + '<numFmts count="1"><numFmt numFmtId="164" formatCode="0.0"/></numFmts>'
+    + '<fonts count="'+FONTS.length+'">'+fontsXml+'</fonts>'
+    + '<fills count="'+FILLS.length+'">'+fillsXml+'</fills>'
+    + '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>'+borderThin+'</borders>'
+    + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+    + '<cellXfs count="'+xfs.length+'">'+xfsXml+'</cellXfs>'
+    + '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+    + '</styleSheet>';
 
-  const fn = '발전스케쥴_' + todayStr + '.xls';
-  const blob = new Blob(['﻿' + full], {type:'application/vnd.ms-excel;charset=utf-8'});
+  // ════════ worksheet XML 빌더 ════════
+  function sheetXml(rows, colWidths, mergeA1) {
+    const cols = colWidths ? ('<cols>' + colWidths.map((w,i) =>
+      '<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>').join('') + '</cols>') : '';
+    let sd = '';
+    rows.forEach((row, ri) => {
+      let cells = '';
+      row.forEach((cell, ci) => {
+        if (cell == null) return;
+        const ref = _colLetter(ci) + (ri+1);
+        if (cell.n) cells += '<c r="'+ref+'" s="'+cell.s+'"><v>'+(cell.v===''?0:cell.v)+'</v></c>';
+        else cells += '<c r="'+ref+'" s="'+cell.s+'" t="inlineStr"><is><t xml:space="preserve">'+_xmlEsc(cell.v)+'</t></is></c>';
+      });
+      sd += '<row r="'+(ri+1)+'">'+cells+'</row>';
+    });
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+      + cols + '<sheetData>'+sd+'</sheetData>'
+      + (mergeA1 ? '<mergeCells count="1"><mergeCell ref="'+mergeA1+'"/></mergeCells>' : '')
+      + '</worksheet>';
+  }
+  const sheet1 = sheetXml(S1, [12,8,9,9,9,9,9,9,11,9,10,9], 'A1:L1');
+  const sheet2 = sheetXml(S2, [9,12,12,12,12,9,9,11], null);
+
+  // ════════ 컨테이너 파일들 ════════
+  const REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const files = [
+    { name:'[Content_Types].xml', data:
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+      + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+      + '<Default Extension="xml" ContentType="application/xml"/>'
+      + '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+      + '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+      + '<Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+      + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+      + '</Types>' },
+    { name:'_rels/.rels', data:
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      + '<Relationship Id="rId1" Type="'+REL+'/officeDocument" Target="xl/workbook.xml"/>'
+      + '</Relationships>' },
+    { name:'xl/workbook.xml', data:
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="'+REL+'">'
+      + '<sheets><sheet name="발전스케쥴" sheetId="1" r:id="rId1"/><sheet name="월별요약" sheetId="2" r:id="rId2"/></sheets>'
+      + '</workbook>' },
+    { name:'xl/_rels/workbook.xml.rels', data:
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      + '<Relationship Id="rId1" Type="'+REL+'/worksheet" Target="worksheets/sheet1.xml"/>'
+      + '<Relationship Id="rId2" Type="'+REL+'/worksheet" Target="worksheets/sheet2.xml"/>'
+      + '<Relationship Id="rId3" Type="'+REL+'/styles" Target="styles.xml"/>'
+      + '</Relationships>' },
+    { name:'xl/styles.xml', data: stylesXml },
+    { name:'xl/worksheets/sheet1.xml', data: sheet1 },
+    { name:'xl/worksheets/sheet2.xml', data: sheet2 },
+  ];
+
+  const zip = _zipStore(files);
+  const fn = '발전스케쥴_' + todayStr + '.xlsx';
+  const blob = new Blob([zip], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = fn;
   document.body.appendChild(a); a.click();
   setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
-  if (typeof toast === 'function') toast('green','내보내기 완료', fn);
+  if (typeof toast === 'function') toast('green','내보내기 완료', fn + ' (모바일에서도 열림)');
 }
 
 function downloadDailyLedgerCSV() {
