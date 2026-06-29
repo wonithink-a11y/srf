@@ -412,6 +412,12 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   .form-label{display:block;font-size:11px;color:var(--text2);margin-bottom:4px;}
   .form-input,.form-select{width:100%;box-sizing:border-box;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 10px;font-size:13px;margin-bottom:10px;}
 
+  /* 발전계획 설정 — 모바일 가로 잘림 방지: 설정 grid 세로 1열 (실제 head) */
+  @media (max-width: 768px) {
+    .sched-stack { grid-template-columns: 1fr !important; align-items: stretch !important; }
+    .sched-stack > * { min-width: 0 !important; width: 100% !important; box-sizing: border-box; }
+    .sched-stack input, .sched-stack select, .sched-stack .form-input { width: 100% !important; box-sizing: border-box; }
+  }
   </style>
 </head>
 <body>
