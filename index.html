@@ -384,6 +384,10 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     #siloBottom { grid-template-columns: 1fr 1fr !important; overflow-x: visible !important; gap: 8px !important; }
     body.is-mobile #siloBottom .silo-card { padding: 8px !important; }
     body.is-mobile #siloBottom .silo-bar { height: 64px !important; }
+    /* ★ 전체재고 지자체 카드(광주/나주/순천): 라벨 위 / 값 아래 (세로). 헤더행(margin-bottom)은 제외 */
+    body.is-mobile #kpi-total [style*="justify-content:space-between"][style*="align-items:center"]:not([style*="margin-bottom"]) {
+      flex-direction: column !important; align-items: flex-start !important; gap: 1px !important;
+    }
     /* ★ 전체재고/KPI 패널: 모바일 세로 1열 (전체재고·지자체 한화면) */
     .dash-kpi-row { grid-template-columns: 1fr !important; }
     .dash-subtab { font-size:12.5px; padding:10px 8px; min-width:78px; }
@@ -408,6 +412,9 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     /* 입고·사용량 지자체 세부 접기 */
     body.is-mobile .jj-detail { display:none !important; }
     body.is-mobile .jj-detail.open { display:flex !important; }
+    /* ★ 입고/사용량 기간카드: 클릭 세부를 오른쪽→아래로 (세로 스택) */
+    body.is-mobile .io-prow { flex-direction: column !important; align-items: stretch !important; gap: 6px !important; }
+    body.is-mobile .io-prow > * { flex: none !important; width: 100% !important; min-width: 0 !important; }
     /* 저장조 카드: 앱에서 세로막대·%·최대 숨김 */
     body.is-mobile .silo-bar, body.is-mobile .silo-pct, body.is-mobile .silo-max { display:none !important; }
   }
@@ -643,65 +650,65 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
         <div style="font-size:14px;font-weight:700;color:#a855f7;padding:2px 2px 7px;border-bottom:1px solid rgba(168,85,247,.25);margin-bottom:2px;">사용량</div>
         <!-- 전일 -->
         <div style="background:var(--bg3);border-radius:7px;padding:6px 10px;">
-          <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">전 일</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
+          <div class="io-prow" style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">전 일</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
               <span id="kpi-in-day" style="font-size:24px;font-weight:700;color:var(--green);">34</span>
               <span style="font-size:13px;color:var(--text2);">톤</span>
             </div><div id="kpi-in-day-jj" style="flex:1;min-width:0;"></div></div>
         </div>
         <div style="background:var(--bg3);border-radius:7px;padding:6px 10px;">
-          <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">전 일</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
+          <div class="io-prow" style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">전 일</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
               <span id="kpi-use-day" style="font-size:24px;font-weight:700;color:var(--accent);">0</span>
               <span style="font-size:13px;color:var(--text2);">톤</span>
             </div><div id="kpi-use-day-jj" style="flex:1;min-width:0;"></div></div>
         </div>
         <!-- 금주 -->
         <div style="background:var(--bg3);border-radius:7px;padding:6px 10px;">
-          <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">금 주</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
+          <div class="io-prow" style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">금 주</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
               <span id="kpi-in-week" style="font-size:24px;font-weight:700;color:var(--green);">110</span>
               <span style="font-size:13px;color:var(--text2);">톤</span>
             </div><div id="kpi-in-week-jj" style="flex:1;min-width:0;"></div></div>
         </div>
         <div style="background:var(--bg3);border-radius:7px;padding:6px 10px;">
-          <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">금 주</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
+          <div class="io-prow" style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">금 주</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
               <span id="kpi-use-week" style="font-size:24px;font-weight:700;color:var(--accent);">0</span>
               <span style="font-size:13px;color:var(--text2);">톤</span>
             </div><div id="kpi-use-week-jj" style="flex:1;min-width:0;"></div></div>
         </div>
         <!-- 전주 -->
         <div style="background:var(--bg3);border-radius:7px;padding:6px 10px;">
-          <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">전 주</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
+          <div class="io-prow" style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">전 주</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
               <span id="kpi-in-prev" style="font-size:24px;font-weight:700;color:var(--green);">111</span>
               <span style="font-size:13px;color:var(--text2);">톤</span>
             </div><div id="kpi-in-prev-jj" style="flex:1;min-width:0;"></div></div>
         </div>
         <div style="background:var(--bg3);border-radius:7px;padding:6px 10px;">
-          <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">전 주</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
+          <div class="io-prow" style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">전 주</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
               <span id="kpi-use-prev" style="font-size:24px;font-weight:700;color:var(--accent);">0</span>
               <span style="font-size:13px;color:var(--text2);">톤</span>
             </div><div id="kpi-use-prev-jj" style="flex:1;min-width:0;"></div></div>
         </div>
         <!-- 당월 -->
         <div style="background:var(--bg3);border-radius:7px;padding:6px 10px;">
-          <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">당 월</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
+          <div class="io-prow" style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">당 월</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
               <span id="kpi-in-curmon" style="font-size:24px;font-weight:700;color:var(--green);">110</span>
               <span style="font-size:13px;color:var(--text2);">톤</span>
             </div><div id="kpi-in-curmon-jj" style="flex:1;min-width:0;"></div></div>
         </div>
         <div style="background:var(--bg3);border-radius:7px;padding:6px 10px;">
-          <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">당 월</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
+          <div class="io-prow" style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">당 월</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
               <span id="kpi-use-curmon" style="font-size:24px;font-weight:700;color:var(--accent);">0</span>
               <span style="font-size:13px;color:var(--text2);">톤</span>
             </div><div id="kpi-use-curmon-jj" style="flex:1;min-width:0;"></div></div>
         </div>
         <!-- 전월 -->
         <div style="background:var(--bg3);border-radius:7px;padding:6px 10px;">
-          <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">전 월</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
+          <div class="io-prow" style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">전 월</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
               <span id="kpi-in-prevmon" style="font-size:24px;font-weight:700;color:var(--green);">601</span>
               <span style="font-size:13px;color:var(--text2);">톤</span>
             </div><div id="kpi-in-prevmon-jj" style="flex:1;min-width:0;"></div></div>
         </div>
         <div style="background:var(--bg3);border-radius:7px;padding:6px 10px;">
-          <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">전 월</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
+          <div class="io-prow" style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;color:var(--text);font-weight:800;white-space:nowrap;min-width:38px;">전 월</span><div style="display:flex;align-items:baseline;gap:3px;justify-content:flex-end;min-width:72px;">
               <span id="kpi-use-prevmon" style="font-size:24px;font-weight:700;color:var(--accent);">1,119</span>
               <span style="font-size:13px;color:var(--text2);">톤</span>
             </div><div id="kpi-use-prevmon-jj" style="flex:1;min-width:0;"></div></div>
