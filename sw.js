@@ -1,6 +1,6 @@
 /* SRF 수급관리 PWA Service Worker
    네트워크 우선 + 캐시 폴백 (오프라인 시 마지막 화면 표시). 데이터는 Firebase로 동기화됨. */
-const CACHE = 'srf-app-v13';
+const CACHE = 'srf-app-v14';
 
 self.addEventListener('install', (e) => { self.skipWaiting(); });
 

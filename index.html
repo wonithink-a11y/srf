@@ -6194,10 +6194,11 @@ const _USAGE_BAKED_HIST = {"2026-01-01":287.25,"2026-01-02":275.44,"2026-01-03":
 const _USAGE_BAKED_FROM = '2026-01-01', _USAGE_BAKED_TO = '2026-04-29';
 // 마감구간을 AD 베이크값으로 강제 동기화 (그 외 기간은 localStorage 값 유지)
 function applyBakedHistUsage() {
-  Object.keys(_usageData).forEach(dd => {
-    if (dd >= _USAGE_BAKED_FROM && dd <= _USAGE_BAKED_TO) delete _usageData[dd];
+  // ★ 비파괴: 사용자가 맞춰둔 기존 사용량은 절대 건드리지 않고, 값이 완전히 비어있는
+  //   날만 AD 베이크값으로 채운다. (어제 정렬한 연료사용량 탭 데이터 보존)
+  Object.entries(_USAGE_BAKED_HIST).forEach(([dd, v]) => {
+    if (_usageData[dd] == null) _usageData[dd] = v;
   });
-  Object.entries(_USAGE_BAKED_HIST).forEach(([dd, v]) => { _usageData[dd] = v; });
 }
 
 // ── 마감구간(1/1~4/29) 일별 재고(◆) = 엑셀 보정 재고합계(AI열) 베이크 ──
