@@ -2377,8 +2377,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   <!-- 저장조 설정 (최대용량 / 일일소비량) -->
   <div class="card" style="margin-bottom:16px;">
     <div class="section-header" style="margin-bottom:12px;">
-      <div class="card-title">🗄️ 저장조 설정 (최대용량 / 일일소비량)</div>
-      <span style="font-size:11px;color:var(--text2);">저장비율(현재재고÷최대용량)이 높은 저장조부터 소비됩니다</span>
+      <div class="card-title">🗄️ 저장조 설정 (최대용량 / 일일소비량 / 우선소비 기준)</div>
+      <span style="font-size:11px;color:var(--text2);">지자체 소유량이 '우선소비 기준' 이상이면 먼저 소비(초과량 많은 순), 아니면 소유량 많은 순</span>
     </div>
     <div style="overflow-x:auto;">
       <table class="data-table" style="font-size:13px;">
@@ -2386,6 +2386,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
           <th>저장조</th>
           <th style="text-align:center;">최대용량 (톤)</th>
           <th style="text-align:center;">일일소비량 (톤/일)</th>
+          <th style="text-align:center;">우선소비 기준 (톤)</th>
           <th style="text-align:center;">현재 저장비율</th>
         </tr></thead>
         <tbody>
@@ -2393,24 +2394,28 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
             <td><span style="color:#38bdf8;font-weight:700;">S1 광주</span></td>
             <td style="text-align:center;"><input type="number" id="silo_cap_S1" value="4000" min="100" step="100" style="width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--accent);padding:4px 8px;font-size:13px;font-weight:700;text-align:right;" oninput="updateSiloRatioPreview()"></td>
             <td style="text-align:center;"><input type="number" id="silo_rate_S1" value="300" min="0" step="10" style="width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--yellow);padding:4px 8px;font-size:13px;font-weight:700;text-align:right;" oninput="onSiloRateInput('S1', this.value)"></td>
+            <td style="text-align:center;"><input type="number" id="silo_prithr_S1" value="3000" min="0" step="100" style="width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:#5eead4;padding:4px 8px;font-size:13px;font-weight:700;text-align:right;" oninput="updateSiloRatioPreview()"></td>
             <td style="text-align:center;" id="silo_ratio_S1">—</td>
           </tr>
           <tr>
             <td><span style="color:#22c55e;font-weight:700;">S2 전남</span></td>
             <td style="text-align:center;"><input type="number" id="silo_cap_S2" value="2000" min="100" step="100" style="width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--accent);padding:4px 8px;font-size:13px;font-weight:700;text-align:right;" oninput="updateSiloRatioPreview()"></td>
             <td style="text-align:center;"><input type="number" id="silo_rate_S2" value="300" min="0" step="10" style="width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--yellow);padding:4px 8px;font-size:13px;font-weight:700;text-align:right;" oninput="onSiloRateInput('S2', this.value)"></td>
+            <td style="text-align:center;"><input type="number" id="silo_prithr_S2" value="1500" min="0" step="100" style="width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:#5eead4;padding:4px 8px;font-size:13px;font-weight:700;text-align:right;" oninput="updateSiloRatioPreview()"></td>
             <td style="text-align:center;" id="silo_ratio_S2">—</td>
           </tr>
           <tr>
             <td><span style="color:#f59e0b;font-weight:700;">S3 순천</span></td>
             <td style="text-align:center;"><input type="number" id="silo_cap_S3" value="1000" min="100" step="100" style="width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--accent);padding:4px 8px;font-size:13px;font-weight:700;text-align:right;" oninput="updateSiloRatioPreview()"></td>
             <td style="text-align:center;"><input type="number" id="silo_rate_S3" value="300" min="0" step="10" style="width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--yellow);padding:4px 8px;font-size:13px;font-weight:700;text-align:right;" oninput="onSiloRateInput('S3', this.value)"></td>
+            <td style="text-align:center;"><input type="number" id="silo_prithr_S3" value="500" min="0" step="100" style="width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:#5eead4;padding:4px 8px;font-size:13px;font-weight:700;text-align:right;" oninput="updateSiloRatioPreview()"></td>
             <td style="text-align:center;" id="silo_ratio_S3">—</td>
           </tr>
           <tr>
             <td><span style="color:#a78bfa;font-weight:700;">S4 나주</span></td>
             <td style="text-align:center;"><input type="number" id="silo_cap_S4" value="500" min="100" step="100" style="width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--accent);padding:4px 8px;font-size:13px;font-weight:700;text-align:right;" oninput="updateSiloRatioPreview()"></td>
             <td style="text-align:center;"><input type="number" id="silo_rate_S4" value="240" min="0" step="10" style="width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--yellow);padding:4px 8px;font-size:13px;font-weight:700;text-align:right;" oninput="onSiloRateInput('S4', this.value)"></td>
+            <td style="text-align:center;"><input type="number" id="silo_prithr_S4" value="300" min="0" step="100" style="width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:#5eead4;padding:4px 8px;font-size:13px;font-weight:700;text-align:right;" oninput="updateSiloRatioPreview()"></td>
             <td style="text-align:center;" id="silo_ratio_S4">—</td>
           </tr>
         </tbody>
@@ -5487,10 +5492,11 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 // DATA STORE
 // ══════════════════════════════════════════
 const SILOS = [
-  { id: 'S1', name: '광주 ST', cap: 4000, cur: 256.70,  dailyRate: 300 },
-  { id: 'S2', name: '전남 ST', cap: 2000, cur: 959.08,  dailyRate: 300 },
-  { id: 'S3', name: '순천 ST', cap: 1000, cur: 0,       dailyRate: 300 },
-  { id: 'S4', name: '나주 ST', cap: 500,  cur: 589.91,  dailyRate: 240 },
+  // priorityThr: 지자체 소유량이 이 값 이상이면 '우선소비' (이상인 것끼리는 초과량 많은 순)
+  { id: 'S1', name: '광주 ST', cap: 4000, cur: 256.70,  dailyRate: 300, priorityThr: 3000 },
+  { id: 'S2', name: '전남 ST', cap: 2000, cur: 959.08,  dailyRate: 300, priorityThr: 1500 },
+  { id: 'S3', name: '순천 ST', cap: 1000, cur: 0,       dailyRate: 300, priorityThr: 500 },
+  { id: 'S4', name: '나주 ST', cap: 500,  cur: 589.91,  dailyRate: 240, priorityThr: 300 },
 ];
 // ── 사일로별 실제 재고 (2026.05.22 기준, 월손실량 3.7% 보정) ──
 const SILO_STOCK_BY_MONTH = {
@@ -6584,32 +6590,50 @@ function renderDcOverrideTable() {
 
 // ── 저장비율 기반 유효 일일소비량 계산 ──
 // fss: 시뮬레이션 재고 객체 (null이면 실제 SILOS.cur 사용)
-function getEffectiveDailyRate(fss) {
-  const stocks = fss || Object.fromEntries(SILOS.map(s => [s.id, s.cur]));
-  const active = SILOS.filter(s => (stocks[s.id]||0) > 0)
-    .sort((a,b) => {
-      const ra = a.cap > 0 ? (stocks[a.id]||0)/a.cap : 0;
-      const rb = b.cap > 0 ? (stocks[b.id]||0)/b.cap : 0;
-      return rb - ra;
+// ── 지자체 소유 우선소비 순서 ──
+//   1순위: 소유량이 우선소비 기준(priorityThr) 이상인 지자체 (그 중 초과량 많은 순)
+//   2순위: 나머지는 소유량 많은 순
+function _origPriorityOrder(stocks) {
+  return SILOS
+    .map(s => ({ id:s.id, amt:(stocks[s.id]||0), thr:(s.priorityThr||0), rate:(s.dailyRate||300) }))
+    .filter(o => o.amt > 0.0001)
+    .sort((a, b) => {
+      const aOver = a.thr > 0 && a.amt >= a.thr;
+      const bOver = b.thr > 0 && b.amt >= b.thr;
+      if (aOver !== bOver) return aOver ? -1 : 1;          // 기준 이상이 먼저
+      if (aOver && bOver)  return (b.amt - b.thr) - (a.amt - a.thr); // 초과량 많은 순
+      return b.amt - a.amt;                                // 둘 다 미만이면 소유량 많은 순
     });
-  return active.length > 0 ? (active[0].dailyRate || 300) : 300;
 }
-
-// fill ratio 우선 저장조별 소비 적용 (시뮬레이션용)
+// 현재(실재고) 지자체별 소유량 — 임시보관 반영 (calcOwnershipDetail 재사용)
+function _currentOwnership() {
+  try {
+    const d = calcOwnershipDetail();
+    const o = {}; SILOS.forEach(s => { o[s.id] = d[s.id] ? d[s.id].total : 0; });
+    return o;
+  } catch(e) {
+    const o = {}; SILOS.forEach(s => { o[s.id] = s.cur || 0; });
+    return o;
+  }
+}
+// 그날 소비 중인(우선순위 1위) 지자체의 일일소비량(톤) — 나주 240 / 나머지 320 식
+function getEffectiveDailyRate(fss) {
+  const stocks = fss || _currentOwnership();
+  const ord = _origPriorityOrder(stocks);
+  return ord.length > 0 ? (ord[0].rate || 300) : 300;
+}
+// 지자체 소유 우선순위대로 소비 (한 지자체가 비면 다음 우선순위로 자동 전환)
 function consumeFromSilos(fss, rate) {
-  const active = SILOS.filter(s => (fss[s.id]||0) > 0)
-    .sort((a,b) => {
-      const ra = a.cap > 0 ? (fss[a.id]||0)/a.cap : 0;
-      const rb = b.cap > 0 ? (fss[b.id]||0)/b.cap : 0;
-      return rb - ra;
-    });
-  let remaining = rate;
-  active.forEach(s => {
-    if (remaining <= 0) return;
-    const consume = Math.min(fss[s.id]||0, remaining);
-    fss[s.id] = (fss[s.id]||0) - consume;
+  let remaining = rate, guard = 0;
+  while (remaining > 0.0001 && guard++ < 200) {
+    const ord = _origPriorityOrder(fss);
+    if (!ord.length) break;
+    const top = ord[0];
+    const consume = Math.min(top.amt, remaining);
+    fss[top.id] = (fss[top.id] || 0) - consume;
     remaining -= consume;
-  });
+    if (consume <= 0.0001) break;
+  }
   return rate - remaining;
 }
 
@@ -6626,8 +6650,10 @@ function saveSiloSettings() {
   SILOS.forEach(s => {
     const capEl  = document.getElementById('silo_cap_'  + s.id);
     const rateEl = document.getElementById('silo_rate_' + s.id);
-    if (capEl)  s.cap       = Math.max(100, parseFloat(capEl.value)  || s.cap);
-    if (rateEl) s.dailyRate = Math.max(0,   parseFloat(rateEl.value) || 0);
+    const thrEl  = document.getElementById('silo_prithr_' + s.id);
+    if (capEl)  s.cap         = Math.max(100, parseFloat(capEl.value)  || s.cap);
+    if (rateEl) s.dailyRate   = Math.max(0,   parseFloat(rateEl.value) || 0);
+    if (thrEl)  s.priorityThr = Math.max(0,   parseFloat(thrEl.value)  || 0);
   });
   saveScheduleSettings();
   updateSiloRatioPreview();
@@ -6687,7 +6713,7 @@ function saveScheduleSettings() {
       defaultStopHour:  _defaultStopHour,
       dayConsumptionOverrides: JSON.parse(JSON.stringify(_dayConsumptionOverrides)),
       dcOverrideIdCounter: _dcOverrideIdCounter,
-      siloSettings: SILOS.map(s => ({ id: s.id, cap: s.cap, dailyRate: s.dailyRate || 300 })),
+      siloSettings: SILOS.map(s => ({ id: s.id, cap: s.cap, dailyRate: s.dailyRate || 300, priorityThr: (s.priorityThr || 0) })),
     };
     localStorage.setItem(LS.schedSettings, JSON.stringify(settings));
     _savedSchedSettings = settings; // 캐시도 최신화
@@ -6721,6 +6747,7 @@ function loadScheduleSettings() {
         if (silo) {
           if (saved.cap)       silo.cap       = saved.cap;
           if (saved.dailyRate) silo.dailyRate = saved.dailyRate;
+          if (saved.priorityThr !== undefined) silo.priorityThr = saved.priorityThr;
         }
       });
     }
@@ -6777,8 +6804,10 @@ function applyScheduleSettingsToDOM() {
   SILOS.forEach(silo => {
     const capEl  = document.getElementById('silo_cap_'  + silo.id);
     const rateEl = document.getElementById('silo_rate_' + silo.id);
+    const thrEl  = document.getElementById('silo_prithr_' + silo.id);
     if (capEl)  capEl.value  = silo.cap;
     if (rateEl) rateEl.value = silo.dailyRate || 300;
+    if (thrEl)  thrEl.value  = (silo.priorityThr != null ? silo.priorityThr : 0);
   });
   updateSiloRatioPreview && updateSiloRatioPreview();
   updateTransitionConsumptionPreview && updateTransitionConsumptionPreview();
@@ -9297,50 +9326,36 @@ if (isPast || (isToday && todayHasData)) {
    // simStock = 과거 실적 누적의 정확한 현재 재고 총량
    // SILOS.cur 비율로 배분하되 총합이 반드시 simStock과 일치하도록 보정
    if (!fSimStocks) {
+     // ★ 지자체 소유 기준 초기화: calcOwnershipDetail(임시보관 반영)의 소유비율로 simStock 배분
+     //    (fSimStocks 키 S1~S4 = 지자체 소유 버킷. 총합은 simStock과 일치)
      fSimStocks = Object.fromEntries(SILOS.map(s => [s.id, 0]));
-     const curTotal = SILOS.reduce((a,s) => a + (s.cur||0), 0);
-     let remaining = simStock;
-     if (curTotal > 0) {
-       // cur 비율로 배분, cap 초과분은 remaining에 돌려줌
-       SILOS.forEach(s => {
-         const want = (s.cur||0) / curTotal * simStock;
-         const fill = Math.min(want, remaining);
-         fSimStocks[s.id] = fill;
-         remaining -= fill;
-       });
-     }
-     // remaining이 남으면 cap 여유 있는 저장조에 추가 채움
-     if (remaining > 0.01) {
-       SILOS.forEach(s => {
-         if (remaining <= 0) return;
-         const space = Number.MAX_SAFE_INTEGER; // cap 제한 없음
-         const add = Math.min(space, remaining);
-         fSimStocks[s.id] += add;
-         remaining -= add;
-       });
+     let own = null;
+     try {
+       const d = calcOwnershipDetail();
+       own = {}; SILOS.forEach(s => { own[s.id] = d[s.id] ? d[s.id].total : 0; });
+     } catch(e) { own = null; }
+     const ownTotal = own ? Object.values(own).reduce((a,b)=>a+b,0) : 0;
+     if (own && ownTotal > 0) {
+       SILOS.forEach(s => { fSimStocks[s.id] = simStock * (own[s.id] / ownTotal); });
+     } else {
+       // 폴백: 물리 저장조 cur 비율
+       const curTotal = SILOS.reduce((a,s) => a + (s.cur||0), 0);
+       if (curTotal > 0) SILOS.forEach(s => { fSimStocks[s.id] = simStock * ((s.cur||0)/curTotal); });
+       else fSimStocks[SILOS[0].id] = simStock;
      }
    }
    // ── 실제 입고 DB 우선 반영: 오늘/미래라도 DB에 입고 기록이 있으면 그것을 사용 ──
    const actualInflow = db.filter(r => r.datetime.slice(0,10) === key).reduce((s,r) => s+r.net, 0);
    const hasActualInflow = db.some(r => r.datetime.slice(0,10) === key);
    if (hasActualInflow) {
-     // 실제 입고 데이터 있음 → DB 합계를 S1~S4에 게이트 기반으로 배분 (없으면 전체 simStock에 합산)
+     // 실제 입고 데이터 있음 → 각 입고 레코드를 '소유 지자체(origin, 없으면 입고 저장조)' 버킷에 반영
      inflow = actualInflow;
-     // fSimStocks에는 총량만 반영 (저장조별 구분 없이 가용 공간에 채움)
-     // 실제 입고는 저장조 총량에 직접 반영 (cap 제한 없음)
-     inflow = actualInflow;
-     // 저장조 비율로 배분 (cap 무시)
-     const fsTotal = Object.values(fSimStocks).reduce((a,b)=>a+b,0);
-     if (fsTotal > 0) {
-       SILOS.forEach(s => {
-         const ratio = (fSimStocks[s.id]||0) / fsTotal;
-         fSimStocks[s.id] = (fSimStocks[s.id]||0) + actualInflow * ratio;
-       });
-     } else {
-       fSimStocks[SILOS[0].id] = (fSimStocks[SILOS[0].id]||0) + actualInflow;
-     }
+     db.filter(r => r.datetime.slice(0,10) === key).forEach(r => {
+       const owner = r.origin || r.silo || SILOS[0].id;
+       fSimStocks[owner] = (fSimStocks[owner]||0) + (r.net||0);
+     });
    } else {
-     // 실제 데이터 없음 → 기존 계획 입고 시뮬레이션
+     // 실제 데이터 없음 → 계획 입고: 각 공급계획의 소유 지자체(홈 저장조 = silos[0]) 버킷에 반영
      inflow = getDailyInflow(d);
      DELIVERY_PLAN.forEach(p => {
        if (!p.days.includes(d.getDay())) return;
@@ -9349,12 +9364,8 @@ if (isPast || (isToday && todayHasData)) {
          .find(s => key >= s.start && key <= s.end);
        const dayAmt = susp ? (susp.daily || 0) : amt;
        if (dayAmt > 0) {
-         const perSilo = dayAmt / p.silos.length;
-         p.silos.forEach(sid => {
-           const s = SILOS.find(x => x.id === sid);
-           if (!s) return;
-           fSimStocks[sid] = (fSimStocks[sid]||0) + perSilo;
-         });
+         const owner = p.silos[0] || SILOS[0].id; // 공급계획의 소유 지자체
+         fSimStocks[owner] = (fSimStocks[owner]||0) + dayAmt;
        }
      });
    }
