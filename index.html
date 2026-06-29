@@ -380,8 +380,10 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   /* 저장조별 현재고: 항상 가로 나열(좁으면 가로 스크롤) */
   #siloBottom { overflow-x:auto; }
   @media (max-width: 768px) {
-    /* ★ 저장조별: 모바일 세로 1열 */
-    #siloBottom { grid-template-columns: 1fr !important; overflow-x: visible !important; }
+    /* ★ 저장조별: 모바일 2열(광주ST·전남ST / 나주ST·순천ST) + 컴팩트 */
+    #siloBottom { grid-template-columns: 1fr 1fr !important; overflow-x: visible !important; gap: 8px !important; }
+    body.is-mobile #siloBottom .silo-card { padding: 8px !important; }
+    body.is-mobile #siloBottom .silo-bar { height: 64px !important; }
     /* ★ 전체재고/KPI 패널: 모바일 세로 1열 (전체재고·지자체 한화면) */
     .dash-kpi-row { grid-template-columns: 1fr !important; }
     .dash-subtab { font-size:12.5px; padding:10px 8px; min-width:78px; }
