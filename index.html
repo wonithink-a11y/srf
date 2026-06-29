@@ -19704,6 +19704,7 @@ function closeAnnNoteModal() {
         var _fl=document.getElementById('srf-btn-pull'); if(_fl){ _fl.textContent='☁️ Firebase 다운로드'; _fl.style.width='auto'; _fl.style.flex='1 1 150px'; _fl.style.margin='0'; _w.appendChild(_fl); }
         var _hdr=document.querySelector('header');
         if(_hdr){ Array.prototype.forEach.call(_hdr.querySelectorAll('.notif-btn'), function(b){ if(/데이터 내보내기|데이터 불러오기|HTML 파일 저장|입고DB 초기화/.test(b.textContent||'')){ b.style.flex='1 1 150px'; b.style.margin='0'; _w.appendChild(b); } }); }
+        var _rs=document.getElementById('srf-result'); if(_rs){ _rs.style.cssText='font-size:12px;line-height:1.6;margin-top:8px;min-height:18px;'; _card.appendChild(_rs); }
         var _wig=document.getElementById('srf-sync-widget'); if(_wig){ _wig.style.display='none'; }
       }
     } catch(e) {}
@@ -20097,30 +20098,34 @@ function generateReport() {
   if (s3!==0) siloLines.push(`  순천 ST : ${String(Math.round(s3)).padStart(6)}톤`);
   siloLines.push(`  전체    : ${String(Math.round(total)).padStart(6)}톤`);
 
-  // 지자체별 재고 (임시보관 반영)
+  // 지자체별 재고 (임시보관 반영) — ★ 대시보드와 동일 계산(calcOwnershipDetail) 우선 사용
   let gjStock = 0, njStock = 0, scStock = 0;
   try {
-    const raw = localStorage.getItem('_tempStorage');
-    if (raw) {
-      const bySilo = JSON.parse(raw);
-      const selfS1 = Math.max(0, s1 - (bySilo.S1?.total||0));
-      const selfS2 = Math.max(0, s2 - (bySilo.S2?.total||0));
-      const selfS4 = Math.max(0, s4 - (bySilo.S4?.total||0));
-      const selfS3 = Math.max(0, s3 - (bySilo.S3?.total||0));
-      gjStock = selfS1 + selfS2;
-      njStock = selfS4;
-      scStock = selfS3;
-      // 임시보관 중인 연료 → 출처 지자체에 귀속
-      Object.entries(bySilo).forEach(([siloId, d]) => {
-        Object.entries(d.origins||{}).forEach(([originId, amt]) => {
-          const nm = (SILO_INFO[originId]?.name||'');
-          if (nm.includes('나주')) njStock += amt;
-          else if (nm.includes('순천')) scStock += amt;
-          else gjStock += amt; // 광주/전남
-        });
-      });
+    if (typeof calcOwnershipDetail === 'function') {
+      // 대시보드 KPI와 완전히 동일한 소유 기준 계산 (앱=PC 일치 보장)
+      var _own = calcOwnershipDetail();
+      gjStock = ((_own.S1 && _own.S1.total) || 0) + ((_own.S2 && _own.S2.total) || 0); // 광주 = 광주ST + 전남ST 소유분
+      njStock = (_own.S4 && _own.S4.total) || 0;
+      scStock = (_own.S3 && _own.S3.total) || 0;
     } else {
-      gjStock = s1+s2; njStock = s4; scStock = s3;
+      // 폴백: _tempStorage 직접 계산 (구버전 호환)
+      const raw = localStorage.getItem('_tempStorage');
+      if (raw) {
+        const bySilo = JSON.parse(raw);
+        const selfS1 = Math.max(0, s1 - (bySilo.S1?.total||0));
+        const selfS2 = Math.max(0, s2 - (bySilo.S2?.total||0));
+        const selfS4 = Math.max(0, s4 - (bySilo.S4?.total||0));
+        const selfS3 = Math.max(0, s3 - (bySilo.S3?.total||0));
+        gjStock = selfS1 + selfS2; njStock = selfS4; scStock = selfS3;
+        Object.entries(bySilo).forEach(([siloId, d]) => {
+          Object.entries(d.origins||{}).forEach(([originId, amt]) => {
+            const nm = (SILO_INFO[originId]?.name||'');
+            if (nm.includes('나주')) njStock += amt;
+            else if (nm.includes('순천')) scStock += amt;
+            else gjStock += amt;
+          });
+        });
+      } else { gjStock = s1+s2; njStock = s4; scStock = s3; }
     }
   } catch(e) { gjStock = s1+s2; njStock = s4; scStock = s3; }
 
