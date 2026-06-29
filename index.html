@@ -6607,9 +6607,21 @@ function updateSiloRatioPreview() {
 }
 function saveScheduleSettings() {
   try {
+    // ★ DOM 입력칸(기동/정지 기준, 입고계획)은 스케쥴 설정탭이 한 번이라도 열려
+    //   저장값이 입력칸에 반영(_schedDomApplied)된 뒤에만 신뢰한다.
+    //   그 전에는 정적 기본값(예: 광주 230)이 들어 있어, 페이지 로드 직후
+    //   자동 재생성이 저장된 값(240)을 기본값으로 덮어쓰는 문제를 방지.
+    const prev = _savedSchedSettings;
+    const domReady = _schedDomApplied || !prev;  // 저장값 없으면 DOM이 곧 진짜값
+    const domVal = (id, fb) => {
+      const el = document.getElementById(id);
+      return (domReady && el) ? el.value : fb;
+    };
+    const startThr = domVal('startThreshold', prev ? prev.startThr : '4000');
+    const stopThr  = domVal('stopThreshold',  prev ? prev.stopThr  : '600');
+    const pd = prev && prev.planDaily ? prev.planDaily : {};
     const settings = {
-      startThr:  document.getElementById('startThreshold')?.value ?? '4000',
-      stopThr:   document.getElementById('stopThreshold')?.value  ?? '600',
+      startThr, stopThr,
       suspensions:        JSON.parse(JSON.stringify(_suspensions)),
       suspIdCounter:      _suspIdCounter,
       maintPeriods:       JSON.parse(JSON.stringify(_maintPeriods)),
@@ -6617,9 +6629,9 @@ function saveScheduleSettings() {
       thresholdOverrides: JSON.parse(JSON.stringify(_thresholdOverrides)),
       thrOverrideIdCounter: _thrOverrideIdCounter,
       planDaily: {
-        D1: document.getElementById('plan_daily_D1')?.value ?? '230',
-        D2: document.getElementById('plan_daily_D2')?.value ?? '60',
-        D3: document.getElementById('plan_daily_D3')?.value ?? '35',
+        D1: domVal('plan_daily_D1', pd.D1 ?? '230'),
+        D2: domVal('plan_daily_D2', pd.D2 ?? '60'),
+        D3: domVal('plan_daily_D3', pd.D3 ?? '35'),
       },
       defaultStartHour: _defaultStartHour,
       defaultStopHour:  _defaultStopHour,
@@ -6628,10 +6640,12 @@ function saveScheduleSettings() {
       siloSettings: SILOS.map(s => ({ id: s.id, cap: s.cap, dailyRate: s.dailyRate || 300 })),
     };
     localStorage.setItem(LS.schedSettings, JSON.stringify(settings));
+    _savedSchedSettings = settings; // 캐시도 최신화
   } catch(e) { console.warn('[schedSettings] save error:', e); }
 }
 
 var _savedSchedSettings = null; // 페이지 로드 시 복원된 설정 캐시
+var _schedDomApplied = false;   // 스케쥴 설정탭 입력칸에 저장값이 반영됐는지
 
 function loadScheduleSettings() {
   try {
@@ -6706,6 +6720,7 @@ function applyScheduleSettingsToDOM() {
   updateSiloRatioPreview && updateSiloRatioPreview();
   updateTransitionConsumptionPreview && updateTransitionConsumptionPreview();
   renderDcOverrideTable && renderDcOverrideTable();
+  _schedDomApplied = true;  // 이제부터 DOM 입력칸 값을 신뢰해 저장
 }
 
 
@@ -11150,10 +11165,10 @@ function downloadSchedule() {
   const HOL = (typeof HOLIDAYS !== 'undefined' && HOLIDAYS) ? HOLIDAYS : {};
   const r1 = n => Math.round((n||0)*10)/10;
 
-  // 색상
+  // 색상 (연한 톤)
   const C = {
-    head:'#D9E1F2', on:'#E2F0D9', off:'#FCE4E4', maint:'#FFF2CC',
-    weekend:'#D9D9D9', sunTxt:'#C00000', satTxt:'#1F4E79'
+    head:'#EAEFF7', on:'#EFF7E8', off:'#FDEFEF', maint:'#FFFAE9',
+    weekend:'#EFEFEF', sunTxt:'#C0504D', satTxt:'#4472C4'
   };
 
   // 날짜별 실제 입고(저장조=지자체별) 집계
