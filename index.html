@@ -380,7 +380,10 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   /* 저장조별 현재고: 항상 가로 나열(좁으면 가로 스크롤) */
   #siloBottom { overflow-x:auto; }
   @media (max-width: 768px) {
-    #siloBottom { grid-template-columns: repeat(4, minmax(150px,1fr)) !important; }
+    /* ★ 저장조별: 모바일 세로 1열 */
+    #siloBottom { grid-template-columns: 1fr !important; overflow-x: visible !important; }
+    /* ★ 전체재고/KPI 패널: 모바일 세로 1열 (전체재고·지자체 한화면) */
+    .dash-kpi-row { grid-template-columns: 1fr !important; }
     .dash-subtab { font-size:12.5px; padding:10px 8px; min-width:78px; }
     /* 발전계획 달력: 폰에서 2달 가로 → 1달씩 세로로 쌓기 */
     .cal-grid { grid-template-columns: 1fr !important; }
@@ -516,7 +519,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
      TAB 1: DASHBOARD
 ══════════════════════════════════════════════════════ -->
 <div id="tab-dashboard" class="tab-panel active">
-  <div style="display:grid;grid-template-columns:1fr 2fr 1.1fr;gap:12px;margin-bottom:20px;">
+  <div class="dash-kpi-row" style="display:grid;grid-template-columns:1fr 2fr 1.1fr;gap:12px;margin-bottom:20px;">
     <!-- 카드1: 전체 재고 -->
     <div class="kpi kpi-xl warn" id="kpi-total" style="background:rgba(56,189,248,0.10);border-color:rgba(56,189,248,0.25);padding:10px 12px;display:flex;flex-direction:column;">
       <div class="kpi-label" style="margin-bottom:2px;display:flex;justify-content:space-between;align-items:center;">
