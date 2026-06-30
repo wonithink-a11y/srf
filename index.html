@@ -11978,12 +11978,13 @@ function renderAnnualLedger() {
     // ── 연도별 행 생성
     const tableRows = years.map(function(year) {
       // 자동 집계 (db)
-      var autoS1=0, autoS2=0, autoS3=0, autoS4=0, autoTotal=0;
+      // 지자체(출처) 기준: recSupplierOf(origin 우선) — 광주연료(S1·S2)=광주, 나주연료(S4), 순천연료(S3)
+      var autoGJ=0, autoNJ=0, autoSC=0, autoTotal=0;
       db.filter(function(r){ return r.datetime.slice(0,4) === year; }).forEach(function(r) {
-        if (r.silo==='S1') autoS1 += r.net;
-        else if (r.silo==='S2') autoS2 += r.net;
-        else if (r.silo==='S3') autoS3 += r.net;
-        else if (r.silo==='S4') autoS4 += r.net;
+        var sup = recSupplierOf(r);
+        if (sup==='광주연료') autoGJ += r.net;
+        else if (sup==='나주연료') autoNJ += r.net;
+        else if (sup==='순천연료') autoSC += r.net;
         autoTotal += r.net;
       });
       var autoUsage = 0, autoOpDays = 0;
@@ -12005,12 +12006,12 @@ function renderAnnualLedger() {
       var hasMo  = Object.keys(months).length > 0;
       var hasDbData = autoTotal > 0 || autoUsage > 0;
 
-      var _s1 = sv.inflowS1 != null ? sv.inflowS1 : Math.round(autoS1);
-      var _s2 = sv.inflowS2 != null ? sv.inflowS2 : Math.round(autoS2);
-      var s1  = Math.round((_s1||0) + (_s2||0));  // 광주+전남 합산
-      var s3  = sv.inflowS3 != null ? sv.inflowS3 : Math.round(autoS3);
-      var s4  = sv.inflowS4 != null ? sv.inflowS4 : Math.round(autoS4);
-      var tot = sv.total    != null ? sv.total    : Math.round(autoTotal);
+      // 입고량: DB 입고기록이 있는 해는 DB(지자체) 자동값 우선, 없으면 저장값(과거 수기 연도)
+      var dbHasInflow = autoTotal > 0;
+      var s1  = dbHasInflow ? Math.round(autoGJ) : Math.round((sv.inflowS1||0) + (sv.inflowS2||0));  // 광주(광주+전남)
+      var s4  = dbHasInflow ? Math.round(autoNJ) : (sv.inflowS4 != null ? sv.inflowS4 : 0);
+      var s3  = dbHasInflow ? Math.round(autoSC) : (sv.inflowS3 != null ? sv.inflowS3 : 0);
+      var tot = dbHasInflow ? Math.round(autoTotal) : (sv.total != null ? sv.total : 0);
       var use = sv.usage    != null ? sv.usage    : Math.round(autoUsage);
       var stk = sv.stockEnd != null ? sv.stockEnd : (autoStockEnd > 0 ? autoStockEnd : '');
       var opd = sv.opDays   != null ? sv.opDays   : (autoOpDays > 0 ? autoOpDays : '');
@@ -12044,20 +12045,20 @@ function renderAnnualLedger() {
       var mRowsHtml = mNames.map(function(mName, mi) {
         var m = mi + 1;
         var mPrefix = year + '-' + (m < 10 ? '0'+m : m);
-        var aS1=0, aS2=0, aS3=0, aS4=0, aTot=0, aUse=0;
+        var aGJ=0, aNJ=0, aSC=0, aTot=0, aUse=0;
         db.filter(function(r){ return r.datetime.slice(0,7) === mPrefix; }).forEach(function(r) {
-          if (r.silo==='S1') aS1+=r.net; else if (r.silo==='S2') aS2+=r.net;
-          else if (r.silo==='S3') aS3+=r.net; else if (r.silo==='S4') aS4+=r.net;
+          var sup = recSupplierOf(r);
+          if (sup==='광주연료') aGJ+=r.net; else if (sup==='나주연료') aNJ+=r.net;
+          else if (sup==='순천연료') aSC+=r.net;
           aTot+=r.net;
         });
         Object.keys(_usageData).forEach(function(d){ if(d.slice(0,7)===mPrefix) aUse+=_usageData[d]; });
         var mv = months[m] || {};
-        var _ms1= mv.inflowS1!=null?mv.inflowS1:Math.round(aS1);
-        var _ms2= mv.inflowS2!=null?mv.inflowS2:Math.round(aS2);
-        var ms1 = Math.round((_ms1||0)+(_ms2||0));  // 광주+전남 합산
-        var ms3 = mv.inflowS3!=null?mv.inflowS3:Math.round(aS3);
-        var ms4 = mv.inflowS4!=null?mv.inflowS4:Math.round(aS4);
-        var mtot= mv.total  !=null?mv.total  :Math.round(aTot);
+        var mDbInflow = aTot > 0;  // 해당 월 DB 입고기록 있으면 DB(지자체) 우선
+        var ms1 = mDbInflow ? Math.round(aGJ) : Math.round((mv.inflowS1||0)+(mv.inflowS2||0));  // 광주(광주+전남)
+        var ms3 = mDbInflow ? Math.round(aSC) : (mv.inflowS3!=null?mv.inflowS3:0);
+        var ms4 = mDbInflow ? Math.round(aNJ) : (mv.inflowS4!=null?mv.inflowS4:0);
+        var mtot= mDbInflow ? Math.round(aTot) : (mv.total!=null?mv.total:0);
         var muse= mv.usage  !=null?mv.usage  :Math.round(aUse);
         var mstk= mv.stockEnd!=null?mv.stockEnd:'';
         var mopd= mv.opDays !=null?mv.opDays :'';
@@ -12115,10 +12116,10 @@ function renderAnnualLedger() {
       '<table class="data-table" style="min-width:900px;font-size:13px;">' +
       '<thead><tr>' +
       '<th style="text-align:left;min-width:100px;">연도</th>' +
-      '<th style="color:#38bdf8;">광주(톤)</th>' +
+      '<th style="color:#38bdf8;">광주(톤)<span style="font-size:9px;color:var(--text2);font-weight:400;">(광주+전남)</span></th>' +
       '<th style="color:#a78bfa;">나주(톤)</th>' +
       '<th style="color:#f59e0b;">순천(톤)</th>' +
-      '<th style="font-weight:700;">입고합계(톤)</th>' +
+      '<th style="font-weight:700;">입고합계(톤)<span style="font-size:9px;color:var(--text2);font-weight:400;"> 지자체(출처)기준</span></th>' +
       '<th style="color:var(--accent);">사용량(톤)</th>' +
       '<th style="color:var(--green);">연말재고(톤)</th>' +
       '<th>가동일</th>' +
@@ -12149,7 +12150,7 @@ function downloadAnnualLedgerCSV() {
     var sv = (_annualData[year] && _annualData[year].summary) ? _annualData[year].summary : {};
     var autoTot=0; db.filter(function(r){return r.datetime.slice(0,4)===year;}).forEach(function(r){autoTot+=r.net;});
     var autoUse=0; Object.keys(_usageData).forEach(function(d){if(d.slice(0,4)===year)autoUse+=_usageData[d];});
-    var tot = sv.total!=null ? sv.total : Math.round(autoTot);
+    var tot = autoTot>0 ? Math.round(autoTot) : (sv.total!=null ? sv.total : 0);
     var use = sv.usage!=null ? sv.usage : Math.round(autoUse);
     csv += year + ',' + (tot||0) + ',' + (use||0) + ',' + (sv.stockEnd||0) + ',' + (sv.opDays||0) + ',"' + (sv.note||'') + '"\n';
   });
