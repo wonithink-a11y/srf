@@ -20387,6 +20387,34 @@ function closeAnnNoteModal() {
         }
       }
     }catch(e){}
+    // ── 설정/기타 탭으로 데이터·동기화 버튼 이동 (헤더 → 설정/기타) ──
+    try {
+      var _setTab=document.getElementById('tab-carrier');
+      if(_setTab && !document.getElementById('settings-data-card')){
+        var _card=document.createElement('div');
+        _card.id='settings-data-card'; _card.className='card'; _card.style.marginBottom='16px';
+        _card.innerHTML='<div class="card-title">🗄️ 데이터 · 동기화</div>'
+          +'<div id="_setDataBtns" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;"></div>'
+          +'<div style="display:flex;flex-wrap:wrap;gap:8px;">'
+          +'<button class="btn btn-primary" style="font-size:13px;padding:8px 14px;" onclick="srfPush()">☁️ PC → Firebase 업로드</button>'
+          +'<button class="btn btn-secondary" style="font-size:13px;padding:8px 14px;" onclick="srfPull()">📥 Firebase → PC 가져오기</button>'
+          +'</div>'
+          +'<div style="font-size:11px;color:var(--text2);margin-top:8px;">※ 데이터 백업/복원 및 Firebase 동기화</div>';
+        _setTab.insertBefore(_card, _setTab.firstChild);
+        var _hr=document.querySelector('.header-right');
+        var _slot=_card.querySelector('#_setDataBtns');
+        if(_hr && _slot){
+          Array.prototype.slice.call(_hr.querySelectorAll('button.notif-btn')).forEach(function(b){
+            var oc=(b.getAttribute('onclick')||'')+(b.textContent||'');
+            if(/exportLocalStorage|importLsFile|saveHtmlWithData|_rawdb_|입고DB|입고 DB/.test(oc)){
+              b.classList.remove('notif-btn'); b.style.fontSize='13px'; b.style.padding='8px 14px';
+              _slot.appendChild(b);
+            }
+          });
+          var _imp=document.getElementById('importLsFile'); if(_imp) _slot.appendChild(_imp);
+        }
+      }
+    }catch(e){}
   }
   if(document.readyState==='complete'){ setTimeout(buildAll,0); }
   else { window.addEventListener('load', function(){ setTimeout(buildAll,50); }); }
