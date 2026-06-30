@@ -5893,7 +5893,7 @@ function _renderForMember(id){
   if(id==='ocr'){ updateVisionUsageDisplay(); onOcrEngineChange(); }
   else if(id==='history') renderHistory();
   else if(id==='reconcile') initReconcileTab();
-  else if(id==='report'){ try{ var rd=document.getElementById('rpt-date'); if(rd&&!rd.value) rd.value=localDateStr(new Date()); }catch(e){} }
+  else if(id==='report'){ try{ if(typeof initRptForm==='function' && !window._rptInit){ window._rptInit=1; initRptForm(); } var rd=document.getElementById('rpt-date'); if(rd&&!rd.value) rd.value=localDateStr(new Date()); }catch(e){} }
   else if(id==='temp-storage') renderTempStorage();
   else if(id==='schedule'){ applyScheduleSettingsToDOM(); generateSchedule(); initSuspendForm(); initMaintForm(); initThrOverrideForm(); renderSuspTable(); renderThrOverrideTbody(); renderMaintTable(); renderDcOverrideTable(); updateTransitionConsumptionPreview(); setTimeout(function(){ if(Object.keys(_schedDayMap).length>0) renderScheduleCalendar(); },50); }
   else if(id==='forecast') renderForecast();
@@ -20420,5 +20420,7 @@ function closeAnnNoteModal() {
   else { window.addEventListener('load', function(){ setTimeout(buildAll,50); }); }
 })();
 </script>
+<!-- 보고문 생성 로직 (v13에서 복원) -->
+<script src="rpt_logic.js"></script>
 </body>
 </html>
