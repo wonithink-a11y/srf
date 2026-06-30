@@ -11947,6 +11947,8 @@ function renderAnnualLedger() {
     loadAnnualData();
     const container = document.getElementById('annualLedgerContainer');
     if (!container) return;
+    // 실시간 대시보드 '가동일수'와 동일하게 표시하기 위해 _opDaysBreakdown 확보
+    if (typeof calcOpDaysFromDB === 'function' && !_opDaysBreakdown) { try { calcOpDaysFromDB(true); } catch(e) {} }
 
     const curYear = new Date().getFullYear();
     const yearSet = new Set();
@@ -12014,7 +12016,10 @@ function renderAnnualLedger() {
       var tot = dbHasInflow ? Math.round(autoTotal) : (sv.total != null ? sv.total : 0);
       var use = sv.usage    != null ? sv.usage    : Math.round(autoUsage);
       var stk = sv.stockEnd != null ? sv.stockEnd : (autoStockEnd > 0 ? autoStockEnd : '');
-      var opd = sv.opDays   != null ? sv.opDays   : (autoOpDays > 0 ? autoOpDays : '');
+      // 가동일: 현재 연도는 실시간 대시보드 '가동일수'(실적)와 동일하게 표시
+      var opd = (year === String(curYear) && _opDaysBreakdown && _opDaysBreakdown.actual != null)
+        ? _opDaysBreakdown.actual
+        : (sv.opDays != null ? sv.opDays : (autoOpDays > 0 ? autoOpDays : ''));
       var note = sv.note || '';
 
       var autoTag = hasMo
@@ -20278,4 +20283,114 @@ function closeAnnNoteModal() {
     if(recentCard) pFlow.appendChild(recentCard);     //              + 최근 입고현황
     if(kpiTotal)   pStock.appendChild(kpiTotal);      // 재고 탭: 전체재고(위)
     if(siloCard)   pStock.appendChild(siloCard);      //          저장조별 현재고(아래)
-    if(aler
+    if(alertCard)  pStock.appendChild(alertCard);     //          + 알림
+
+    // ── 전체재고 지자체(광주/나주/순천)를 세로열 → 가로열 ──
+    var cw=document.getElementById('kpi-stock-S1');
+    while(cw && !(cw.style && cw.style.flexDirection==='column')) cw=cw.parentElement;
+    if(cw){ cw.style.flexDirection='row'; cw.style.flexWrap='wrap'; cw.style.gap='8px'; }
+    // ── 모바일: 지자체 세부(저장조별)는 기본 접힘, 박스 탭 시 펼침 ──
+    var isMob=window.innerWidth<=768;
+    if(isMob) document.body.classList.add('is-mobile');
+    ['S1','S4','S3'].forEach(function(sid){
+      try{
+        var det=document.getElementById('kpi-stock-'+sid+'-detail'); if(!det) return;
+        det.classList.add('collapsible');
+        var box=det.parentElement; if(!box) return;
+        box.style.cursor='pointer';
+        box.addEventListener('click', function(){ det.classList.toggle('open'); });
+      }catch(e){}
+    });
+
+    // ── 빈 컨테이너 정리 ──
+    [topGrid,leftWrap,bottomGrid].forEach(function(g){ try{ if(g && g.children.length===0) g.remove(); }catch(e){} });
+
+    // ── 서브탭 전환 ──
+    bar.addEventListener('click', function(e){
+      var b=e.target.closest('.dash-subtab'); if(!b) return;
+      bar.querySelectorAll('.dash-subtab').forEach(function(x){ x.classList.toggle('active', x===b); });
+      var p=b.getAttribute('data-p');
+      pStock.style.display=(p==='stock')?'':'none';
+      pFlow.style.display =(p==='flow') ?'':'none';
+      pSched.style.display=(p==='sched')?'':'none';
+    });
+  }
+  // ── 범용 서브탭 헬퍼: 탭 내부 섹션들을 제목으로 그룹지어 내부탭으로 분리 ──
+  function _secTitle(sec){ var t=sec.querySelector('.card-title,.section-title'); return t?(t.textContent||'').trim():''; }
+  function makeSubtabs(tabId, groups){
+    var tab=document.getElementById(tabId); if(!tab) return;
+    if(tab.querySelector(':scope > .dash-subtab-bar')) return;
+    var secs=[]; for(var i=0;i<tab.children.length;i++){ if(tab.children[i].nodeType===1) secs.push(tab.children[i]); }
+    if(secs.length<2) return;
+    var bar=document.createElement('div'); bar.className='dash-subtab-bar';
+    var panes=groups.map(function(g,gi){ var pn=document.createElement('div'); pn.className='dash-pane'; if(gi>0) pn.style.display='none'; return pn; });
+    bar.innerHTML=groups.map(function(g,gi){ return '<button class="dash-subtab'+(gi===0?' active':'')+'" data-i="'+gi+'">'+g.label+'</button>'; }).join('');
+    secs.forEach(function(sec){
+      var title=_secTitle(sec); var gi=0;
+      for(var k=0;k<groups.length;k++){ var mm=groups[k].match; if(mm && mm.some(function(x){ return title.indexOf(x)>=0; })){ gi=k; break; } }
+      panes[gi].appendChild(sec);
+    });
+    for(var j=panes.length-1;j>=0;j--) tab.insertBefore(panes[j], tab.firstChild);
+    tab.insertBefore(bar, tab.firstChild);
+    bar.addEventListener('click', function(e){ var b=e.target.closest('.dash-subtab'); if(!b) return;
+      var bs=bar.querySelectorAll('.dash-subtab'); for(var z=0;z<bs.length;z++) bs[z].classList.toggle('active', bs[z]===b);
+      var idx=+b.getAttribute('data-i'); for(var z=0;z<panes.length;z++) panes[z].style.display=(z===idx)?'':'none';
+    });
+  }
+  // ── 보고문 버튼 직접 재바인딩 (inline onclick 미해소 환경 대응) ──
+  function _rptBindButtons(){
+    try{
+      var FNS=['generateReport','autoLoadInbound','setRptType','addRptInRow','addRptMoistRow','updateRptStockMode','rptPeriodChanged','loadCurrentStock','copyReport','updateTotalInDefault'];
+      var nodes=document.querySelectorAll('button[onclick],[onchange]');
+      Array.prototype.forEach.call(nodes, function(b){
+        if(b._rptBound) return;
+        var hasClick=b.hasAttribute('onclick'), oc=b.getAttribute('onclick')||b.getAttribute('onchange')||'';
+        var m=oc.match(/^\s*([a-zA-Z_$][\w$]*)\s*\(([^)]*)\)/);
+        if(!m || FNS.indexOf(m[1])<0) return;
+        var fn=m[1], arg=(m[2]||'').trim(), evt=hasClick?'click':'change';
+        b._rptBound=1; b.removeAttribute('onclick'); b.removeAttribute('onchange');
+        b.addEventListener(evt, function(){
+          var f=window[fn];
+          if(typeof f==='function'){ if(arg==='') f(); else if(arg==='true') f(true); else f(arg.replace(/^['"]|['"]$/g,'')); }
+        });
+      });
+    }catch(e){ console.log('rptBind err',e); }
+  }
+  function buildAll(){
+    try{ buildDashSubtabs(); }catch(e){}
+    try{ makeSubtabs('tab-schedule',[{label:'📅 발전 달력'},{label:'⚙️ 스케쥴 설정',match:['설정']}]); }catch(e){}
+    try{ makeSubtabs('tab-history',[{label:'📋 입고 이력',match:['입고 이력']},{label:'📥 CSV 가져오기',match:['CSV 입고']}]); }catch(e){}
+    try{ makeSubtabs('tab-ledger',[{label:'📅 관리대장',match:['관리대장']},{label:'📊 추이·엑셀',match:['추이','엑셀']}]); }catch(e){}
+    try{ _rptBindButtons(); }catch(e){}
+    // ── 모바일 전용 UI: 세부 접기 + 발전 달력 좌우 스와이프 ──
+    try{
+      if(window.innerWidth<=768){
+        document.body.classList.add('is-mobile');
+        document.querySelectorAll('[id$="-jj"]').forEach(function(jj){
+          jj.classList.add('jj-detail');
+          var row=jj.parentElement; if(row){ row.style.cursor='pointer'; row.addEventListener('click', function(){ jj.classList.toggle('open'); }); }
+        });
+        var sb=document.getElementById('siloBottom');
+        if(sb && !sb._collapseBound){ sb._collapseBound=true;
+          sb.addEventListener('click', function(e){ var c=e.target.closest('.silo-card'); if(c) c.classList.toggle('silo-card-open'); });
+        }
+        // 발전 달력: 오른쪽 ▲▼ 버튼 숨김 (좌우 스와이프로 대체)
+        var _navb=document.querySelector('[onclick*="schedSliderStep(-2)"]');
+        if(_navb && _navb.parentElement) _navb.parentElement.style.display='none';
+        // 발전 달력: 좌우 스와이프로 월 이동 (왼쪽=다음, 오른쪽=이전)
+        var calC=document.getElementById('calendarContainer');
+        if(calC && !calC._swipeBound){ calC._swipeBound=true;
+          var _sx=0,_sy=0;
+          calC.addEventListener('touchstart', function(e){ var t=e.touches[0]; _sx=t.clientX; _sy=t.clientY; }, {passive:true});
+          calC.addEventListener('touchend', function(e){ var t=e.changedTouches[0]; var dx=t.clientX-_sx, dy=t.clientY-_sy;
+            if(Math.abs(dx)>50 && Math.abs(dx)>Math.abs(dy)*1.5 && typeof schedSliderStep==='function'){ schedSliderStep(dx<0?2:-2); } }, {passive:true});
+        }
+      }
+    }catch(e){}
+  }
+  if(document.readyState==='complete'){ setTimeout(buildAll,0); }
+  else { window.addEventListener('load', function(){ setTimeout(buildAll,50); }); }
+})();
+</script>
+</body>
+</html>
