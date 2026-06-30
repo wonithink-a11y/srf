@@ -1160,7 +1160,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
      TAB 2: OCR
 ══════════════════════════════════════════════════════ -->
 <div id="tab-ocr" class="tab-panel">
-  <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-inbound" data-member="history" onclick="switchSubTab('inbound','history')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📋 입고 이력</button><button class="subbtn-inbound" data-member="ocr" onclick="switchSubTab('inbound','ocr')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📷 OCR 입고처리</button><button class="subbtn-inbound" data-member="temp-storage" onclick="switchSubTab('inbound','temp-storage')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📦 임시보관</button><button class="subbtn-inbound" data-member="reconcile" onclick="switchSubTab('inbound','reconcile')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🔍 업체대조</button></div>
+  <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-inbound" data-member="history" onclick="switchSubTab('inbound','history')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📋 입고 이력</button><button class="subbtn-inbound" data-member="ocr" onclick="switchSubTab('inbound','ocr')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📷 OCR 입고처리</button><button class="subbtn-inbound" data-member="report" onclick="switchSubTab('inbound','report')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📢 보고문 생성</button><button class="subbtn-inbound" data-member="temp-storage" onclick="switchSubTab('inbound','temp-storage')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📦 임시보관</button><button class="subbtn-inbound" data-member="reconcile" onclick="switchSubTab('inbound','reconcile')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🔍 업체대조</button></div>
   <div class="grid-2 ocr-result-grid">
     <div>
       <div class="card">
@@ -2683,7 +2683,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 <!-- ══════════════════════════════════════════════════════
      TAB 5: HISTORY
 ══════════════════════════════════════════════════════ -->
-<div id="tab-history" class="tab-panel">
+<div id="tab-report" class="tab-panel">
+  <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-inbound" data-member="history" onclick="switchSubTab('inbound','history')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📋 입고 이력</button><button class="subbtn-inbound" data-member="ocr" onclick="switchSubTab('inbound','ocr')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📷 OCR 입고처리</button><button class="subbtn-inbound" data-member="report" onclick="switchSubTab('inbound','report')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📢 보고문 생성</button><button class="subbtn-inbound" data-member="temp-storage" onclick="switchSubTab('inbound','temp-storage')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📦 임시보관</button><button class="subbtn-inbound" data-member="reconcile" onclick="switchSubTab('inbound','reconcile')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🔍 업체대조</button></div>
 <div class="rpt-card-wrap">
 <div class="card">
       <div class="card-title">📢 현황 보고문 생성</div>
@@ -2804,7 +2805,9 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       </div>
     </div>
 </div>
-  <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-inbound" data-member="history" onclick="switchSubTab('inbound','history')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📋 입고 이력</button><button class="subbtn-inbound" data-member="ocr" onclick="switchSubTab('inbound','ocr')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📷 OCR 입고처리</button><button class="subbtn-inbound" data-member="temp-storage" onclick="switchSubTab('inbound','temp-storage')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📦 임시보관</button><button class="subbtn-inbound" data-member="reconcile" onclick="switchSubTab('inbound','reconcile')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🔍 업체대조</button></div>
+</div>
+<div id="tab-history" class="tab-panel">
+  <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-inbound" data-member="history" onclick="switchSubTab('inbound','history')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📋 입고 이력</button><button class="subbtn-inbound" data-member="ocr" onclick="switchSubTab('inbound','ocr')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📷 OCR 입고처리</button><button class="subbtn-inbound" data-member="report" onclick="switchSubTab('inbound','report')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📢 보고문 생성</button><button class="subbtn-inbound" data-member="temp-storage" onclick="switchSubTab('inbound','temp-storage')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📦 임시보관</button><button class="subbtn-inbound" data-member="reconcile" onclick="switchSubTab('inbound','reconcile')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🔍 업체대조</button></div>
   <!-- ══ CSV 입고 데이터 가져오기 ══ -->
   <div class="card" style="margin-bottom:16px;">
     <div class="section-header" style="margin-bottom:14px;">
@@ -4524,7 +4527,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 ══════════════════════════════════════════════════════ -->
 <!-- ══ 업체 CSV 대조 ══ -->
 <div id="tab-reconcile" class="tab-panel">
-  <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-inbound" data-member="history" onclick="switchSubTab('inbound','history')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📋 입고 이력</button><button class="subbtn-inbound" data-member="ocr" onclick="switchSubTab('inbound','ocr')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📷 OCR 입고처리</button><button class="subbtn-inbound" data-member="temp-storage" onclick="switchSubTab('inbound','temp-storage')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📦 임시보관</button><button class="subbtn-inbound" data-member="reconcile" onclick="switchSubTab('inbound','reconcile')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🔍 업체대조</button></div>
+  <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-inbound" data-member="history" onclick="switchSubTab('inbound','history')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📋 입고 이력</button><button class="subbtn-inbound" data-member="ocr" onclick="switchSubTab('inbound','ocr')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📷 OCR 입고처리</button><button class="subbtn-inbound" data-member="report" onclick="switchSubTab('inbound','report')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📢 보고문 생성</button><button class="subbtn-inbound" data-member="temp-storage" onclick="switchSubTab('inbound','temp-storage')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📦 임시보관</button><button class="subbtn-inbound" data-member="reconcile" onclick="switchSubTab('inbound','reconcile')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🔍 업체대조</button></div>
   <div class="card">
     <div class="section-header" style="margin-bottom:14px;">
       <div class="section-title">🔍 업체 CSV 대조 (공급업체 자료 vs 내 입고 데이터)</div>
@@ -4970,15 +4973,14 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
         <thead>
           <tr>
             <th rowspan="2" style="text-align:center;vertical-align:middle;background:var(--bg3);">월</th>
-            <th colspan="5" style="text-align:center;background:rgba(56,189,248,.12);color:var(--accent);">입고량 (톤)</th>
+            <th colspan="4" style="text-align:center;background:rgba(56,189,248,.12);color:var(--accent);">입고량 (톤) · 지자체(출처) 기준</th>
             <th colspan="2" style="text-align:center;background:rgba(239,68,68,.12);color:var(--red);">사용량 (톤)</th>
             <th colspan="2" style="text-align:center;background:rgba(34,197,94,.12);color:var(--green);">재고량 (톤)</th>
             <th rowspan="2" style="text-align:center;vertical-align:middle;background:var(--bg3);">가동일</th>
             <th rowspan="2" style="text-align:center;vertical-align:middle;background:var(--bg3);">비고</th>
           </tr>
           <tr>
-            <th style="background:rgba(56,189,248,.08);color:#38bdf8;">광주</th>
-            <th style="background:rgba(56,189,248,.08);color:#22c55e;">전남</th>
+            <th style="background:rgba(56,189,248,.08);color:#38bdf8;">광주<span style="font-size:9px;color:var(--text2);font-weight:400;">(광주+전남)</span></th>
             <th style="background:rgba(56,189,248,.08);color:#a78bfa;">나주</th>
             <th style="background:rgba(56,189,248,.08);color:#f59e0b;">순천</th>
             <th style="background:rgba(56,189,248,.08);font-weight:700;">합계</th>
@@ -5417,7 +5419,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 
 <!-- 임시보관 현황 탭 -->
 <div id="tab-temp-storage" class="tab-panel">
-  <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-inbound" data-member="history" onclick="switchSubTab('inbound','history')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📋 입고 이력</button><button class="subbtn-inbound" data-member="ocr" onclick="switchSubTab('inbound','ocr')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📷 OCR 입고처리</button><button class="subbtn-inbound" data-member="temp-storage" onclick="switchSubTab('inbound','temp-storage')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📦 임시보관</button><button class="subbtn-inbound" data-member="reconcile" onclick="switchSubTab('inbound','reconcile')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🔍 업체대조</button></div>
+  <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-inbound" data-member="history" onclick="switchSubTab('inbound','history')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📋 입고 이력</button><button class="subbtn-inbound" data-member="ocr" onclick="switchSubTab('inbound','ocr')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📷 OCR 입고처리</button><button class="subbtn-inbound" data-member="report" onclick="switchSubTab('inbound','report')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📢 보고문 생성</button><button class="subbtn-inbound" data-member="temp-storage" onclick="switchSubTab('inbound','temp-storage')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📦 임시보관</button><button class="subbtn-inbound" data-member="reconcile" onclick="switchSubTab('inbound','reconcile')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🔍 업체대조</button></div>
   <div class="section" style="max-width:900px;margin:0 auto;">
     <div class="section-title">📦 임시보관 현황 <span style="font-size:12px;color:var(--yellow);font-weight:400;">정비기간 저장조≠지자체 현황</span></div>
 
@@ -5891,6 +5893,7 @@ function _renderForMember(id){
   if(id==='ocr'){ updateVisionUsageDisplay(); onOcrEngineChange(); }
   else if(id==='history') renderHistory();
   else if(id==='reconcile') initReconcileTab();
+  else if(id==='report'){ try{ var rd=document.getElementById('rpt-date'); if(rd&&!rd.value) rd.value=localDateStr(new Date()); }catch(e){} }
   else if(id==='temp-storage') renderTempStorage();
   else if(id==='schedule'){ applyScheduleSettingsToDOM(); generateSchedule(); initSuspendForm(); initMaintForm(); initThrOverrideForm(); renderSuspTable(); renderThrOverrideTbody(); renderMaintTable(); renderDcOverrideTable(); updateTransitionConsumptionPreview(); setTimeout(function(){ if(Object.keys(_schedDayMap).length>0) renderScheduleCalendar(); },50); }
   else if(id==='forecast') renderForecast();
@@ -12235,13 +12238,16 @@ function renderMonthlyLedger() {
     return;
   }
   const today = _schedToday;
-  // ── 사일로별 입고량 집계 (db 기준) ──
-  const monthlyInflow = {};  // key='YYYY-MM', val={S1,S2,S3,S4,total}
+  // ── 지자체(출처) 기준 입고량 집계 (db 기준) ──
+  //   recSupplierOf: 임시저장입고는 origin(실제 출처 지자체 저장조)으로 판정, 그 외 silo로 판정
+  //   광주연료(S1·S2=광주+전남) → GJ, 나주연료(S4) → NJ, 순천연료(S3) → SC
+  const SUP_KEY = { '광주연료':'GJ', '나주연료':'NJ', '순천연료':'SC' };
+  const monthlyInflow = {};  // key='YYYY-MM', val={GJ,NJ,SC,total}
   db.forEach(r => {
     const mo = r.datetime.slice(0, 7);
-    if (!monthlyInflow[mo]) monthlyInflow[mo] = {S1:0, S2:0, S3:0, S4:0, total:0};
-    const silo = r.silo || gateToSilo(r.gate || '');
-    monthlyInflow[mo][silo] = (monthlyInflow[mo][silo]||0) + r.net;
+    if (!monthlyInflow[mo]) monthlyInflow[mo] = {GJ:0, NJ:0, SC:0, total:0};
+    const k = SUP_KEY[recSupplierOf(r)];
+    if (k) monthlyInflow[mo][k] += r.net;
     monthlyInflow[mo].total += r.net;
   });
   // ── 월별 사용량/재고량 (schedDayMap 기준) ──
@@ -12265,10 +12271,10 @@ function renderMonthlyLedger() {
   const tbody = document.getElementById('ledgerTbody');
   const tfoot = document.getElementById('ledgerFoot');
   const monthNames = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-  let totInflowS1=0, totInflowS2=0, totInflowS3=0, totInflowS4=0, totInflow=0;
+  let totInflowGJ=0, totInflowNJ=0, totInflowSC=0, totInflow=0;
   let totUsage=0, totDaysOn=0;
   const rows = months.map((mo, idx) => {
-    const inf  = monthlyInflow[mo]  || {S1:0, S2:0, S3:0, S4:0, total:0};
+    const inf  = monthlyInflow[mo]  || {GJ:0, NJ:0, SC:0, total:0};
     const use  = monthlyUsage[mo]   || {usage:0, daysOn:0, stockEnd:0};
     const act  = MONTHLY_ACTUAL[mo] || null;
     const isFuture = mo > today.toISOString().slice(0,7);
@@ -12277,8 +12283,7 @@ function renderMonthlyLedger() {
     const usageSim    = Math.round(use.usage);
     const usageActual = act ? Math.round(act.usage) : null;
     const stockEnd    = Math.round(use.stockEnd);
-    totInflowS1 += inf.S1; totInflowS2 += inf.S2;
-    totInflowS3 += inf.S3; totInflowS4 += inf.S4;
+    totInflowGJ += inf.GJ; totInflowNJ += inf.NJ; totInflowSC += inf.SC;
     totInflow   += inf.total; totUsage += use.usage; totDaysOn += use.daysOn;
     const prevMo  = months[idx - 1];
     const prevAct = prevMo ? MONTHLY_ACTUAL[prevMo] : null;
@@ -12290,10 +12295,9 @@ function renderMonthlyLedger() {
     const moLabel = monthNames[idx] + (isFuture ? '' : '');
     return `<tr style="${bgFuture}${bgPartial}">
       <td style="font-weight:700;text-align:center;">${moLabel}</td>
-      <td style="text-align:right;color:#38bdf8;">${inf.S1>0?Math.round(inf.S1).toLocaleString():'—'}</td>
-      <td style="text-align:right;color:#22c55e;">${inf.S2>0?Math.round(inf.S2).toLocaleString():'—'}</td>
-      <td style="text-align:right;color:#a78bfa;">${inf.S4>0?Math.round(inf.S4).toLocaleString():'—'}</td>
-      <td style="text-align:right;color:#f59e0b;">${inf.S3>0?Math.round(inf.S3).toLocaleString():'—'}</td>
+      <td style="text-align:right;color:#38bdf8;">${inf.GJ>0?Math.round(inf.GJ).toLocaleString():'—'}</td>
+      <td style="text-align:right;color:#a78bfa;">${inf.NJ>0?Math.round(inf.NJ).toLocaleString():'—'}</td>
+      <td style="text-align:right;color:#f59e0b;">${inf.SC>0?Math.round(inf.SC).toLocaleString():'—'}</td>
       <td style="text-align:right;font-weight:700;">${inflowTotal>0?inflowTotal.toLocaleString():'—'}</td>
       <td style="text-align:right;">${usageActual!==null?usageActual.toLocaleString():'—'}</td>
       <td style="text-align:right;color:var(--text2);">${usageSim>0?usageSim.toLocaleString():isFuture?usageSim.toLocaleString():'—'}</td>
@@ -12306,10 +12310,9 @@ function renderMonthlyLedger() {
   tbody.innerHTML = rows.join('');
   tfoot.innerHTML = `<tr style="font-weight:700;background:rgba(56,189,248,.08);border-top:2px solid var(--accent);">
     <td style="text-align:center;">합계</td>
-    <td style="text-align:right;color:#38bdf8;">${Math.round(totInflowS1).toLocaleString()}</td>
-    <td style="text-align:right;color:#22c55e;">${Math.round(totInflowS2).toLocaleString()}</td>
-    <td style="text-align:right;color:#a78bfa;">${Math.round(totInflowS4).toLocaleString()}</td>
-    <td style="text-align:right;color:#f59e0b;">${Math.round(totInflowS3).toLocaleString()}</td>
+    <td style="text-align:right;color:#38bdf8;">${Math.round(totInflowGJ).toLocaleString()}</td>
+    <td style="text-align:right;color:#a78bfa;">${Math.round(totInflowNJ).toLocaleString()}</td>
+    <td style="text-align:right;color:#f59e0b;">${Math.round(totInflowSC).toLocaleString()}</td>
     <td style="text-align:right;">${Math.round(totInflow).toLocaleString()}</td>
     <td style="text-align:right;">—</td>
     <td style="text-align:right;color:var(--text2);">${Math.round(totUsage).toLocaleString()}</td>
@@ -12361,7 +12364,7 @@ function renderMonthlyLedger() {
   });
 }
 function downloadLedgerCSV() {
-  const headers = ['월','광주입고','전남입고','나주입고','순천입고','입고합계','실적사용량','계획사용량','월말재고','가동일'];
+  const headers = ['월','광주입고(광주+전남)','나주입고','순천입고','입고합계','실적사용량','계획사용량','월말재고','전월대비','가동일'];
   const rows = [headers.join(',')];
   document.querySelectorAll('#ledgerTbody tr').forEach(tr => {
     const cells = [...tr.querySelectorAll('td')].map(td => td.innerText.trim().replace(/,/g,''));
