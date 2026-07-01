@@ -20113,7 +20113,7 @@ function closeAnnNoteModal() {
       if (!window._srfLiveTimer) {
         window._srfLiveTimer = setInterval(function(){
           if (typeof window.srfLivePull === 'function') window.srfLivePull(true);
-        }, 5 * 60 * 1000); // 5분마다 자동 확인
+        }, 30 * 60 * 1000); // 30분마다 자동 확인 (데이터 등록 시점은 각 등록 동작 직후 즉시 push라 별개)
       }
     } catch(e) {
       setStatus('❌ 연결 실패: ' + e.message, '#f85149');
