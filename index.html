@@ -10425,12 +10425,20 @@ function showDayDetail(day, siloId) {
           <button onclick="swapSingleHistRow(${r.id})" title="기준↔비교 교체"
             style="background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.4);color:var(--yellow);border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer;margin-right:3px;">🔁</button>
           <button onclick="openHistEditRow(${r.id},'${day}','${siloId}')"
-            style="background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.3);color:var(--accent);border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;">✏️</button>
+            style="background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.3);color:var(--accent);border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;margin-right:3px;">✏️</button>
+          <button onclick="deleteHistRow(${r.id},'${day}','${siloId}')" title="이 건 삭제"
+            style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.35);color:#f87171;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;">🗑️</button>
         </td>
       </tr>
       <tr id="hist_edit_${r.id}" style="display:none;background:rgba(251,191,36,.05);">
         <td colspan="7" style="padding:8px 12px;">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:11px;color:var(--text2);">차량:</span>
+            <input type="text" id="hist_vehicle_${r.id}" value="${(r.vehicle||'').replace(/"/g,'&quot;')}"
+              style="width:88px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:3px 8px;font-size:12px;">
+            <span style="font-size:11px;color:var(--text2);">순중량(톤):</span>
+            <input type="number" step="0.001" id="hist_net_${r.id}" value="${r.net}"
+              style="width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:3px 8px;font-size:12px;">
             <span style="font-size:11px;color:var(--text2);">저장조:</span>
             <select id="hist_silo_${r.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:3px 8px;font-size:12px;">
               ${SILOS.map(s=>`<option value="${s.id}" ${s.id===r.silo?'selected':''}>${s.name}</option>`).join('')}
@@ -10488,12 +10496,20 @@ function showDayAllDetail(day) {
           <button onclick="swapSingleHistRow(${r.id})" title="기준↔비교 교체"
             style="background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.4);color:var(--yellow);border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer;margin-right:3px;">🔁</button>
           <button onclick="openHistEditRow(${r.id},'${day}',null)"
-            style="background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.3);color:var(--accent);border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;">✏️</button>
+            style="background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.3);color:var(--accent);border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;margin-right:3px;">✏️</button>
+          <button onclick="deleteHistRow(${r.id},'${day}',null)" title="이 건 삭제"
+            style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.35);color:#f87171;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;">🗑️</button>
         </td>
       </tr>
       <tr id="hist_edit_${r.id}" style="display:none;background:rgba(251,191,36,.05);">
         <td colspan="7" style="padding:8px 12px;">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:11px;color:var(--text2);">차량:</span>
+            <input type="text" id="hist_vehicle_${r.id}" value="${(r.vehicle||'').replace(/"/g,'&quot;')}"
+              style="width:88px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:3px 8px;font-size:12px;">
+            <span style="font-size:11px;color:var(--text2);">순중량(톤):</span>
+            <input type="number" step="0.001" id="hist_net_${r.id}" value="${r.net}"
+              style="width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:3px 8px;font-size:12px;">
             <span style="font-size:11px;color:var(--text2);">저장조:</span>
             <select id="hist_silo_${r.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:3px 8px;font-size:12px;">
               ${SILOS.map(s=>`<option value="${s.id}" ${s.id===r.silo?'selected':''}>${s.name}</option>`).join('')}
@@ -10611,6 +10627,8 @@ function saveHistEdit(id, day, siloId) {
   const newSilo = document.getElementById('hist_silo_' + id)?.value;
   const originChk = document.getElementById('hist_origin_chk_' + id)?.checked;
   const newOrigin = document.getElementById('hist_origin_sel_' + id)?.value;
+  const newVehicleRaw = document.getElementById('hist_vehicle_' + id)?.value;
+  const newNetRaw = document.getElementById('hist_net_' + id)?.value;
 
   const oldSilo = rec.silo;
   rec.silo = newSilo || rec.silo;
@@ -10620,6 +10638,8 @@ function saveHistEdit(id, day, siloId) {
   } else {
     delete rec.origin;
   }
+  if (newVehicleRaw !== undefined && newVehicleRaw.trim() !== '') rec.vehicle = newVehicleRaw.trim();
+  if (newNetRaw !== undefined && newNetRaw !== '' && !isNaN(+newNetRaw) && +newNetRaw > 0) rec.net = +(+newNetRaw).toFixed(3);
 
   // 전체 db localStorage 플러시
   const allYears = new Set(db.map(r => r.datetime.slice(0,4)));
@@ -10635,12 +10655,57 @@ function saveHistEdit(id, day, siloId) {
   document.getElementById('hist_edit_' + id).style.display = 'none';
   const siloName = (SILOS.find(s=>s.id===rec.silo)||{}).name||rec.silo;
   const originName = rec.origin ? ' (출처: '+(SILOS.find(s=>s.id===rec.origin)||{}).name+')' : '';
-  toast('green', '수정 완료', `${rec.vehicle} → ${siloName}저장조${originName}`);
+  toast('green', '수정 완료', `${rec.vehicle} · ${rec.net.toFixed(3)}톤 → ${siloName}저장조${originName}`);
 
   // 모달 내용 새로고침
   if (siloId) showDayDetail(day, siloId);
   else showDayAllDetail(day);
   renderHistory();
+  renderDashboard();
+}
+// ── 입고 건별 삭제 ──
+function deleteHistRow(id, day, siloId) {
+  const rec = db.find(r => r.id === id);
+  if (!rec) { toast('red','오류','레코드를 찾을 수 없습니다.'); return; }
+
+  const siloName = (SILOS.find(s=>s.id===rec.silo)||{}).name || rec.silo || '—';
+  const ok = confirm(
+    `다음 1건을 삭제하시겠습니까?\n\n` +
+    `일자: ${(rec.datetime||'').slice(0,10)}\n` +
+    `차량: ${rec.vehicle||'—'}\n` +
+    `순중량: ${(+rec.net||0).toFixed(3)} 톤\n` +
+    `저장조: ${siloName}\n\n` +
+    `삭제 후에는 되돌릴 수 없습니다.`
+  );
+  if (!ok) return;
+
+  db = db.filter(r => r.id !== id);
+
+  // 해당 연도 localStorage 갱신
+  const yr = (rec.datetime||'').slice(0,4);
+  if (yr) {
+    const yearRecs = db.filter(r => r.datetime.startsWith(yr));
+    saveYearDbToStorage(parseInt(yr), yearRecs);
+  }
+
+  // override 저장소에 동일 키가 남아있다면 정리 (재로드 시 유령 데이터 방지)
+  try {
+    const key = (rec.datetime||'').slice(0,16) + '|' + (rec.vehicle||'') + '|' + Math.round((rec.gross||0)/1000*1000);
+    const existing = JSON.parse(localStorage.getItem('_rawdb_override') || '{}');
+    if (existing[key]) {
+      delete existing[key];
+      localStorage.setItem('_rawdb_override', JSON.stringify(existing));
+    }
+  } catch(e) {}
+
+  recalcStockFromBaseline();
+  toast('green', '삭제 완료', `${rec.vehicle||'—'} · ${(+rec.net||0).toFixed(3)}톤 삭제됨`);
+
+  // 모달 내용 새로고침 (남은 레코드 없으면 자동으로 빈 상태 표시)
+  if (siloId) showDayDetail(day, siloId);
+  else showDayAllDetail(day);
+  renderHistory();
+  renderDashboard();
 }
 function closeHistoryModal() {
   document.getElementById('historyModal').style.display = 'none';
