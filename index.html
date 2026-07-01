@@ -5891,7 +5891,7 @@ function switchSubTab(group, memberId){
 }
 function _renderForMember(id){
   if(id==='ocr'){ updateVisionUsageDisplay(); onOcrEngineChange(); }
-  else if(id==='history') renderHistory();
+  else if(id==='history'){ renderHistory(); if (typeof srfLivePull === 'function') srfLivePull(true); }
   else if(id==='reconcile') initReconcileTab();
   else if(id==='report'){ try{ if(typeof initRptForm==='function' && !window._rptInit){ window._rptInit=1; initRptForm(); } var rd=document.getElementById('rpt-date'); if(rd&&!rd.value) rd.value=localDateStr(new Date()); }catch(e){} }
   else if(id==='temp-storage') renderTempStorage();
@@ -6492,6 +6492,29 @@ function saveYearDbToStorage(year, records) {
     if (typeof toast === 'function') toast('red','저장 실패',`${year}년 데이터 저장 실패 (용량 초과 가능). 🗜️HTML저장 후 재시도 권장.`);
     return false;
   }
+}
+
+// ── 라이브 동기화 구간(마감 전 데이터) 관리 ──
+// 마감 기준월(YYYY-MM) 이후 데이터만 Firebase 자동 동기화 대상(rawdb_live)으로 취급.
+// 마감 기준월 이전 데이터는 연간 백업(rawdb_연도, 기존 수동 업로드)으로만 관리.
+function getSyncClosedThrough() {
+  let v = null;
+  try { v = localStorage.getItem('_syncClosedThrough'); } catch(e) {}
+  if (!v) {
+    // 최초 1회: 기본값 = 지난달까지 마감된 것으로 간주 (이번 달만 자동 동기화 대상)
+    const now = new Date();
+    const prevM = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    v = `${prevM.getFullYear()}-${String(prevM.getMonth()+1).padStart(2,'0')}`;
+    try { localStorage.setItem('_syncClosedThrough', v); } catch(e) {}
+  }
+  return v;
+}
+function setSyncClosedThrough(v) {
+  try { localStorage.setItem('_syncClosedThrough', v); } catch(e) {}
+}
+function getLiveWindowRecords() {
+  const closedThrough = getSyncClosedThrough();
+  return db.filter(r => (r.datetime || '').slice(0, 7) > closedThrough);
 }
 
 function loadAllYearDbFromStorage() {
@@ -10611,6 +10634,7 @@ function applyBulkEdit() {
   else showDayAllDetail(_modalDay);
   renderHistory();
   renderDashboard();
+  if (typeof srfLivePush === 'function') srfLivePush(true);
 }
 
 // ── 입고 건별 저장조/출처 수정 ──
@@ -10662,6 +10686,7 @@ function saveHistEdit(id, day, siloId) {
   else showDayAllDetail(day);
   renderHistory();
   renderDashboard();
+  if (typeof srfLivePush === 'function') srfLivePush(true);
 }
 // ── 입고 건별 삭제 ──
 function deleteHistRow(id, day, siloId) {
@@ -10706,6 +10731,7 @@ function deleteHistRow(id, day, siloId) {
   else showDayAllDetail(day);
   renderHistory();
   renderDashboard();
+  if (typeof srfLivePush === 'function') srfLivePush(true);
 }
 function closeHistoryModal() {
   document.getElementById('historyModal').style.display = 'none';
@@ -11096,6 +11122,7 @@ function importCsvData() {
   toast('green', 'CSV 가져오기 완료', msg);
   renderHistory();
   renderDashboard();
+  if (typeof srfLivePush === 'function') srfLivePush(true);
 }
 // ── '기준/비교 정정' 버튼: 업로드한 CSV와 비교해, 기존 저장 데이터의 기준/비교가 뒤바뀐 건만 정정 ──
 //   · 저장된 기준 == CSV 기준  → 방향 정상, 그대로 둠
@@ -11373,6 +11400,7 @@ function importOcrCsv() {
   toast('green', '계근데이터 등록 완료', msg);
   renderDashboard();
   if (typeof renderHistory === 'function') renderHistory();
+  if (typeof srfLivePush === 'function') srfLivePush(true);
 }
 
 function clearOcrCsv() {
@@ -20022,9 +20050,14 @@ function closeAnnNoteModal() {
   <div id="srf-panel" style="display:none;position:absolute;bottom:64px;right:0;width:300px;background:#161b22;border:1px solid #30363d;border-radius:12px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,0.6);">
     <div style="font-size:13px;font-weight:700;color:#e6edf3;margin-bottom:4px;">⚡ SRF Firebase 동기화</div>
     <div id="srf-fb-status" style="font-size:11px;color:#8b949e;margin-bottom:12px;">초기화 중...</div>
-    <button onclick="srfPush()" id="srf-btn-push" style="width:100%;padding:9px;margin-bottom:8px;background:#58a6ff;color:#0d1117;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">☁️ PC → Firebase 업로드</button>
-    <button onclick="srfPull()" id="srf-btn-pull" style="width:100%;padding:9px;margin-bottom:8px;background:#238636;color:#ffffff;border:1px solid #2ea043;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">📥 Firebase → PC 가져오기</button>
-    <div id="srf-result" style="font-size:11px;color:#8b949e;line-height:1.6;white-space:pre-wrap;"></div>
+    <button onclick="srfPush()" id="srf-btn-push" style="width:100%;padding:9px;margin-bottom:8px;background:#58a6ff;color:#0d1117;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">☁️ PC → Firebase 업로드 (전체)</button>
+    <button onclick="srfPull()" id="srf-btn-pull" style="width:100%;padding:9px;margin-bottom:8px;background:#238636;color:#ffffff;border:1px solid #2ea043;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">📥 Firebase → PC 가져오기 (전체)</button>
+    <div id="srf-result" style="font-size:11px;color:#8b949e;line-height:1.6;white-space:pre-wrap;margin-bottom:10px;"></div>
+    <div style="padding-top:10px;border-top:1px solid #30363d;">
+      <div style="font-size:12px;font-weight:700;color:#e6edf3;margin-bottom:4px;">🔄 자동 동기화 (최근 데이터)</div>
+      <div id="srf-live-status" style="font-size:11px;color:#8b949e;margin-bottom:8px;">확인 중...</div>
+      <button onclick="srfCloseMonth()" id="srf-btn-close" style="width:100%;padding:8px;background:#da3633;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">🔒 월마감 종료</button>
+    </div>
   </div>
 </div>
 
@@ -20074,6 +20107,14 @@ function closeAnnNoteModal() {
       if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
       db = firebase.firestore();
       setStatus('✅ Firebase 연결됨', '#3fb950');
+      // ── 연결되면 최근 데이터 자동 확인 + 주기적 자동 동기화 시작 ──
+      if (typeof updateSrfLiveStatus === 'function') updateSrfLiveStatus();
+      if (typeof window.srfLivePull === 'function') window.srfLivePull(true);
+      if (!window._srfLiveTimer) {
+        window._srfLiveTimer = setInterval(function(){
+          if (typeof window.srfLivePull === 'function') window.srfLivePull(true);
+        }, 5 * 60 * 1000); // 5분마다 자동 확인
+      }
     } catch(e) {
       setStatus('❌ 연결 실패: ' + e.message, '#f85149');
     }
@@ -20273,6 +20314,147 @@ function closeAnnNoteModal() {
       setResult('❌ 가져오기 실패: ' + e.message, false);
     } finally {
       btn.disabled = false; btn.textContent = '📥 Firebase → PC 가져오기';
+    }
+  };
+
+  // ── 자동 동기화(최근 데이터, rawdb_live) ──
+  //   전체 스냅샷을 통째로 올리는 위의 Push/Pull과 달리, 마감 기준월 이후(아직 마감 안 된)
+  //   데이터만 별도의 작은 문서(rawdb_live)로 자동 push/pull. 매번 전체를 올리지 않으므로
+  //   연차가 쌓여도 문서 크기가 커지지 않음. 완결된(과거) 데이터는 이 자동 동기화 대상에서 제외되어
+  //   과거 정상 데이터를 실수로 덮어쓸 위험이 낮음.
+  function _liveStatusText() {
+    const closedThrough = (typeof getSyncClosedThrough === 'function') ? getSyncClosedThrough() : '—';
+    return `마감 완료: ~${closedThrough} · 자동 동기화 대상: ${closedThrough} 다음달~`;
+  }
+  function updateSrfLiveStatus(extra) {
+    const el = document.getElementById('srf-live-status');
+    if (!el) return;
+    const now = new Date().toLocaleTimeString('ko-KR');
+    el.textContent = _liveStatusText() + (extra ? ` · ${extra}` : ` · 확인 ${now}`);
+  }
+
+  window.srfLivePush = async function(silent) {
+    if (!db) return;
+    if (typeof getLiveWindowRecords !== 'function') return;
+    try {
+      const liveRecs = getLiveWindowRecords();
+      const payload = JSON.parse(JSON.stringify(liveRecs)); // undefined 등 정리
+      const closedThrough = getSyncClosedThrough();
+      await db.collection(FB_COL).doc('rawdb_live').set({
+        records: payload,
+        count: payload.length,
+        closedThrough: closedThrough,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      updateSrfLiveStatus(`${payload.length}건 업로드됨`);
+      if (!silent) setResult(`✅ 자동 동기화 완료 (${payload.length}건)`, true);
+    } catch(e) {
+      console.warn('[srfLivePush] 실패:', e);
+      updateSrfLiveStatus('❌ 자동 동기화 실패 (네트워크 확인)');
+      if (!silent) setResult('❌ 자동 동기화 실패: ' + e.message, false);
+      // 조용한 자동호출이라도 실패는 사용자가 알 수 있어야 함(안 그러면 "자동인데 왜 안 되지"가 재발)
+      else if (typeof toast === 'function') toast('red', '자동 동기화 실패', '네트워크를 확인하세요. ☁️ 버튼으로 수동 업로드해주세요.');
+    }
+  };
+
+  window.srfLivePull = async function(silent) {
+    if (!db) return;
+    try {
+      const doc = await db.collection(FB_COL).doc('rawdb_live').get();
+      if (!doc.exists) { updateSrfLiveStatus(); return; }
+      const data = doc.data();
+      const remoteClosedThrough = data.closedThrough || null;
+      if (remoteClosedThrough && typeof getSyncClosedThrough === 'function') {
+        const localClosed = getSyncClosedThrough();
+        if (remoteClosedThrough > localClosed && typeof setSyncClosedThrough === 'function') {
+          setSyncClosedThrough(remoteClosedThrough);
+        }
+      }
+      const remoteRecs = Array.isArray(data.records) ? data.records : [];
+      const globalDb = window._getRecordsDb ? window._getRecordsDb() : null;
+      if (!globalDb) { updateSrfLiveStatus(); return; }
+      const closedThrough = (typeof getSyncClosedThrough === 'function') ? getSyncClosedThrough() : (remoteClosedThrough || '0000-00');
+      // 마감 전(오픈) 구간의 로컬 레코드는 원격 스냅샷으로 교체 (추가/수정/삭제 모두 반영)
+      const closedLocal = globalDb.filter(r => (r.datetime || '').slice(0, 7) <= closedThrough);
+      let maxId = closedLocal.reduce((m, r) => Math.max(m, r.id || 0), 0);
+      const rebuiltOpen = remoteRecs.map(r => {
+        const rid = r.id || 0;
+        maxId = Math.max(maxId, rid);
+        return rid ? r : Object.assign({}, r, { id: ++maxId });
+      });
+      const merged = closedLocal.concat(rebuiltOpen);
+      globalDb.length = 0;
+      merged.forEach(r => globalDb.push(r));
+      const touchedYears = new Set(merged.map(r => (r.datetime || '').slice(0, 4)));
+      touchedYears.forEach(yr => {
+        if (!yr) return;
+        const yearRecs = globalDb.filter(r => (r.datetime || '').startsWith(yr));
+        if (typeof saveYearDbToStorage === 'function') saveYearDbToStorage(parseInt(yr), yearRecs);
+      });
+      if (typeof recalcStockFromBaseline === 'function') recalcStockFromBaseline();
+      if (typeof renderHistory === 'function') renderHistory();
+      if (typeof renderDashboard === 'function') renderDashboard();
+      updateSrfLiveStatus(`${remoteRecs.length}건 반영됨`);
+      if (!silent) setResult(`✅ 자동 동기화 완료 (${remoteRecs.length}건 반영)`, true);
+    } catch(e) {
+      console.warn('[srfLivePull] 실패:', e);
+      updateSrfLiveStatus('❌ 동기화 확인 실패 (네트워크 확인)');
+      if (!silent) setResult('❌ 자동 동기화 실패: ' + e.message, false);
+    }
+  };
+
+  // ── 월마감 종료: 마감 대상 월을 연간 백업에 영구 보관하고, 자동 동기화 구간(rawdb_live)에서 제외 ──
+  window.srfCloseMonth = async function() {
+    if (!db) { setResult('Firebase 연결 안됨', false); return; }
+    if (typeof getSyncClosedThrough !== 'function') return;
+    const globalDb = window._getRecordsDb ? window._getRecordsDb() : [];
+    const closedThrough = getSyncClosedThrough();
+    const nowMonth = new Date().toISOString().slice(0, 7);
+    const openMonths = Array.from(new Set(
+      globalDb.map(r => (r.datetime || '').slice(0, 7)).filter(m => m && m > closedThrough)
+    )).sort();
+    const targets = openMonths.filter(m => m < nowMonth); // 이번 달은 마감 대상에서 제외
+    const targetMonth = targets.length ? targets[targets.length - 1] : null;
+    if (!targetMonth) { setResult('마감 처리할 지난달 데이터가 없습니다 (이번 달 데이터만 있음).', false); return; }
+    const ok = confirm(
+      `${targetMonth} 데이터를 마감 처리하시겠습니까?\n\n` +
+      `- 마감 후 ${targetMonth} 데이터는 연간 백업에 영구 보관되고, 자동 동기화 대상에서 제외됩니다.\n` +
+      `- 마감 이후에는 ${targetMonth} 데이터를 고쳐도 자동으로 동기화되지 않으니, 마감 전 데이터를 확인해주세요.\n` +
+      `- 이 마감 기준은 사용하는 모든 PC에 공유됩니다.`
+    );
+    if (!ok) return;
+
+    const btn = document.getElementById('srf-btn-close');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ 마감 처리 중...'; }
+    try {
+      // 1) 해당 연도 전체를 연간 백업 문서에 최신 반영 (기존 수동 업로드와 동일한 포맷 재사용)
+      const yr = targetMonth.slice(0, 4);
+      const yearRecs = globalDb.filter(r => (r.datetime || '').startsWith(yr));
+      if (typeof saveYearDbToStorage === 'function') saveYearDbToStorage(parseInt(yr), yearRecs);
+      const rawVal = localStorage.getItem('_rawdb_' + yr);
+      if (rawVal) {
+        const compactArr = JSON.parse(rawVal);
+        const recordsStr = compactArr.map(r => Array.isArray(r) ? JSON.stringify(r) : r);
+        await db.collection(FB_COL).doc('rawdb_' + yr).set({
+          records: recordsStr, count: compactArr.length, format: 'json_str',
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+      // 2) 마감 기준월 갱신 (로컬 + Firebase 공유 meta)
+      setSyncClosedThrough(targetMonth);
+      await db.collection(FB_COL).doc('meta').set({
+        syncClosedThrough: targetMonth,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      // 3) rawdb_live를 새 마감 기준으로 축소 재업로드
+      await window.srfLivePush(true);
+      setResult(`✅ ${targetMonth} 마감 완료`, true);
+      if (typeof toast === 'function') toast('green', '월마감 완료', `${targetMonth} 데이터가 마감 처리되었습니다.`);
+      updateSrfLiveStatus();
+    } catch(e) {
+      setResult('❌ 마감 처리 실패: ' + e.message, false);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '🔒 월마감 종료'; }
     }
   };
 
