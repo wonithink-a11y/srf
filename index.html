@@ -1562,6 +1562,13 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 <!-- ══════════════════════════════════════════════════════
      TAB: WHAT-IF (발전 스케쥴 가상 시뮬레이션)
 ══════════════════════════════════════════════════════ -->
+<style>
+/* 발전 스케쥴(가상) — 좁은 화면에서 2열 그리드만 세로 전환 (입력칸 폭은 유지해 한 줄 배치) */
+@media (max-width: 768px) {
+  #tab-whatif .wi-stack { grid-template-columns: 1fr !important; }
+  #tab-whatif .wi-stack > * { min-width: 0; width: 100%; box-sizing: border-box; }
+}
+</style>
 <div id="tab-whatif" class="tab-panel">
   <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-plan" data-member="schedule" onclick="switchSubTab('plan','schedule')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🏭 발전 스케쥴</button><button class="subbtn-plan" data-member="forecast" onclick="switchSubTab('plan','forecast')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📈 수요 예측</button><button class="subbtn-plan" data-member="whatif" onclick="switchSubTab('plan','whatif')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🧪 발전 스케쥴(가상)</button></div>
 
@@ -1587,7 +1594,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       <div id="wiScenList" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;"></div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 320px;gap:14px;margin-top:12px;align-items:start;" class="sched-stack">
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:14px;margin-top:12px;align-items:start;" class="wi-stack">
       <!-- 좌: 연료별 입고 가정 (기간별 다중 구간) -->
       <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;">
         <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px;">📦 연료별 입고 가정 <span style="font-size:11px;color:var(--text2);font-weight:400;">(휴입고 설정과 무관 · 연료마다 기간별 입고량을 여러 구간 등록 가능)</span></div>
@@ -1627,7 +1634,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px;align-items:start;" class="sched-stack">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px;align-items:start;" class="wi-stack">
       <!-- 수기 기동일 -->
       <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;">
         <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px;">⚡ 수기 기동일 <span style="font-size:11px;color:var(--text2);font-weight:400;">— 재고가 몇 톤이든 이 날짜에 기동 (기동 기준보다 우선)</span></div>
@@ -21497,17 +21504,17 @@ function buildWiPlanBox() {
       + '<button onclick="wiAddPeriod(\'' + p.id + '\')" style="margin-left:auto;padding:3px 10px;border-radius:6px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;">➕ 구간 추가</button>'
       + '</div>';
     var rows = row.periods.map(function(pr, i) {
-      return '<div style="display:flex;gap:6px;align-items:center;margin:4px 0 4px 24px;flex-wrap:wrap;' + (row.enabled ? '' : 'opacity:.4;') + '">'
+      return '<div style="display:flex;gap:6px;align-items:center;margin:4px 0 4px 24px;flex-wrap:nowrap;min-width:540px;' + (row.enabled ? '' : 'opacity:.4;') + '">'
         + '<span style="font-size:10.5px;color:var(--text2);width:36px;">구간' + (i+1) + '</span>'
-        + '<input type="date" value="' + (pr.start||'') + '" onchange="wiPeriodChanged(\'' + p.id + '\',' + i + ',\'start\',this.value)" style="padding:5px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px;">'
+        + '<input type="date" value="' + (pr.start||'') + '" onchange="wiPeriodChanged(\'' + p.id + '\',' + i + ',\'start\',this.value)" style="width:138px;flex:0 0 auto;padding:5px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px;">'
         + '<span style="color:var(--text2);font-size:11px;">~</span>'
-        + '<input type="date" value="' + (pr.end||'') + '" onchange="wiPeriodChanged(\'' + p.id + '\',' + i + ',\'end\',this.value)" title="비우면 계속" style="padding:5px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px;">'
+        + '<input type="date" value="' + (pr.end||'') + '" onchange="wiPeriodChanged(\'' + p.id + '\',' + i + ',\'end\',this.value)" title="비우면 계속" style="width:138px;flex:0 0 auto;padding:5px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px;">'
         + '<input type="number" value="' + (pr.daily != null ? pr.daily : 0) + '" step="5" min="0" onchange="wiPeriodChanged(\'' + p.id + '\',' + i + ',\'daily\',this.value)" oninput="wiPeriodChanged(\'' + p.id + '\',' + i + ',\'daily\',this.value)" style="width:78px;padding:5px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--accent);font-weight:700;font-size:12px;text-align:right;">'
         + '<span style="font-size:11px;color:var(--text2);">톤/일</span>'
         + (row.periods.length > 1 ? '<button onclick="wiDelPeriod(\'' + p.id + '\',' + i + ')" style="padding:2px 8px;border-radius:6px;border:1px solid rgba(239,68,68,.4);background:transparent;color:var(--red);font-size:11px;cursor:pointer;">삭제</button>' : '')
         + '</div>';
     }).join('');
-    return '<div style="border-bottom:1px solid var(--border);padding:8px 0;">' + head + rows + '</div>';
+    return '<div style="border-bottom:1px solid var(--border);padding:8px 0;overflow-x:auto;">' + head + rows + '</div>';
   }).join('');
 }
 function wiToggleEnabled(pid, checked) {
