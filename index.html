@@ -1559,8 +1559,149 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 <!-- ══════════════════════════════════════════════════════
      TAB 3: FORECAST
 ══════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════
+     TAB: WHAT-IF (발전 스케쥴 가상 시뮬레이션)
+══════════════════════════════════════════════════════ -->
+<div id="tab-whatif" class="tab-panel">
+  <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-plan" data-member="schedule" onclick="switchSubTab('plan','schedule')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🏭 발전 스케쥴</button><button class="subbtn-plan" data-member="forecast" onclick="switchSubTab('plan','forecast')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📈 수요 예측</button><button class="subbtn-plan" data-member="whatif" onclick="switchSubTab('plan','whatif')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🧪 발전 스케쥴(가상)</button></div>
+
+  <!-- 시나리오 입력 -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="section-header">
+      <div class="section-title">🧪 가상 입고 시나리오 <span style="font-size:11px;color:var(--text2);font-weight:400;">— 입고 시작일이 미정·가변일 때 "만약 O월 O일부터 들어온다면?" 스케쥴을 계산합니다 (실제 데이터는 변경되지 않음)</span></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runWhatIf()">▶ 가상 스케쥴 생성</button>
+        <button class="btn btn-secondary" onclick="downloadWhatIfExcel()">📥 엑셀 내보내기(가상)</button>
+        <button class="btn btn-secondary" onclick="resetWhatIf()">🔄 초기화</button>
+      </div>
+    </div>
+    <div id="wiStockBanner" style="margin-top:10px;padding:9px 14px;border-radius:8px;font-size:12px;font-weight:600;background:rgba(56,189,248,.08);color:var(--accent);border:1px solid rgba(56,189,248,.25);"></div>
+
+    <div style="margin-top:12px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <span style="font-size:12px;font-weight:700;color:var(--text);">📁 시나리오</span>
+        <input id="wiTitle" type="text" maxlength="40" placeholder="시나리오 제목 입력 (예: 광주 7/13 지연 입고)" style="flex:1;min-width:220px;padding:7px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12.5px;">
+        <button class="btn btn-primary" onclick="saveWhatIfScenario()" style="font-size:12px;">💾 시나리오 저장</button>
+        <button class="btn btn-secondary" onclick="newWhatIfScenario()" style="font-size:12px;">➕ 새 시나리오</button>
+      </div>
+      <div id="wiScenList" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;"></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:14px;margin-top:12px;align-items:start;" class="sched-stack">
+      <!-- 좌: 연료별 입고 가정 (기간별 다중 구간) -->
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px;">📦 연료별 입고 가정 <span style="font-size:11px;color:var(--text2);font-weight:400;">(휴입고 설정과 무관 · 연료마다 기간별 입고량을 여러 구간 등록 가능)</span></div>
+        <div id="wiPlanBox"></div>
+        <div style="font-size:11px;color:var(--text2);margin-top:8px;">※ 구간에 속하지 않는 날은 해당 연료 입고 0톤. 구간이 겹치면 아래(나중) 구간이 우선 적용됩니다. 종료일을 비우면 계속 적용.</div>
+      </div>
+      <!-- 우: 시뮬 옵션 -->
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text);">⚙️ 시뮬레이션 옵션</div>
+        <label style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text);">시뮬 기간
+          <select id="wiMonths" style="width:110px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px;">
+            <option value="3">3개월</option><option value="6" selected>6개월</option><option value="12">12개월</option>
+          </select>
+        </label>
+        <label style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text);">시작 재고(톤)
+          <input id="wiInitStock" type="number" step="1" style="width:110px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px;text-align:right;">
+        </label>
+        <label style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text);">현재 설비 상태
+          <select id="wiInitState" style="width:110px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px;">
+            <option value="auto" selected>자동(재고 기준)</option><option value="on">가동 중</option><option value="off">정지 중</option>
+          </select>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);cursor:pointer;">
+          <input id="wiUseMaint" type="checkbox" checked> 설비 점검 기간 반영
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);cursor:pointer;">
+          <input id="wiUseThrOv" type="checkbox" checked> 날짜별 기동/정지 기준 반영
+        </label>
+        <div style="border-top:1px solid var(--border);padding-top:10px;display:flex;gap:10px;">
+          <label style="flex:1;font-size:11px;color:var(--text2);">기동 기준(톤)
+            <input id="wiStartThr" type="number" step="100" style="width:100%;margin-top:3px;padding:5px 8px;border-radius:6px;border:1px solid rgba(34,197,94,.4);background:var(--bg2);color:var(--green);font-size:12px;text-align:right;font-weight:700;">
+          </label>
+          <label style="flex:1;font-size:11px;color:var(--text2);">정지 기준(톤)
+            <input id="wiStopThr" type="number" step="50" style="width:100%;margin-top:3px;padding:5px 8px;border-radius:6px;border:1px solid rgba(239,68,68,.4);background:var(--bg2);color:var(--red);font-size:12px;text-align:right;font-weight:700;">
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px;align-items:start;" class="sched-stack">
+      <!-- 수기 기동일 -->
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px;">⚡ 수기 기동일 <span style="font-size:11px;color:var(--text2);font-weight:400;">— 재고가 몇 톤이든 이 날짜에 기동 (기동 기준보다 우선)</span></div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;">
+          <input id="wiNewStartDate" type="date" style="padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px;">
+          <button class="btn btn-secondary" onclick="wiAddManualStart()" style="font-size:12px;">➕ 기동일 추가</button>
+        </div>
+        <div id="wiManualStartList" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;"></div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);cursor:pointer;margin-top:10px;">
+          <input id="wiUseAutoStart" type="checkbox" checked> 재고가 기동 기준에 도달하면 자동 기동도 사용
+        </label>
+        <div style="font-size:11px;color:var(--text2);margin-top:6px;">※ 정지는 항상 정지 기준(재고 이하)을 따릅니다. 점검 기간에는 기동일이어도 점검이 우선입니다.</div>
+      </div>
+      <!-- 연료 소모량 패턴 -->
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px;">🔥 연료 소모량 패턴 <span style="font-size:11px;color:var(--text2);font-weight:400;">— 소비 중인 지자체 연료의 일 소모량(톤/일)</span></div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;">
+          <span style="font-size:12px;color:var(--text2);">패턴:</span>
+          <button class="btn btn-secondary" onclick="wiApplyLoadPattern('min')" style="font-size:12px;">최소부하</button>
+          <button class="btn btn-secondary" onclick="wiApplyLoadPattern('max')" style="font-size:12px;">최대부하</button>
+          <button class="btn btn-secondary" onclick="wiApplyLoadPattern('cur')" style="font-size:12px;">저장조 설정값</button>
+          <span id="wiLoadPatternLabel" style="font-size:11px;color:var(--accent);font-weight:700;"></span>
+        </div>
+        <div id="wiRateBox" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;"></div>
+        <div style="font-size:11px;color:var(--text2);margin-top:8px;">※ 최소부하 기본: 광주·전남·순천 300 / 나주 240. 최대부하 값은 직접 수정하면 기억됩니다.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 결과: 기동/정지 이벤트 -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="section-header">
+      <div class="section-title">⚡ 가상 기동/정지 스케쥴 <span id="wiEventMeta" style="font-size:11px;color:var(--text2);font-weight:400;"></span></div>
+    </div>
+    <div id="wiEventSummary" style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 4px;"></div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:640px;">
+        <thead>
+          <tr style="color:var(--text2);border-bottom:1px solid var(--border);">
+            <th style="padding:7px 6px;text-align:center;">구분</th>
+            <th style="padding:7px 6px;text-align:center;">날짜</th>
+            <th style="padding:7px 6px;text-align:center;">요일</th>
+            <th style="padding:7px 6px;text-align:center;">D-Day</th>
+            <th style="padding:7px 6px;text-align:right;">그 시점 예상재고(톤)</th>
+            <th style="padding:7px 6px;text-align:left;">비고</th>
+          </tr>
+        </thead>
+        <tbody id="wiEventTbody">
+          <tr><td colspan="6" style="padding:18px;text-align:center;color:var(--text2);">'▶ 가상 스케쥴 생성'을 누르면 결과가 표시됩니다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 결과: 일별 상세 (엑셀 형식) -->
+  <div class="card">
+    <div class="section-header">
+      <div class="section-title">📋 일별 상세 (엑셀 형식) <span id="wiDailyMeta" style="font-size:11px;color:var(--text2);font-weight:400;"></span></div>
+    </div>
+    <div id="wiDailyWrap" style="max-height:520px;overflow:auto;margin-top:10px;border:1px solid var(--border);border-radius:8px;">
+      <table style="width:100%;border-collapse:collapse;font-size:11.5px;min-width:760px;" id="wiDailyTable">
+        <thead style="position:sticky;top:0;background:var(--bg2);z-index:2;">
+          <tr id="wiDailyHead" style="color:var(--text2);border-bottom:1px solid var(--border);"></tr>
+        </thead>
+        <tbody id="wiDailyTbody">
+          <tr><td style="padding:18px;text-align:center;color:var(--text2);">결과 없음</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <div id="tab-forecast" class="tab-panel">
-  <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-plan" data-member="schedule" onclick="switchSubTab('plan','schedule')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🏭 발전 스케쥴</button><button class="subbtn-plan" data-member="forecast" onclick="switchSubTab('plan','forecast')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📈 수요 예측</button></div>
+  <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-plan" data-member="schedule" onclick="switchSubTab('plan','schedule')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🏭 발전 스케쥴</button><button class="subbtn-plan" data-member="forecast" onclick="switchSubTab('plan','forecast')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📈 수요 예측</button><button class="subbtn-plan" data-member="whatif" onclick="switchSubTab('plan','whatif')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🧪 발전 스케쥴(가상)</button></div>
   <div class="card">
     <div class="section-header">
       <div class="section-title">📈 1년 수요 예측 리포트</div>
@@ -1672,7 +1813,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
      TAB 4: SCHEDULE
 ══════════════════════════════════════════════════════ -->
 <div id="tab-schedule" class="tab-panel">
-  <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-plan" data-member="schedule" onclick="switchSubTab('plan','schedule')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🏭 발전 스케쥴</button><button class="subbtn-plan" data-member="forecast" onclick="switchSubTab('plan','forecast')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📈 수요 예측</button></div>
+  <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-plan" data-member="schedule" onclick="switchSubTab('plan','schedule')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🏭 발전 스케쥴</button><button class="subbtn-plan" data-member="forecast" onclick="switchSubTab('plan','forecast')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📈 수요 예측</button><button class="subbtn-plan" data-member="whatif" onclick="switchSubTab('plan','whatif')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🧪 발전 스케쥴(가상)</button></div>
   <div class="card" style="margin-bottom:16px;">
     <div class="section-header">
       <div class="section-title">발전설비 기동/정지 스케쥴</div>
@@ -5897,6 +6038,7 @@ function _renderForMember(id){
   else if(id==='temp-storage') renderTempStorage();
   else if(id==='schedule'){ applyScheduleSettingsToDOM(); generateSchedule(); initSuspendForm(); initMaintForm(); initThrOverrideForm(); renderSuspTable(); renderThrOverrideTbody(); renderMaintTable(); renderDcOverrideTable(); updateTransitionConsumptionPreview(); setTimeout(function(){ if(Object.keys(_schedDayMap).length>0) renderScheduleCalendar(); },50); }
   else if(id==='forecast') renderForecast();
+  else if(id==='whatif') renderWhatIf();
   else if(id==='carrier') renderCarrierTab();
   else if(id==='api-status') renderApiStatus();
 }
@@ -20045,9 +20187,9 @@ function closeAnnNoteModal() {
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-<div id="srf-sync-widget" style="position:fixed;bottom:20px;right:20px;z-index:99999;font-family:'맑은 고딕',sans-serif;">
-  <button id="srf-toggle-btn" onclick="srfTogglePanel()" style="width:56px;height:56px;border-radius:50%;background:#1a2332;border:2px solid #58a6ff;color:#58a6ff;font-size:22px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;">☁️</button>
-  <div id="srf-panel" style="display:none;position:absolute;bottom:64px;right:0;width:300px;background:#161b22;border:1px solid #30363d;border-radius:12px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,0.6);">
+<div id="srf-sync-widget" style="position:fixed;top:64px;right:16px;z-index:99999;font-family:'맑은 고딕',sans-serif;">
+  <button id="srf-toggle-btn" onclick="srfTogglePanel()" style="width:44px;height:44px;border-radius:50%;background:#1a2332;border:2px solid #58a6ff;color:#58a6ff;font-size:17px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;">☁️</button>
+  <div id="srf-panel" style="display:none;position:absolute;top:52px;right:0;width:300px;background:#161b22;border:1px solid #30363d;border-radius:12px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,0.6);">
     <div style="font-size:13px;font-weight:700;color:#e6edf3;margin-bottom:4px;">⚡ SRF Firebase 동기화</div>
     <div id="srf-fb-status" style="font-size:11px;color:#8b949e;margin-bottom:12px;">초기화 중...</div>
     <button onclick="srfPush()" id="srf-btn-push" style="width:100%;padding:9px;margin-bottom:8px;background:#58a6ff;color:#0d1117;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">☁️ PC → Firebase 업로드 (전체)</button>
@@ -21203,5 +21345,784 @@ function updateTotalInDefault() {
   try{ console.log("[보고문] 로드 완료 (인라인)"); }catch(e){}
 })();
 </script>
+<script>
+/* ══════════════════════════════════════════════════════
+   발전 스케쥴(가상) — What-If 시뮬레이션 v4
+   · 실제 데이터(db, 설정, localStorage 원본)는 변경하지 않는 읽기 전용 시뮬레이션
+   · 연료별 기간별 입고 구간(여러 개), 수기 기동일(기동 기준 무시),
+     지자체별 일 소모량 패턴(최소/최대부하) 지원
+══════════════════════════════════════════════════════ */
+var _wiInit = false;
+var _wiResult = null;
+var WI_LS_KEY  = '_whatifDraft_v4';      // 작성 중 임시본 (자동 저장)
+var WI_LS_LIST = '_whatifScenarios_v2';  // 저장된 시나리오 목록
+var WI_LS_MAX  = '_wiMaxLoad_v1';        // 최대부하 커스텀 값 기억
+var _wiCurrentId = null;
+var _wiAutoTimer = null;
+var _wiRows = null;          // {D1:{enabled,periods:[{start,end,daily}]},...}
+var _wiManualStarts = [];    // ['2026-07-07',...]
+var _wiRates = null;         // {S1:300,...}
+var _wiPatternLabel = '';
+
+var WI_MIN_RATES = { S1:300, S2:300, S3:300, S4:240 }; // 최소부하 (광주·전남·순천 300 / 나주 240)
+
+function _wiAutoRun() {
+  clearTimeout(_wiAutoTimer);
+  _wiAutoTimer = setTimeout(function(){ try { runWhatIf(); } catch(e) { console.warn('[whatif auto]', e); } }, 600);
+}
+function _wiTodayStr() { return localDateStr(new Date()); }
+
+/* ── 기본 상태 ── */
+function _wiDefaultRows() {
+  var t = _wiTodayStr(), rows = {};
+  DELIVERY_PLAN.forEach(function(p) {
+    rows[p.id] = { enabled: true, periods: [ { start: t, end: '', daily: getPlanDaily(p.id) || p.daily } ] };
+  });
+  return rows;
+}
+function _wiDefaultRates() {
+  var r = {};
+  SILOS.forEach(function(s){ r[s.id] = s.dailyRate || 300; });
+  return r;
+}
+function _wiState() {
+  return {
+    rows: _wiRows, manualStarts: _wiManualStarts.slice(), rates: Object.assign({}, _wiRates),
+    pattern: _wiPatternLabel,
+    opts: {
+      months:   (document.getElementById('wiMonths')||{}).value || '6',
+      initStock:(document.getElementById('wiInitStock')||{}).value || '',
+      initState:(document.getElementById('wiInitState')||{}).value || 'auto',
+      useMaint: !!(document.getElementById('wiUseMaint')||{}).checked,
+      useThrOv: !!(document.getElementById('wiUseThrOv')||{}).checked,
+      useAutoStart: !!(document.getElementById('wiUseAutoStart')||{}).checked,
+      startThr: (document.getElementById('wiStartThr')||{}).value || '',
+      stopThr:  (document.getElementById('wiStopThr')||{}).value || ''
+    }
+  };
+}
+function _wiApplyState(st) {
+  if (!st) return;
+  // rows: 구버전(단일 start/end/daily 배열) 마이그레이션
+  if (Array.isArray(st.rows)) {
+    var conv = {};
+    st.rows.forEach(function(r) {
+      conv[r.planId] = { enabled: r.enabled !== false, periods: [ { start: r.start || _wiTodayStr(), end: r.end || '', daily: r.daily != null ? r.daily : 0 } ] };
+    });
+    _wiRows = conv;
+  } else if (st.rows && typeof st.rows === 'object') {
+    _wiRows = JSON.parse(JSON.stringify(st.rows));
+  }
+  DELIVERY_PLAN.forEach(function(p) { // 누락 연료 보충
+    if (!_wiRows[p.id]) _wiRows[p.id] = _wiDefaultRows()[p.id];
+    if (!Array.isArray(_wiRows[p.id].periods) || !_wiRows[p.id].periods.length)
+      _wiRows[p.id].periods = _wiDefaultRows()[p.id].periods;
+  });
+  _wiManualStarts = Array.isArray(st.manualStarts) ? st.manualStarts.slice() : [];
+  _wiRates = (st.rates && typeof st.rates === 'object') ? Object.assign(_wiDefaultRates(), st.rates) : _wiDefaultRates();
+  _wiPatternLabel = st.pattern || '';
+  var o = st.opts || {};
+  var set = function(id, v){ var el = document.getElementById(id); if (el != null && v != null) el.value = v; };
+  set('wiMonths', o.months); set('wiInitStock', o.initStock); set('wiInitState', o.initState);
+  set('wiStartThr', o.startThr); set('wiStopThr', o.stopThr);
+  var chk = function(id, v, dft){ var el = document.getElementById(id); if (el) el.checked = (v == null ? dft : !!v); };
+  chk('wiUseMaint', o.useMaint, true); chk('wiUseThrOv', o.useThrOv, true); chk('wiUseAutoStart', o.useAutoStart, true);
+}
+function _wiSaveDraft() {
+  try { localStorage.setItem(WI_LS_KEY, JSON.stringify(_wiState())); } catch(e) {}
+}
+function _wiLoadDraft() {
+  try { var raw = localStorage.getItem(WI_LS_KEY); if (raw) return JSON.parse(raw); } catch(e) {}
+  return null;
+}
+
+/* ── 초기화/렌더 ── */
+function renderWhatIf() {
+  if (!_wiInit) {
+    _wiInit = true;
+    _wiRows = _wiDefaultRows();
+    _wiRates = _wiDefaultRates();
+    var draft = _wiLoadDraft();
+    if (draft) { _wiApplyState(draft); }
+    buildWhatIfForm();
+    ['wiMonths','wiInitStock','wiInitState','wiUseMaint','wiUseThrOv','wiUseAutoStart','wiStartThr','wiStopThr'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el && !el._wiBound) { el._wiBound = true; el.addEventListener('change', _wiAutoRun); el.addEventListener('input', _wiAutoRun); }
+    });
+  }
+  updateWhatIfBanner();
+  renderWhatIfScenList();
+}
+function updateWhatIfBanner() {
+  var el = document.getElementById('wiStockBanner');
+  if (!el) return;
+  var stock = totalStock();
+  var t = _wiTodayStr();
+  var maint = _maintPeriods.filter(function(p){ return t >= p.start && t <= p.end; });
+  el.innerHTML = '현재 재고 <b>' + fmtNum(Math.round(stock)) + '톤</b> 기준으로 오늘부터 시뮬레이션합니다.'
+    + (maint.length ? ' &nbsp;·&nbsp; 🔧 현재 점검기간 중 (' + maint[0].start + ' ~ ' + maint[0].end + ')' : '')
+    + ' &nbsp;·&nbsp; 아래 입력은 가상 시나리오 전용으로 실제 스케쥴/데이터에 영향 없음';
+  var initEl = document.getElementById('wiInitStock');
+  if (initEl && initEl.value === '') initEl.value = Math.round(stock);
+  var stEl = document.getElementById('wiStartThr'), spEl = document.getElementById('wiStopThr');
+  var st = parseFloat((document.getElementById('startThreshold')||{}).value) || 4000;
+  var sp = parseFloat((document.getElementById('stopThreshold')||{}).value)  || 600;
+  if (stEl && stEl.value === '') stEl.value = st;
+  if (spEl && spEl.value === '') spEl.value = sp;
+}
+function _wiDowLabel(days) {
+  var DOW = ['일','월','화','수','목','금','토'];
+  if (!days || !days.length) return '-';
+  var sorted = days.slice().sort();
+  var isRange = true;
+  for (var i = 1; i < sorted.length; i++) if (sorted[i] !== sorted[i-1] + 1) { isRange = false; break; }
+  if (isRange && sorted.length > 2) return DOW[sorted[0]] + '~' + DOW[sorted[sorted.length-1]];
+  return sorted.map(function(d){ return DOW[d]; }).join('·');
+}
+function buildWhatIfForm() {
+  buildWiPlanBox();
+  buildWiRateBox();
+  renderWiManualStarts();
+}
+function buildWiPlanBox() {
+  var box = document.getElementById('wiPlanBox');
+  if (!box) return;
+  box.innerHTML = DELIVERY_PLAN.map(function(p) {
+    var row = _wiRows[p.id];
+    var silo = SILOS.find(function(s){ return s.id === p.silos[0]; });
+    var head = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">'
+      + '<input type="checkbox"' + (row.enabled ? ' checked' : '') + ' onchange="wiToggleEnabled(\'' + p.id + '\', this.checked)">'
+      + '<span style="font-weight:700;color:var(--text);font-size:12.5px;">' + p.name + '</span>'
+      + '<span style="font-size:10.5px;color:var(--text2);">→ ' + (silo ? silo.name : p.silos[0]) + ' · 입고요일 ' + _wiDowLabel(p.days) + '</span>'
+      + '<button onclick="wiAddPeriod(\'' + p.id + '\')" style="margin-left:auto;padding:3px 10px;border-radius:6px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;">➕ 구간 추가</button>'
+      + '</div>';
+    var rows = row.periods.map(function(pr, i) {
+      return '<div style="display:flex;gap:6px;align-items:center;margin:4px 0 4px 24px;flex-wrap:wrap;' + (row.enabled ? '' : 'opacity:.4;') + '">'
+        + '<span style="font-size:10.5px;color:var(--text2);width:36px;">구간' + (i+1) + '</span>'
+        + '<input type="date" value="' + (pr.start||'') + '" onchange="wiPeriodChanged(\'' + p.id + '\',' + i + ',\'start\',this.value)" style="padding:5px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px;">'
+        + '<span style="color:var(--text2);font-size:11px;">~</span>'
+        + '<input type="date" value="' + (pr.end||'') + '" onchange="wiPeriodChanged(\'' + p.id + '\',' + i + ',\'end\',this.value)" title="비우면 계속" style="padding:5px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px;">'
+        + '<input type="number" value="' + (pr.daily != null ? pr.daily : 0) + '" step="5" min="0" onchange="wiPeriodChanged(\'' + p.id + '\',' + i + ',\'daily\',this.value)" oninput="wiPeriodChanged(\'' + p.id + '\',' + i + ',\'daily\',this.value)" style="width:78px;padding:5px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--accent);font-weight:700;font-size:12px;text-align:right;">'
+        + '<span style="font-size:11px;color:var(--text2);">톤/일</span>'
+        + (row.periods.length > 1 ? '<button onclick="wiDelPeriod(\'' + p.id + '\',' + i + ')" style="padding:2px 8px;border-radius:6px;border:1px solid rgba(239,68,68,.4);background:transparent;color:var(--red);font-size:11px;cursor:pointer;">삭제</button>' : '')
+        + '</div>';
+    }).join('');
+    return '<div style="border-bottom:1px solid var(--border);padding:8px 0;">' + head + rows + '</div>';
+  }).join('');
+}
+function wiToggleEnabled(pid, checked) {
+  if (_wiRows[pid]) _wiRows[pid].enabled = checked;
+  buildWiPlanBox(); _wiSaveDraft(); _wiAutoRun();
+}
+function wiPeriodChanged(pid, idx, field, val) {
+  var r = _wiRows[pid]; if (!r || !r.periods[idx]) return;
+  if (field === 'daily') r.periods[idx].daily = parseFloat(val) || 0;
+  else r.periods[idx][field] = val;
+  _wiSaveDraft(); _wiAutoRun();
+}
+function wiAddPeriod(pid) {
+  var r = _wiRows[pid]; if (!r) return;
+  var last = r.periods[r.periods.length - 1] || {};
+  var nextStart = last.end ? (function(){ var d = new Date(last.end + 'T00:00:00'); d.setDate(d.getDate()+1); return localDateStr(d); })() : _wiTodayStr();
+  r.periods.push({ start: nextStart, end: '', daily: last.daily != null ? last.daily : 0 });
+  buildWiPlanBox(); _wiSaveDraft(); _wiAutoRun();
+}
+function wiDelPeriod(pid, idx) {
+  var r = _wiRows[pid]; if (!r || r.periods.length <= 1) return;
+  r.periods.splice(idx, 1);
+  buildWiPlanBox(); _wiSaveDraft(); _wiAutoRun();
+}
+/* ── 수기 기동일 ── */
+function renderWiManualStarts() {
+  var box = document.getElementById('wiManualStartList');
+  if (!box) return;
+  if (!_wiManualStarts.length) {
+    box.innerHTML = '<span style="font-size:11.5px;color:var(--text2);">등록된 수기 기동일이 없습니다.</span>';
+    return;
+  }
+  var DOW = ['일','월','화','수','목','금','토'];
+  box.innerHTML = _wiManualStarts.slice().sort().map(function(d) {
+    var dow = DOW[new Date(d + 'T00:00:00').getDay()];
+    return '<span style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:8px;font-size:12px;border:1px solid rgba(34,197,94,.45);background:rgba(34,197,94,.1);color:var(--green);font-weight:700;">'
+      + '⚡ ' + d + ' (' + dow + ')'
+      + '<span onclick="wiDelManualStart(\'' + d + '\')" style="color:var(--red);cursor:pointer;font-weight:700;padding:0 2px;">✕</span></span>';
+  }).join('');
+}
+function wiAddManualStart() {
+  var el = document.getElementById('wiNewStartDate');
+  var v = el && el.value;
+  if (!v) { toast('yellow','날짜 필요','기동일 날짜를 선택해 주세요.'); return; }
+  if (_wiManualStarts.indexOf(v) < 0) _wiManualStarts.push(v);
+  if (el) el.value = '';
+  renderWiManualStarts(); _wiSaveDraft(); _wiAutoRun();
+}
+function wiDelManualStart(d) {
+  _wiManualStarts = _wiManualStarts.filter(function(x){ return x !== d; });
+  renderWiManualStarts(); _wiSaveDraft(); _wiAutoRun();
+}
+/* ── 소모량 패턴 ── */
+function buildWiRateBox() {
+  var box = document.getElementById('wiRateBox');
+  if (!box) return;
+  box.innerHTML = SILOS.map(function(s) {
+    return '<label style="font-size:11px;color:var(--text2);">' + s.name
+      + '<input type="number" id="wi_rate_' + s.id + '" value="' + (_wiRates[s.id] != null ? _wiRates[s.id] : (s.dailyRate||300)) + '" step="10" min="0"'
+      + ' onchange="wiRateChanged(\'' + s.id + '\', this.value)" oninput="wiRateChanged(\'' + s.id + '\', this.value)"'
+      + ' style="width:100%;margin-top:3px;padding:5px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--yellow);font-weight:700;font-size:12px;text-align:right;"></label>';
+  }).join('');
+  var lbl = document.getElementById('wiLoadPatternLabel');
+  if (lbl) lbl.textContent = _wiPatternLabel ? '(' + _wiPatternLabel + ')' : '';
+}
+function wiRateChanged(sid, val) {
+  _wiRates[sid] = parseFloat(val) || 0;
+  if (_wiPatternLabel === '최대부하') {
+    try { localStorage.setItem(WI_LS_MAX, JSON.stringify(_wiRates)); } catch(e) {}
+  } else if (_wiPatternLabel && _wiPatternLabel !== '직접 입력') {
+    _wiPatternLabel = '직접 입력';
+    var lbl = document.getElementById('wiLoadPatternLabel');
+    if (lbl) lbl.textContent = '(직접 입력)';
+  }
+  _wiSaveDraft(); _wiAutoRun();
+}
+function wiApplyLoadPattern(kind) {
+  if (kind === 'min') { _wiRates = Object.assign({}, WI_MIN_RATES); _wiPatternLabel = '최소부하'; }
+  else if (kind === 'max') {
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem(WI_LS_MAX) || 'null'); } catch(e) {}
+    if (saved) { _wiRates = Object.assign(_wiDefaultRates(), saved); }
+    else {
+      _wiRates = Object.assign({}, WI_MIN_RATES);
+      toast('yellow','최대부하 값 입력','최대부하 소모량이 아직 없습니다. 값을 직접 수정하면 최대부하 패턴으로 기억됩니다.');
+    }
+    _wiPatternLabel = '최대부하';
+  }
+  else { _wiRates = _wiDefaultRates(); _wiPatternLabel = '저장조 설정값'; }
+  buildWiRateBox(); _wiSaveDraft(); _wiAutoRun();
+}
+/* ── 시나리오 저장/불러오기 ── */
+function _wiListLoad() {
+  try { var v = JSON.parse(localStorage.getItem(WI_LS_LIST) || '[]'); return Array.isArray(v) ? v : []; } catch(e) { return []; }
+}
+function _wiListSave(list) {
+  try { localStorage.setItem(WI_LS_LIST, JSON.stringify(list)); } catch(e) {}
+}
+function saveWhatIfScenario() {
+  var titleEl = document.getElementById('wiTitle');
+  var title = (titleEl && titleEl.value || '').trim();
+  if (!title) { toast('yellow','제목 필요','시나리오 제목을 입력해 주세요.'); if (titleEl) titleEl.focus(); return; }
+  var st = _wiState();
+  var list = _wiListLoad();
+  var now = new Date().toISOString().slice(0,16).replace('T',' ');
+  var item = null;
+  if (_wiCurrentId != null) item = list.find(function(x){ return x.id === _wiCurrentId; });
+  if (!item) item = list.find(function(x){ return x.title === title; });
+  if (item) {
+    item.title = title; item.state = st; item.updatedAt = now;
+    delete item.rows; delete item.opts; // 구버전 필드 제거
+    toast('green','시나리오 갱신', '"' + title + '" 저장(덮어쓰기) 완료');
+  } else {
+    item = { id: Date.now(), title: title, state: st, updatedAt: now };
+    list.push(item);
+    toast('green','시나리오 저장', '"' + title + '" 저장 완료 (총 ' + list.length + '개)');
+  }
+  _wiCurrentId = item.id;
+  _wiListSave(list);
+  renderWhatIfScenList();
+}
+function loadWhatIfScenario(id) {
+  var item = _wiListLoad().find(function(x){ return x.id === id; });
+  if (!item) { toast('yellow','없음','시나리오를 찾을 수 없습니다.'); return; }
+  _wiCurrentId = item.id;
+  var titleEl = document.getElementById('wiTitle'); if (titleEl) titleEl.value = item.title;
+  // v4(state) 또는 구버전(rows/opts) 모두 지원
+  if (item.state) _wiApplyState(item.state);
+  else _wiApplyState({ rows: item.rows, opts: item.opts });
+  buildWhatIfForm();
+  renderWhatIfScenList();
+  _wiSaveDraft();
+  runWhatIf();
+  toast('green','시나리오 불러옴', '"' + item.title + '" — 결과를 다시 계산했습니다.');
+}
+function deleteWhatIfScenario(id, ev) {
+  if (ev) ev.stopPropagation();
+  var list = _wiListLoad();
+  var item = list.find(function(x){ return x.id === id; });
+  if (!item) return;
+  if (!confirm('시나리오 "' + item.title + '" 를 삭제할까요?')) return;
+  _wiListSave(list.filter(function(x){ return x.id !== id; }));
+  if (_wiCurrentId === id) _wiCurrentId = null;
+  renderWhatIfScenList();
+  toast('green','삭제 완료', '"' + item.title + '" 삭제됨');
+}
+function newWhatIfScenario() {
+  _wiCurrentId = null;
+  var titleEl = document.getElementById('wiTitle'); if (titleEl) { titleEl.value = ''; titleEl.focus(); }
+  _wiRows = _wiDefaultRows();
+  _wiManualStarts = [];
+  _wiRates = _wiDefaultRates();
+  _wiPatternLabel = '';
+  buildWhatIfForm();
+  renderWhatIfScenList();
+  _wiSaveDraft();
+  toast('green','새 시나리오','입력값을 새로 작성한 뒤 제목을 넣고 저장하세요.');
+}
+function renderWhatIfScenList() {
+  var box = document.getElementById('wiScenList');
+  if (!box) return;
+  var list = _wiListLoad();
+  if (!list.length) {
+    box.innerHTML = '<span style="font-size:11.5px;color:var(--text2);">저장된 시나리오가 없습니다 — 제목을 입력하고 💾 저장을 누르면 여기에 쌓입니다.</span>';
+    return;
+  }
+  box.innerHTML = list.map(function(x) {
+    var active = x.id === _wiCurrentId;
+    return '<span onclick="loadWhatIfScenario(' + x.id + ')" title="클릭하면 불러와서 바로 계산합니다" '
+      + 'style="display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:12px;'
+      + 'border:1px solid ' + (active ? 'var(--accent)' : 'var(--border)') + ';'
+      + 'background:' + (active ? 'rgba(56,189,248,.12)' : 'var(--bg2)') + ';color:var(--text);">'
+      + '<b style="color:' + (active ? 'var(--accent)' : 'var(--text)') + ';">' + _xmlEsc(x.title) + '</b>'
+      + '<span style="font-size:10px;color:var(--text2);">' + (x.updatedAt || '') + '</span>'
+      + '<span onclick="deleteWhatIfScenario(' + x.id + ', event)" title="삭제" '
+      + 'style="color:var(--red);font-weight:700;padding:0 3px;">✕</span></span>';
+  }).join('');
+}
+function resetWhatIf() {
+  try { localStorage.removeItem(WI_LS_KEY); } catch(e) {}
+  _wiCurrentId = null;
+  var titleEl = document.getElementById('wiTitle'); if (titleEl) titleEl.value = '';
+  ['wiInitStock','wiStartThr','wiStopThr'].forEach(function(i){ var el = document.getElementById(i); if (el) el.value = ''; });
+  var m = document.getElementById('wiMonths'); if (m) m.value = '6';
+  var s = document.getElementById('wiInitState'); if (s) s.value = 'auto';
+  ['wiUseMaint','wiUseThrOv','wiUseAutoStart'].forEach(function(i){ var el = document.getElementById(i); if (el) el.checked = true; });
+  _wiRows = _wiDefaultRows();
+  _wiManualStarts = [];
+  _wiRates = _wiDefaultRates();
+  _wiPatternLabel = '';
+  buildWhatIfForm();
+  updateWhatIfBanner();
+  _wiResult = null;
+  var eb = document.getElementById('wiEventTbody');
+  if (eb) eb.innerHTML = '<tr><td colspan="6" style="padding:18px;text-align:center;color:var(--text2);">\'▶ 가상 스케쥴 생성\'을 누르면 결과가 표시됩니다.</td></tr>';
+  var db2 = document.getElementById('wiDailyTbody');
+  if (db2) db2.innerHTML = '<tr><td style="padding:18px;text-align:center;color:var(--text2);">결과 없음</td></tr>';
+  var es = document.getElementById('wiEventSummary'); if (es) es.innerHTML = '';
+  renderWhatIfScenList();
+  toast('green','초기화','가상 시나리오가 기본값으로 초기화되었습니다. (저장된 시나리오 목록은 유지)');
+}
+
+/* ── 소모량: 우선순위 1위 지자체의 커스텀 소모량 ── */
+function _wiDailyRate(fss, rates) {
+  var ord = _origPriorityOrder(fss);
+  if (!ord.length) { var vs = Object.values(rates||{}); return vs.length ? vs[0] : 300; }
+  var top = ord[0];
+  return (rates && rates[top.id] != null) ? rates[top.id] : (top.rate || 300);
+}
+/* ── 해당 날짜의 연료별 가상 입고량 ── */
+function _wiInflowOf(pid, key, dow) {
+  var r = _wiRows[pid];
+  if (!r || !r.enabled) return 0;
+  var p = DELIVERY_PLAN.find(function(x){ return x.id === pid; });
+  if (!p || !p.days.includes(dow)) return 0;
+  for (var i = r.periods.length - 1; i >= 0; i--) { // 나중 구간 우선
+    var pr = r.periods[i];
+    if (pr.start && key >= pr.start && (!pr.end || key <= pr.end)) return pr.daily || 0;
+  }
+  return 0;
+}
+
+/* ── 시뮬레이션 본체 ── */
+function runWhatIf() {
+  try {
+    if (!_wiRows) { _wiRows = _wiDefaultRows(); _wiRates = _wiDefaultRates(); }
+    _wiSaveDraft();
+    var months   = parseInt((document.getElementById('wiMonths')||{}).value) || 6;
+    var startThr = parseFloat((document.getElementById('wiStartThr')||{}).value) || 4000;
+    var stopThr  = parseFloat((document.getElementById('wiStopThr')||{}).value)  || 600;
+    var useMaint = !!(document.getElementById('wiUseMaint')||{}).checked;
+    var useThrOv = !!(document.getElementById('wiUseThrOv')||{}).checked;
+    var useAutoStart = !!(document.getElementById('wiUseAutoStart')||{}).checked;
+    var initState= (document.getElementById('wiInitState')||{}).value || 'auto';
+    if (stopThr >= startThr) { toast('yellow','설정 오류','정지 기준은 기동 기준보다 낮아야 합니다.'); return; }
+    var rates = Object.assign({}, _wiRates);
+    var manual = {}; _wiManualStarts.forEach(function(d){ manual[d] = true; });
+
+    var today = new Date(); today.setHours(0,0,0,0);
+    var maxStock = SILOS.reduce(function(a,s){ return a + s.cap; }, 0);
+    var initStock = parseFloat((document.getElementById('wiInitStock')||{}).value);
+    if (!(initStock >= 0)) initStock = totalStock();
+
+    var fss = {};
+    SILOS.forEach(function(s){ fss[s.id] = 0; });
+    var own = null;
+    try {
+      var d0 = calcOwnershipDetail();
+      own = {}; SILOS.forEach(function(s){ own[s.id] = d0[s.id] ? d0[s.id].total : 0; });
+    } catch(e) { own = null; }
+    var ownTotal = own ? Object.values(own).reduce(function(a,b){ return a+b; }, 0) : 0;
+    if (own && ownTotal > 0) SILOS.forEach(function(s){ fss[s.id] = initStock * (own[s.id] / ownTotal); });
+    else {
+      var curTotal = SILOS.reduce(function(a,s){ return a + (s.cur||0); }, 0);
+      if (curTotal > 0) SILOS.forEach(function(s){ fss[s.id] = initStock * ((s.cur||0)/curTotal); });
+      else fss[SILOS[0].id] = initStock;
+    }
+
+    var simEnd = new Date(today.getFullYear(), today.getMonth() + months, today.getDate());
+    var genRunning = initState === 'on' ? true : initState === 'off' ? false : (useAutoStart ? initStock >= startThr : false);
+    var prevStatus = null;
+    var days = [];
+    var simStock = initStock;
+    var DOW = ['일','월','화','수','목','금','토'];
+
+    for (var d = new Date(today); d <= simEnd; d.setDate(d.getDate()+1)) {
+      var key = localDateStr(d);
+      var dow = d.getDay();
+
+      var inflows = {}, inflowTot = 0;
+      DELIVERY_PLAN.forEach(function(p) {
+        var amt = _wiInflowOf(p.id, key, dow);
+        inflows[p.id] = amt;
+        inflowTot += amt;
+        if (amt > 0) {
+          var owner = p.silos[0] || SILOS[0].id;
+          fss[owner] = (fss[owner]||0) + amt;
+        }
+      });
+      var tot = Object.values(fss).reduce(function(a,b){ return a+b; }, 0);
+      if (tot > maxStock) {
+        var over = tot - maxStock;
+        var ids = Object.keys(fss).sort(function(a,b){ return fss[b]-fss[a]; });
+        for (var i2 = 0; i2 < ids.length && over > 0.001; i2++) {
+          var cut = Math.min(fss[ids[i2]], over);
+          fss[ids[i2]] -= cut; over -= cut;
+        }
+        tot = maxStock;
+      }
+      simStock = tot;
+
+      var isMaint = useMaint && _maintPeriods.some(function(p){ return key >= p.start && key <= p.end; });
+      var dayStartThr = startThr, dayStopThr = stopThr;
+      if (useThrOv) {
+        for (var j = _thresholdOverrides.length - 1; j >= 0; j--) {
+          var ov = _thresholdOverrides[j];
+          if (key >= ov.start && key <= ov.end) { dayStartThr = ov.startThr; dayStopThr = ov.stopThr; break; }
+        }
+      }
+      var isManual = !!manual[key];
+      var prevRunning = genRunning;
+      if (!isMaint) {
+        if (useAutoStart && simStock >= dayStartThr) genRunning = true;
+        if (simStock <= dayStopThr) genRunning = false;
+        if (isManual) genRunning = true; // 수기 기동일: 재고와 무관하게 기동 (최우선)
+      }
+      var status = isMaint ? 'maint' : (genRunning ? 'on' : 'off');
+
+      var dailyUse = _wiDailyRate(fss, rates);
+      var usedQty = 0;
+      if (status === 'on') {
+        usedQty = dailyUse;
+        var isStartDay = (!prevRunning && genRunning) || (prevStatus === 'maint');
+        if (isStartDay) usedQty = Math.round(dailyUse * (24 - _defaultStartHour) / 24 * 10) / 10;
+        consumeFromSilos(fss, usedQty);
+        simStock = Math.max(Object.values(fss).reduce(function(a,b){ return a+b; }, 0), 0);
+      }
+
+      days.push({ key: key, dow: DOW[dow], hol: (typeof HOLIDAYS!=='undefined' && HOLIDAYS[key]) || '',
+                  status: status, inflows: inflows, inflowTot: Math.round(inflowTot*10)/10,
+                  used: Math.round(usedQty*10)/10, stock: Math.round(simStock),
+                  rate: dailyUse, manual: isManual && status === 'on' && prevStatus !== 'on' });
+      prevStatus = status;
+    }
+
+    // 정지일 후처리
+    for (var k = 1; k < days.length; k++) {
+      var pv = days[k-1], cu = days[k];
+      if (pv.status === 'on' && cu.status !== 'on') {
+        var adj = Math.round((pv.rate||300) * _defaultStopHour / 24 * 10) / 10;
+        var diff = pv.used - adj;
+        if (diff > 0) {
+          pv.used = adj;
+          for (var m2 = k - 1; m2 < days.length; m2++) days[m2].stock = Math.round(days[m2].stock + diff);
+        }
+      }
+    }
+
+    // 이벤트 추출
+    var events = [];
+    var runLen = 0, stopLen = 0;
+    for (var e = 0; e < days.length; e++) {
+      var cur = days[e], prev = e > 0 ? days[e-1] : null;
+      if (e === 0) { runLen = cur.status === 'on' ? 1 : 0; stopLen = cur.status !== 'on' ? 1 : 0; continue; }
+      if (prev.status !== 'on' && cur.status === 'on') {
+        events.push({ type: '기동', key: cur.key, dow: cur.dow, stock: cur.stock,
+                      note: (cur.manual ? '⚡ 수기 기동일 (재고 무관 기동)' : (prev.status==='maint' ? '점검 종료 후 기동' : '정지 ' + stopLen + '일 후 기동')) });
+        runLen = 1; stopLen = 0;
+      } else if (prev.status === 'on' && cur.status !== 'on') {
+        events.push({ type: cur.status === 'maint' ? '점검 시작' : '정지', key: cur.key, dow: cur.dow, stock: cur.stock,
+                      note: '가동 ' + runLen + '일 후 ' + (cur.status==='maint'?'점검':'정지') });
+        stopLen = 1; runLen = 0;
+      } else if (cur.status === 'on') { runLen++; }
+      else { stopLen++; }
+      if (prev.status === 'maint' && cur.status === 'off') {
+        events.push({ type: '점검 종료', key: cur.key, dow: cur.dow, stock: cur.stock, note: '점검 종료 (재고 부족으로 정지 유지)' });
+      }
+    }
+
+    var wiTitle = ((document.getElementById('wiTitle')||{}).value || '').trim();
+    _wiResult = { days: days, events: events,
+      params: { title: wiTitle, months: months, startThr: startThr, stopThr: stopThr,
+                initStock: Math.round(initStock), rows: JSON.parse(JSON.stringify(_wiRows)),
+                manualStarts: _wiManualStarts.slice().sort(), rates: rates, pattern: _wiPatternLabel,
+                useAutoStart: useAutoStart } };
+    renderWhatIfResults();
+    toast('green','가상 스케쥴 생성 완료', months + '개월 시뮬레이션 (' + days.length + '일)');
+  } catch(err) {
+    console.error('[whatif]', err);
+    toast('red','가상 시뮬 오류', err.message || String(err));
+  }
+}
+
+function _wiAssumText(prm) {
+  var parts = DELIVERY_PLAN.map(function(p) {
+    var r = prm.rows[p.id];
+    if (!r || !r.enabled) return p.name + ' 제외';
+    var seg = r.periods.map(function(pr) {
+      return (pr.start||'').slice(5).replace('-','/') + '~' + (pr.end ? pr.end.slice(5).replace('-','/') : '') + ' ' + pr.daily + 't';
+    }).join(', ');
+    return p.name + ' ' + seg;
+  });
+  var rateTxt = SILOS.map(function(s){ return (prm.rates[s.id] != null ? prm.rates[s.id] : '-'); }).join('/');
+  var msTxt = prm.manualStarts.length ? '수기기동 ' + prm.manualStarts.map(function(d){ return d.slice(5).replace('-','/'); }).join(',') : '수기기동 없음';
+  return parts.join('  ·  ') + '  ·  ' + msTxt + '  ·  소모량 ' + rateTxt + 't' + (prm.pattern ? '(' + prm.pattern + ')' : '')
+    + (prm.useAutoStart ? '' : '  ·  자동기동 끔');
+}
+
+function renderWhatIfResults() {
+  if (!_wiResult) return;
+  var days = _wiResult.days, events = _wiResult.events;
+  var todayStr = days.length ? days[0].key : _wiTodayStr();
+
+  var onDays = days.filter(function(x){ return x.status === 'on'; }).length;
+  var maintDays = days.filter(function(x){ return x.status === 'maint'; }).length;
+  var firstOn = events.find(function(x){ return x.type === '기동'; });
+  var firstOff = events.find(function(x){ return x.type === '정지'; });
+  var minStockDay = days.reduce(function(m,x){ return (!m || x.stock < m.stock) ? x : m; }, null);
+  var chips = [
+    ['다음 기동', firstOn ? firstOn.key + ' (' + firstOn.dow + ')' : '기간 내 없음', 'var(--green)'],
+    ['다음 정지', firstOff ? firstOff.key + ' (' + firstOff.dow + ')' : '기간 내 없음', 'var(--red)'],
+    ['가동일수', onDays + '일 / ' + days.length + '일', 'var(--accent)'],
+    ['점검일수', maintDays + '일', 'var(--yellow)'],
+    ['최저 재고', minStockDay ? fmtNum(minStockDay.stock) + '톤 (' + minStockDay.key + ')' : '-', 'var(--text)'],
+    ['기간 말 재고', days.length ? fmtNum(days[days.length-1].stock) + '톤' : '-', 'var(--text)'],
+  ];
+  var es = document.getElementById('wiEventSummary');
+  if (es) {
+    es.innerHTML = chips.map(function(c) {
+      return '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 14px;min-width:130px;">'
+        + '<div style="font-size:10.5px;color:var(--text2);margin-bottom:3px;">' + c[0] + '</div>'
+        + '<div style="font-size:13px;font-weight:700;color:' + c[2] + ';">' + c[1] + '</div></div>';
+    }).join('')
+    + '<div style="flex-basis:100%;font-size:11.5px;color:var(--yellow);background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:7px 12px;">'
+    + '📌 계산 가정: ' + _wiAssumText(_wiResult.params) + ' &nbsp;·&nbsp; 입력을 바꾸면 자동으로 다시 계산됩니다</div>';
+  }
+
+  var eb = document.getElementById('wiEventTbody');
+  var meta = document.getElementById('wiEventMeta');
+  if (meta) meta.textContent = (_wiResult.params.title ? '— 「' + _wiResult.params.title + '」 ' : '') + '— 기준일 ' + todayStr + ' · 시작 재고 ' + fmtNum(_wiResult.params.initStock) + '톤 · 기동 ' + fmtNum(_wiResult.params.startThr) + 't / 정지 ' + fmtNum(_wiResult.params.stopThr) + 't';
+  if (eb) {
+    if (!events.length) {
+      eb.innerHTML = '<tr><td colspan="6" style="padding:18px;text-align:center;color:var(--text2);">기간 내 기동/정지 전환이 없습니다 (상태 유지).</td></tr>';
+    } else {
+      eb.innerHTML = events.map(function(ev) {
+        var col = ev.type === '기동' ? 'var(--green)' : ev.type.indexOf('점검') >= 0 ? 'var(--yellow)' : 'var(--red)';
+        var icon = ev.type === '기동' ? '🟢' : ev.type.indexOf('점검') >= 0 ? '🔧' : '🔴';
+        var dday = Math.round((new Date(ev.key+'T00:00:00') - new Date(todayStr+'T00:00:00')) / 86400000);
+        return '<tr style="border-bottom:1px solid var(--border);">'
+          + '<td style="padding:7px 6px;text-align:center;font-weight:700;color:' + col + ';">' + icon + ' ' + ev.type + '</td>'
+          + '<td style="padding:7px 6px;text-align:center;font-weight:700;color:var(--text);">' + ev.key + '</td>'
+          + '<td style="padding:7px 6px;text-align:center;color:var(--text2);">' + ev.dow + '</td>'
+          + '<td style="padding:7px 6px;text-align:center;color:var(--accent);font-weight:700;">' + (dday === 0 ? '오늘' : 'D+' + dday) + '</td>'
+          + '<td style="padding:7px 6px;text-align:right;color:var(--text);">' + fmtNum(ev.stock) + '</td>'
+          + '<td style="padding:7px 6px;color:var(--text2);">' + ev.note + '</td></tr>';
+      }).join('');
+    }
+  }
+
+  var head = document.getElementById('wiDailyHead');
+  if (head) {
+    head.innerHTML = '<th style="padding:6px;text-align:center;">날짜</th><th style="padding:6px;text-align:center;">요일</th><th style="padding:6px;text-align:center;">상태</th>'
+      + DELIVERY_PLAN.map(function(p){ return '<th style="padding:6px;text-align:right;">' + p.name + '(t)</th>'; }).join('')
+      + '<th style="padding:6px;text-align:right;">입고합계(t)</th><th style="padding:6px;text-align:right;">사용량(t)</th><th style="padding:6px;text-align:right;">예상재고(t)</th>';
+  }
+  var tb = document.getElementById('wiDailyTbody');
+  var dm = document.getElementById('wiDailyMeta');
+  if (dm) dm.textContent = '— ' + days.length + '일';
+  if (tb) {
+    tb.innerHTML = days.map(function(x) {
+      var stCol = x.status === 'on' ? 'var(--green)' : x.status === 'maint' ? 'var(--yellow)' : 'var(--red)';
+      var stTxt = x.status === 'on' ? (x.manual ? '가동⚡' : '가동') : x.status === 'maint' ? '점검' : '정지';
+      var bg = x.status === 'on' ? 'rgba(34,197,94,.05)' : x.status === 'maint' ? 'rgba(245,158,11,.05)' : 'rgba(239,68,68,.04)';
+      var dowCol = x.dow === '일' || x.hol ? 'var(--red)' : x.dow === '토' ? 'var(--accent)' : 'var(--text2)';
+      return '<tr style="border-bottom:1px solid var(--border);background:' + bg + ';">'
+        + '<td style="padding:5px 6px;text-align:center;color:var(--text);">' + x.key + '</td>'
+        + '<td style="padding:5px 6px;text-align:center;color:' + dowCol + ';">' + x.dow + (x.hol ? '·' + x.hol : '') + '</td>'
+        + '<td style="padding:5px 6px;text-align:center;font-weight:700;color:' + stCol + ';">' + stTxt + '</td>'
+        + DELIVERY_PLAN.map(function(p){ var v = x.inflows[p.id] || 0; return '<td style="padding:5px 6px;text-align:right;color:' + (v>0?'var(--text)':'var(--text3)') + ';">' + (v>0?fmtNum(v):'—') + '</td>'; }).join('')
+        + '<td style="padding:5px 6px;text-align:right;font-weight:700;color:var(--accent);">' + (x.inflowTot>0?fmtNum(x.inflowTot):'—') + '</td>'
+        + '<td style="padding:5px 6px;text-align:right;color:' + (x.used>0?'var(--red)':'var(--text3)') + ';">' + (x.used>0?fmtNum(x.used):'—') + '</td>'
+        + '<td style="padding:5px 6px;text-align:right;font-weight:700;color:var(--text);">' + fmtNum(x.stock) + '</td></tr>';
+    }).join('');
+  }
+}
+
+/* ── 엑셀(xlsx) 내보내기 ── */
+function downloadWhatIfExcel() {
+  if (!_wiResult) { runWhatIf(); }
+  if (!_wiResult) { toast('yellow','데이터 없음','가상 스케쥴을 먼저 생성해 주세요.'); return; }
+  var days = _wiResult.days, events = _wiResult.events, prm = _wiResult.params;
+  var statusKo = function(s){ return s==='on'?'가동':s==='maint'?'점검':'정지'; };
+
+  var FONTS = [ {sz:10,c:'333333'}, {sz:10,b:1,c:'1F3864'}, {sz:12,b:1,c:'1F3864'} ];
+  var FILLS = ['none','gray125','EAEFF7','EFF7E8','FDEFEF','FFFAE9','FFFFFF'];
+  var xfs = [
+    {nf:0,fontId:0,fillId:6,align:'c'},
+    {nf:0,fontId:1,fillId:2,align:'c'},
+    {nf:0,fontId:0,fillId:3,align:'c'},
+    {nf:0,fontId:0,fillId:4,align:'c'},
+    {nf:0,fontId:0,fillId:5,align:'c'},
+    {nf:164,fontId:0,fillId:6,align:'r'},
+    {nf:0,fontId:2,fillId:6,align:'l'},
+    {nf:164,fontId:0,fillId:3,align:'r'},
+    {nf:164,fontId:0,fillId:4,align:'r'},
+    {nf:164,fontId:0,fillId:5,align:'r'},
+  ];
+  var numXf = function(st){ return st==='on'?7:st==='maint'?9:8; };
+  var txtXf = function(st){ return st==='on'?2:st==='maint'?4:3; };
+
+  var wiT = (prm.title || '').trim();
+  var S1 = [];
+  S1.push([{v:'발전 스케쥴(가상)' + (wiT ? ' 「' + wiT + '」' : '') + ' — 기준일 ' + days[0].key + ' · 시작재고 ' + prm.initStock + 't · 기동 ' + prm.startThr + 't / 정지 ' + prm.stopThr + 't', s:6}]);
+  S1.push(['날짜','요일','상태'].concat(DELIVERY_PLAN.map(function(p){ return p.name + '(t)'; })).concat(['입고합계(t)','사용량(t)','예상재고(t)'])
+    .map(function(h){ return {v:h, s:1}; }));
+  days.forEach(function(x) {
+    var t = txtXf(x.status), n = numXf(x.status);
+    S1.push([
+      {v:x.key, s:t}, {v:x.dow + (x.hol?('('+x.hol+')'):''), s:t}, {v:statusKo(x.status) + (x.manual?'⚡':''), s:t},
+    ].concat(DELIVERY_PLAN.map(function(p){ return {v:Math.round((x.inflows[p.id]||0)*10)/10, s:n, n:true}; }))
+     .concat([ {v:x.inflowTot, s:n, n:true}, {v:x.used, s:n, n:true}, {v:x.stock, s:n, n:true} ]));
+  });
+
+  var S2 = [];
+  S2.push([{v:'기동/정지 이벤트 — 가상 시나리오' + (wiT ? ' 「' + wiT + '」' : ''), s:6}]);
+  S2.push(['구분','날짜','요일','D-Day','그 시점 예상재고(t)','비고'].map(function(h){ return {v:h, s:1}; }));
+  events.forEach(function(ev) {
+    var st = ev.type === '기동' ? 'on' : ev.type.indexOf('점검') >= 0 ? 'maint' : 'off';
+    var dday = Math.round((new Date(ev.key+'T00:00:00') - new Date(days[0].key+'T00:00:00')) / 86400000);
+    S2.push([ {v:ev.type, s:txtXf(st)}, {v:ev.key, s:0}, {v:ev.dow, s:0},
+              {v:'D+'+dday, s:0}, {v:ev.stock, s:5, n:true}, {v:ev.note, s:0} ]);
+  });
+  S2.push([]);
+  S2.push([{v:'가상 입고 가정', s:1}, {v:'구간 시작', s:1}, {v:'구간 종료', s:1}, {v:'일 입고량(t)', s:1}, {v:'사용', s:1}, {v:'', s:0}]);
+  DELIVERY_PLAN.forEach(function(p) {
+    var r = prm.rows[p.id] || { enabled:false, periods:[] };
+    if (!r.periods.length) {
+      S2.push([ {v:p.name, s:0}, {v:'-', s:0}, {v:'-', s:0}, {v:0, s:5, n:true}, {v:r.enabled?'O':'X', s:0}, {v:'', s:0} ]);
+    } else {
+      r.periods.forEach(function(pr, i) {
+        S2.push([ {v:i===0?p.name:'', s:0}, {v:pr.start||'', s:0}, {v:pr.end||'(계속)', s:0},
+                  {v:pr.daily||0, s:5, n:true}, {v:i===0?(r.enabled?'O':'X'):'', s:0}, {v:'', s:0} ]);
+      });
+    }
+  });
+  S2.push([]);
+  S2.push([{v:'수기 기동일', s:1}, {v:prm.manualStarts.length ? prm.manualStarts.join(', ') : '없음', s:0}, {v:'', s:0}, {v:'', s:0}, {v:'자동기동', s:1}, {v:prm.useAutoStart?'사용':'사용 안함', s:0}]);
+  S2.push([{v:'일 소모량(t)', s:1}].concat(SILOS.map(function(s){ return {v:s.name + ' ' + (prm.rates[s.id]!=null?prm.rates[s.id]:'-'), s:0}; })).concat([{v:prm.pattern||'', s:0}]));
+
+  var fontsXml = FONTS.map(function(f){ return '<font><sz val="'+f.sz+'"/>'+(f.b?'<b/>':'')+'<color rgb="FF'+f.c+'"/><name val="맑은 고딕"/></font>'; }).join('');
+  var fillsXml = FILLS.map(function(f){
+    if (f==='none') return '<fill><patternFill patternType="none"/></fill>';
+    if (f==='gray125') return '<fill><patternFill patternType="gray125"/></fill>';
+    return '<fill><patternFill patternType="solid"><fgColor rgb="FF'+f+'"/><bgColor indexed="64"/></patternFill></fill>';
+  }).join('');
+  var borderThin = '<border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border>';
+  var xfsXml = xfs.map(function(x){
+    var h = x.align==='r'?'right':(x.align==='l'?'left':'center');
+    return '<xf numFmtId="'+x.nf+'" fontId="'+x.fontId+'" fillId="'+x.fillId+'" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"'+(x.nf?' applyNumberFormat="1"':'')+'><alignment horizontal="'+h+'" vertical="center"/></xf>';
+  }).join('');
+  var stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+    + '<numFmts count="1"><numFmt numFmtId="164" formatCode="0.0"/></numFmts>'
+    + '<fonts count="'+FONTS.length+'">'+fontsXml+'</fonts>'
+    + '<fills count="'+FILLS.length+'">'+fillsXml+'</fills>'
+    + '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>'+borderThin+'</borders>'
+    + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+    + '<cellXfs count="'+xfs.length+'">'+xfsXml+'</cellXfs>'
+    + '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+    + '</styleSheet>';
+  function wiSheetXml(rows, colWidths) {
+    var cols = colWidths ? ('<cols>' + colWidths.map(function(w,i){ return '<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>'; }).join('') + '</cols>') : '';
+    var sd = '';
+    rows.forEach(function(row, ri) {
+      var cells = '';
+      row.forEach(function(cell, ci) {
+        if (cell == null) return;
+        var ref = _colLetter(ci) + (ri+1);
+        if (cell.n) cells += '<c r="'+ref+'" s="'+cell.s+'"><v>'+(cell.v===''?0:cell.v)+'</v></c>';
+        else cells += '<c r="'+ref+'" s="'+cell.s+'" t="inlineStr"><is><t xml:space="preserve">'+_xmlEsc(cell.v)+'</t></is></c>';
+      });
+      sd += '<row r="'+(ri+1)+'">'+cells+'</row>';
+    });
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+      + cols + '<sheetData>'+sd+'</sheetData></worksheet>';
+  }
+  var s1w = [12,10,8].concat(DELIVERY_PLAN.map(function(){ return 11; })).concat([11,10,12]);
+  var sheet1 = wiSheetXml(S1, s1w);
+  var sheet2 = wiSheetXml(S2, [14,12,10,11,17,30]);
+  var REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  var files = [
+    { name:'[Content_Types].xml', data:
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+      + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+      + '<Default Extension="xml" ContentType="application/xml"/>'
+      + '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+      + '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+      + '<Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+      + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+      + '</Types>' },
+    { name:'_rels/.rels', data:
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      + '<Relationship Id="rId1" Type="'+REL+'/officeDocument" Target="xl/workbook.xml"/>'
+      + '</Relationships>' },
+    { name:'xl/workbook.xml', data:
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="'+REL+'">'
+      + '<sheets><sheet name="일별상세(가상)" sheetId="1" r:id="rId1"/><sheet name="기동정지 이벤트" sheetId="2" r:id="rId2"/></sheets>'
+      + '</workbook>' },
+    { name:'xl/_rels/workbook.xml.rels', data:
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      + '<Relationship Id="rId1" Type="'+REL+'/worksheet" Target="worksheets/sheet1.xml"/>'
+      + '<Relationship Id="rId2" Type="'+REL+'/worksheet" Target="worksheets/sheet2.xml"/>'
+      + '<Relationship Id="rId3" Type="'+REL+'/styles" Target="styles.xml"/>'
+      + '</Relationships>' },
+    { name:'xl/styles.xml', data: stylesXml },
+    { name:'xl/worksheets/sheet1.xml', data: sheet1 },
+    { name:'xl/worksheets/sheet2.xml', data: sheet2 },
+  ];
+  var zip = _zipStore(files);
+  var safeT = wiT ? '_' + wiT.replace(/[\\\/:*?"<>|]/g, '').slice(0, 20) : '';
+  var fn = '발전스케쥴_가상' + safeT + '_' + days[0].key + '.xlsx';
+  var blob = new Blob([zip], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = fn;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  toast('green','내보내기 완료', fn);
+}
+</script>
+
 </body>
 </html>
