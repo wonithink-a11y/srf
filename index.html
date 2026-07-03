@@ -1609,8 +1609,11 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
             <option value="3">3개월</option><option value="6" selected>6개월</option><option value="12">12개월</option>
           </select>
         </label>
-        <label style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text);">시작 재고(톤)
-          <input id="wiInitStock" type="number" step="1" style="width:110px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px;text-align:right;">
+        <label style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text);gap:6px;">시작 재고(톤)
+          <span style="display:flex;gap:6px;align-items:center;">
+            <button type="button" onclick="wiResetInitStock()" title="비우면 항상 현재 재고로 자동 계산됩니다" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--accent);font-size:11px;cursor:pointer;white-space:nowrap;">↺ 자동</button>
+            <input id="wiInitStock" type="number" step="1" placeholder="자동" title="비워두면 현재 재고를 자동 사용, 숫자를 넣으면 그 값으로 고정" style="width:110px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px;text-align:right;">
+          </span>
         </label>
         <label style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text);">현재 설비 상태
           <select id="wiInitState" style="width:110px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px;">
@@ -21378,6 +21381,13 @@ function _wiAutoRun() {
   _wiAutoTimer = setTimeout(function(){ try { runWhatIf(); } catch(e) { console.warn('[whatif auto]', e); } }, 600);
 }
 function _wiTodayStr() { return localDateStr(new Date()); }
+function wiResetInitStock() {
+  var el = document.getElementById('wiInitStock');
+  if (el) el.value = '';
+  updateWhatIfBanner();
+  _wiSaveDraft(); _wiAutoRun();
+  toast('green','시작 재고 자동','현재 재고(' + fmtNum(Math.round(totalStock())) + '톤)를 자동 사용합니다. 값을 입력하면 고정됩니다.');
+}
 
 /* ── 기본 상태 ── */
 function _wiDefaultRows() {
@@ -21397,6 +21407,7 @@ function _wiState() {
     rows: _wiRows, manualStarts: _wiManualStarts.slice(), rates: Object.assign({}, _wiRates),
     pattern: _wiPatternLabel,
     opts: {
+      v5: 1,
       months:   (document.getElementById('wiMonths')||{}).value || '6',
       initStock:(document.getElementById('wiInitStock')||{}).value || '',
       initState:(document.getElementById('wiInitState')||{}).value || 'auto',
@@ -21450,7 +21461,11 @@ function renderWhatIf() {
     _wiRows = _wiDefaultRows();
     _wiRates = _wiDefaultRates();
     var draft = _wiLoadDraft();
-    if (draft) { _wiApplyState(draft); }
+    if (draft) {
+      _wiApplyState(draft);
+      // 구버전 draft는 시작재고가 자동 채움값으로 굳어 있으므로 비워서 '자동'으로 복귀
+      if (!draft.opts || !draft.opts.v5) { var _ie = document.getElementById('wiInitStock'); if (_ie) _ie.value = ''; }
+    }
     buildWhatIfForm();
     ['wiMonths','wiInitStock','wiInitState','wiUseMaint','wiUseThrOv','wiUseAutoStart','wiStartThr','wiStopThr'].forEach(function(id) {
       var el = document.getElementById(id);
@@ -21470,7 +21485,7 @@ function updateWhatIfBanner() {
     + (maint.length ? ' &nbsp;·&nbsp; 🔧 현재 점검기간 중 (' + maint[0].start + ' ~ ' + maint[0].end + ')' : '')
     + ' &nbsp;·&nbsp; 아래 입력은 가상 시나리오 전용으로 실제 스케쥴/데이터에 영향 없음';
   var initEl = document.getElementById('wiInitStock');
-  if (initEl && initEl.value === '') initEl.value = Math.round(stock);
+  if (initEl) initEl.placeholder = '자동 · ' + fmtNum(Math.round(stock));
   var stEl = document.getElementById('wiStartThr'), spEl = document.getElementById('wiStopThr');
   var st = parseFloat((document.getElementById('startThreshold')||{}).value) || 4000;
   var sp = parseFloat((document.getElementById('stopThreshold')||{}).value)  || 600;
@@ -22128,6 +22143,290 @@ function downloadWhatIfExcel() {
   document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
   toast('green','내보내기 완료', fn);
+}
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   업체대조 v2 (기존 함수 재정의)
+   · 순천 명세서 형식 지원 (2차계량일 / 1차·2차중량 / 실중량 kg)
+   · 전체(일치 포함) 행 단위 대조 테이블 + 보기 전환
+   · 차이 건 "업체값으로 교체" / 업체에만 있는 건 "내 DB에 추가"
+══════════════════════════════════════════════════════ */
+var _recViewAll = false;
+var REC_DEFAULT_SILO = { '광주연료':'S1', '나주연료':'S4', '순천연료':'S3' };
+var REC_GATE_OF_SILO = { S1:'광주', S2:'전남', S3:'순천', S4:'나주' };
+function _recNormVeh(v){ return String(v||'').replace(/\s+/g,''); }
+function _recKt(v){ v=+v||0; if(v>500) v=v/1000; return v; }  // kg 저장값 → 톤
+
+/* ── CSV 파싱 (컬럼명 확장: 순천 명세서 지원) ── */
+function parseRecCsv(){
+  var raw=(document.getElementById('recPasteArea').value||'').trim();
+  if(!raw){ toast('yellow','내용 없음','업체 CSV 파일을 올리거나 붙여넣어 주세요.'); return; }
+  var sel=document.getElementById('recSiloSel');
+  var supplier=sel?sel.value:'';
+  if(!supplier){ toast('yellow','업체 선택','이 파일이 어느 공급업체 자료인지 먼저 선택하세요.'); return; }
+  var lines=raw.split(/\r?\n/);
+  var hIdx=-1, header=null;
+  for(var i=0;i<lines.length;i++){
+    if(lines[i].indexOf('차량번호')>=0 && lines[i].indexOf('실중량')>=0){ hIdx=i; header=splitCsvLine(lines[i]).map(function(x){return (x||'').trim();}); break; }
+  }
+  if(hIdx<0){ toast('red','형식 인식 실패','헤더(차량번호·실중량 포함)를 찾지 못했습니다.'); return; }
+  function findCol(names){ for(var j=0;j<header.length;j++){ for(var k=0;k<names.length;k++){ if(header[j]===names[k]) return j; } } return -1; }
+  var ci={ date:findCol(['계량일자','날짜','2차계량일','1차계량일','계량일','일자','거래일자']),
+           veh:findCol(['차량번호','차량 번호','차번호']),
+           net:findCol(['실중량','순중량','실 중량']),
+           gross:findCol(['상차중량','일차계량','2차중량','총중량']),
+           tare:findCol(['공차중량','이차계량','1차중량']) };
+  if(ci.date<0||ci.net<0){ toast('red','형식 인식 실패','날짜 또는 실중량 컬럼을 찾지 못했습니다.'); return; }
+  _recParsed=[];
+  for(var r=hIdx+1;r<lines.length;r++){
+    if(!lines[r].trim()) continue;
+    var c=splitCsvLine(lines[r]);
+    if(c.length<=ci.net) continue;
+    var dObj=parseDateCsv((c[ci.date]||'').trim()); if(!dObj) continue;
+    var net=parseNumCsv(c[ci.net]);
+    var gross=ci.gross>=0?parseNumCsv(c[ci.gross]):0;
+    var tare =ci.tare>=0?parseNumCsv(c[ci.tare]):0;
+    if(net>500) net=net/1000;
+    if(gross>500) gross=gross/1000;
+    if(tare>500) tare=tare/1000;
+    if(net<=0 && gross>0 && tare>0) net=+(gross-tare).toFixed(3);
+    if(net<=0) continue;
+    _recParsed.push({ date:dObj.toISOString().slice(0,10), vehicle:(ci.veh>=0?(c[ci.veh]||'').trim():''),
+      net:parseFloat(net.toFixed(3)), gross:+((gross>0?gross:0).toFixed(3)), tare:+((tare>0?tare:0).toFixed(3)), supplier:supplier });
+  }
+  if(!_recParsed.length){ toast('red','파싱 실패','유효한 데이터 행이 없습니다.'); return; }
+  runReconcile();
+}
+
+/* ── 대조 분석 (행 단위 매칭 확장) ── */
+function runReconcile(){
+  if(!_recParsed.length){ toast('yellow','데이터 없음','먼저 업체 CSV를 올려주세요.'); return; }
+  var supplier=_recParsed[0].supplier;
+  var dates=_recParsed.map(function(r){return r.date;}).sort();
+  var dmin=dates[0], dmax=dates[dates.length-1];
+  var mine=db.filter(function(r){ var d=(r.datetime||'').slice(0,10); return d>=dmin&&d<=dmax && recSupplierOf(r)===supplier; });
+  var csvT=_recParsed.reduce(function(a,r){return a+(r.net||0);},0);
+  var myT=mine.reduce(function(a,r){return a+(r.net||0);},0);
+  var bySilo={}; mine.forEach(function(r){ var k=r.silo; bySilo[k]=bySilo[k]||{cnt:0,t:0}; bySilo[k].cnt++; bySilo[k].t+=(r.net||0); });
+  var keyset={}; _recParsed.forEach(function(r){keyset[r.date]=true;}); mine.forEach(function(r){keyset[(r.datetime||'').slice(0,10)]=true;});
+  var dayRows=Object.keys(keyset).sort().map(function(d){
+    var cR=_recParsed.filter(function(r){return r.date===d;});
+    var mR=mine.filter(function(r){return (r.datetime||'').slice(0,10)===d;});
+    var cT=cR.reduce(function(a,r){return a+(r.net||0);},0);
+    var mT2=mR.reduce(function(a,r){return a+(r.net||0);},0);
+    return {d:d,csvCnt:cR.length,myCnt:mR.length,csvT:cT,myT:mT2,cntDiff:mR.length-cR.length,tDiff:+(mT2-cT).toFixed(3)};
+  });
+  // 1차: 날짜+실중량 정확 일치
+  function pk(d,n){ return d+'|'+(+(n||0)).toFixed(3); }
+  var myPool={}; mine.forEach(function(r){ var k=pk((r.datetime||'').slice(0,10),r.net); (myPool[k]=myPool[k]||[]).push(r); });
+  var matchedRows=[], csvOnly=[];
+  _recParsed.forEach(function(r){
+    var k=pk(r.date,r.net);
+    if(myPool[k]&&myPool[k].length){ var m=myPool[k].shift();
+      matchedRows.push({date:r.date, veh:m.vehicle||r.vehicle, myNet:+(m.net||0), csvNet:+(r.net||0),
+        myG:_recKt(m.gross), myTa:_recKt(m.tare), csvG:+(r.gross||0), csvTa:+(r.tare||0)});
+      return; }
+    csvOnly.push(r);
+  });
+  var myOnly=[]; Object.keys(myPool).forEach(function(k){ myPool[k].forEach(function(r){ myOnly.push(r); }); });
+  // 2차: 날짜+차량번호 페어링(중량 차이) → 3차: 날짜만 페어링(차량 상이 의심)
+  var pairs=[], csvLeft=csvOnly.slice(), myLeft=myOnly.slice();
+  function pass(byVeh){
+    var pool={};
+    myLeft.forEach(function(r){ var k=(r.datetime||'').slice(0,10)+(byVeh?'|'+_recNormVeh(r.vehicle):''); (pool[k]=pool[k]||[]).push(r); });
+    var remain=[];
+    csvLeft.forEach(function(c){
+      var k=c.date+(byVeh?'|'+_recNormVeh(c.vehicle):'');
+      if(pool[k]&&pool[k].length){ var m=pool[k].shift();
+        pairs.push({date:c.date, veh:m.vehicle||c.vehicle||'-', csvVeh:c.vehicle||'-', myId:m.id,
+                    myNet:+(m.net||0), csvNet:+(c.net||0), diff:+((m.net||0)-(c.net||0)).toFixed(3), vehMatch:byVeh,
+                    myG:_recKt(m.gross), myTa:_recKt(m.tare), csvG:+(c.gross||0), csvTa:+(c.tare||0)});
+      } else remain.push(c);
+    });
+    csvLeft=remain;
+    var rest=[]; Object.keys(pool).forEach(function(k){ pool[k].forEach(function(r){ rest.push(r); }); });
+    myLeft=rest;
+  }
+  pass(true); pass(false);
+  pairs.sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:0; });
+  _recResult={ supplier:supplier, dmin:dmin, dmax:dmax, csvCnt:_recParsed.length, myCnt:mine.length,
+    csvT:csvT, myT:myT, bySilo:bySilo, dayRows:dayRows,
+    csvOnly:csvOnly, myOnly:myOnly,                 // (구버전 호환: 엑셀 내보내기 등)
+    matchedRows:matchedRows, pairs:pairs, csvMissing:csvLeft, myExtra:myLeft };
+  renderReconcileReport();
+}
+
+/* ── DB 반영 공통 ── */
+function _recPersist(changed){
+  try{
+    var years={}; db.forEach(function(r){ var y=String(r.datetime||'').slice(0,4); if(/^\d{4}$/.test(y)) years[y]=1; });
+    Object.keys(years).forEach(function(yr){
+      var recs=db.filter(function(r){ return String(r.datetime||'').indexOf(yr)===0; });
+      saveYearDbToStorage(parseInt(yr), recs);
+    });
+    if(changed&&changed.length&&typeof saveOverrideDb==='function') saveOverrideDb(changed);
+    if(typeof recalcStockFromBaseline==='function') recalcStockFromBaseline();
+    try{ if(typeof renderHistory==='function') renderHistory(); }catch(e){}
+    try{ if(typeof renderDashboard==='function') renderDashboard(); }catch(e){}
+    try{ if(typeof srfLivePush==='function') srfLivePush(true); }catch(e){}
+  }catch(e){ console.error('[recPersist]', e); toast('red','저장 오류', e.message||String(e)); }
+}
+/* ── 차이 건 교체 ── */
+function recReplaceOne(i){
+  var R=_recResult; if(!R||!R.pairs[i]) return;
+  var p=R.pairs[i];
+  var rec=db.find(function(r){ return r.id===p.myId; });
+  if(!rec){ toast('red','오류','내 레코드를 찾을 수 없습니다.'); return; }
+  if(!confirm('업체값으로 교체할까요?\n\n'+p.date+' · '+(rec.vehicle||'-')+'\n내 실중량 '+p.myNet.toFixed(3)+'t → 업체 '+p.csvNet.toFixed(3)+'t')) return;
+  rec.net=+(+p.csvNet).toFixed(3);
+  if(p.csvG>0) rec.gross=Math.round(p.csvG*1000);
+  if(p.csvTa>0) rec.tare=Math.round(p.csvTa*1000);
+  _recPersist([rec]);
+  toast('green','교체 완료', p.date+' '+(rec.vehicle||'')+' → '+p.csvNet.toFixed(3)+'t (공차·총중량 포함)');
+  runReconcile();
+}
+function recReplaceAllDiffs(){
+  var R=_recResult; if(!R||!R.pairs.length){ toast('yellow','대상 없음','교체할 차이 건이 없습니다.'); return; }
+  var tot=R.pairs.reduce(function(a,p){return a+(p.csvNet-p.myNet);},0);
+  if(!confirm('중량 차이 '+R.pairs.length+'건을 모두 업체값으로 교체합니다.\n(내 합계가 '+(tot>=0?'+':'')+tot.toFixed(3)+'t 변동)\n\n계속할까요?')) return;
+  var changed=[];
+  R.pairs.forEach(function(p){
+    var rec=db.find(function(r){ return r.id===p.myId; });
+    if(rec){ rec.net=+(+p.csvNet).toFixed(3);
+      if(p.csvG>0) rec.gross=Math.round(p.csvG*1000);
+      if(p.csvTa>0) rec.tare=Math.round(p.csvTa*1000);
+      changed.push(rec); }
+  });
+  _recPersist(changed);
+  toast('green','일괄 교체 완료', changed.length+'건의 실중량을 업체값으로 교체했습니다.');
+  runReconcile();
+}
+/* ── 업체에만 있는 건 추가 ── */
+function _recBuildAddRec(c){
+  var silo=REC_DEFAULT_SILO[c.supplier]||'S3';
+  var maxId=db.reduce(function(m,r){ return Math.max(m, +r.id||0); }, 0);
+  return { id:maxId+1, datetime:c.date+' 00:00', company:c.supplier, vehicle:c.vehicle||'',
+           type:'화물차', gross:(c.gross>0?Math.round(c.gross*1000):0), tare:(c.tare>0?Math.round(c.tare*1000):0),
+           net:+(+c.net).toFixed(3), fueltype:'SRF',
+           silo:silo, gate:REC_GATE_OF_SILO[silo]||'', method:'업체대조 추가' };
+}
+function recAddOne(i){
+  var R=_recResult; if(!R||!R.csvMissing[i]) return;
+  var c=R.csvMissing[i];
+  var silo=REC_DEFAULT_SILO[c.supplier]||'S3';
+  if(!confirm('내 DB에 없는 업체 데이터를 추가할까요?\n\n'+c.date+' · '+(c.vehicle||'-')+' · '+(+c.net).toFixed(3)+'t\n저장조: '+_recSiloName(silo))) return;
+  var rec=_recBuildAddRec(c);
+  db.push(rec);
+  _recPersist([rec]);
+  toast('green','추가 완료', c.date+' '+(c.vehicle||'')+' '+(+c.net).toFixed(3)+'t → '+_recSiloName(silo));
+  runReconcile();
+}
+function recAddAllMissing(){
+  var R=_recResult; if(!R||!R.csvMissing.length){ toast('yellow','대상 없음','추가할 누락 건이 없습니다.'); return; }
+  var tot=R.csvMissing.reduce(function(a,c){return a+(+c.net||0);},0);
+  if(!confirm('내 DB에 없는 업체 데이터 '+R.csvMissing.length+'건(합계 '+tot.toFixed(3)+'t)을 모두 추가합니다.\n저장조: '+_recSiloName(REC_DEFAULT_SILO[R.supplier]||'S3')+'\n\n계속할까요?')) return;
+  var changed=[];
+  R.csvMissing.forEach(function(c){ var rec=_recBuildAddRec(c); db.push(rec); changed.push(rec); });
+  _recPersist(changed);
+  toast('green','일괄 추가 완료', changed.length+'건을 내 DB에 추가했습니다.');
+  runReconcile();
+}
+function recSetView(all){ _recViewAll=!!all; renderReconcileReport(); }
+
+/* ── 리포트 렌더링 (전체/차이 보기 + 조치 버튼) ── */
+function renderReconcileReport(){
+  var R=_recResult, el=document.getElementById('recReport'); if(!el) return;
+  if(!R){ el.innerHTML=''; return; }
+  var EPS=0.05;
+  function tD(v){ var k=Math.abs(v)<EPS; return '<span style="color:'+(k?'var(--text2)':'var(--red)')+';font-weight:'+(k?'400':'700')+';">'+(v>0?'+':'')+v.toFixed(3)+'</span>'; }
+  var ok=(R.myCnt===R.csvCnt && Math.abs(R.myT-R.csvT)<EPS && !R.pairs.length && !R.csvMissing.length && !R.myExtra.length);
+  var siloDist=Object.keys(R.bySilo).map(function(k){ return _recSiloName(k)+' '+R.bySilo[k].cnt+'건/'+R.bySilo[k].t.toFixed(1)+'t'; }).join(' · ')||'-';
+  var html='';
+  html+='<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">공급업체: <strong style="color:var(--text);">'+R.supplier+'</strong> · 기간 <strong style="color:var(--text);">'+R.dmin+' ~ '+R.dmax+'</strong></div>';
+  html+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">';
+  html+='<div style="flex:1;min-width:150px;background:var(--bg3);border-radius:8px;padding:10px 12px;"><div style="font-size:11px;color:var(--text2);">내 저장</div><div style="font-size:18px;font-weight:800;color:var(--accent);">'+R.myT.toFixed(2)+'t</div><div style="font-size:11px;color:var(--text2);">'+R.myCnt+'건</div></div>';
+  html+='<div style="flex:1;min-width:150px;background:var(--bg3);border-radius:8px;padding:10px 12px;"><div style="font-size:11px;color:var(--text2);">업체 CSV</div><div style="font-size:18px;font-weight:800;color:var(--text);">'+R.csvT.toFixed(2)+'t</div><div style="font-size:11px;color:var(--text2);">'+R.csvCnt+'건</div></div>';
+  html+='<div style="flex:1;min-width:150px;background:'+(ok?'rgba(34,197,94,.1)':'rgba(239,68,68,.1)')+';border-radius:8px;padding:10px 12px;"><div style="font-size:11px;color:var(--text2);">차이</div><div style="font-size:18px;font-weight:800;color:'+(ok?'#34d399':'var(--red)')+';">'+((R.myT-R.csvT>=0?'+':'')+(R.myT-R.csvT).toFixed(2))+'t</div><div style="font-size:11px;color:var(--text2);">건수차 '+((R.myCnt-R.csvCnt>=0?'+':'')+(R.myCnt-R.csvCnt))+' · '+(ok?'일치':'차이')+'</div></div>';
+  html+='</div>';
+  html+='<div style="font-size:11px;color:var(--text2);margin-bottom:12px;">내 저장 저장조 분포: '+siloDist+'</div>';
+
+  // 조치 배너
+  if(R.pairs.length || R.csvMissing.length){
+    html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding:10px 12px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.3);border-radius:8px;align-items:center;">';
+    html+='<span style="font-size:12px;color:var(--yellow);font-weight:700;">⚠ 중량 차이 '+R.pairs.length+'건 · 내 DB 누락 '+R.csvMissing.length+'건 · 내 데이터만 '+R.myExtra.length+'건</span>';
+    if(R.pairs.length) html+='<button class="btn btn-secondary" onclick="recReplaceAllDiffs()" style="font-size:11.5px;padding:5px 10px;">🔁 차이 '+R.pairs.length+'건 모두 업체값으로 교체</button>';
+    if(R.csvMissing.length) html+='<button class="btn btn-secondary" onclick="recAddAllMissing()" style="font-size:11.5px;padding:5px 10px;">➕ 누락 '+R.csvMissing.length+'건 모두 내 DB에 추가</button>';
+    html+='</div>';
+  }
+
+  // ── 행 단위 대조 테이블 ──
+  var rows=[];
+  R.matchedRows.forEach(function(m){ rows.push({date:m.date, veh:m.veh, my:m.myNet, csv:m.csvNet, diff:0, st:'match',
+    myG:m.myG, myTa:m.myTa, csvG:m.csvG, csvTa:m.csvTa}); });
+  R.pairs.forEach(function(p,i){ rows.push({date:p.date, veh:p.veh+(p.vehMatch?'':' ⚠'), my:p.myNet, csv:p.csvNet, diff:+(p.myNet-p.csvNet).toFixed(3), st:'diff', idx:i, vehMatch:p.vehMatch,
+    myG:p.myG, myTa:p.myTa, csvG:p.csvG, csvTa:p.csvTa}); });
+  R.csvMissing.forEach(function(c,i){ rows.push({date:c.date, veh:c.vehicle||'-', my:null, csv:+c.net, diff:null, st:'missing', idx:i,
+    myG:null, myTa:null, csvG:+(c.gross||0), csvTa:+(c.tare||0)}); });
+  R.myExtra.forEach(function(m){ rows.push({date:(m.datetime||'').slice(0,10), veh:m.vehicle||'-', my:+(m.net||0), csv:null, diff:null, st:'extra',
+    myG:_recKt(m.gross), myTa:_recKt(m.tare), csvG:null, csvTa:null}); });
+  rows.sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:0; });
+  var shown=_recViewAll?rows:rows.filter(function(r){return r.st!=='match';});
+  var stLabel={match:'<span style="color:#34d399;">✓ 일치</span>', diff:'<span style="color:var(--red);font-weight:700;">≠ 중량차이</span>',
+               missing:'<span style="color:var(--yellow);font-weight:700;">− 내 DB 없음</span>', extra:'<span style="color:#f59e0b;font-weight:700;">+ 내 데이터만</span>'};
+  html+='<div style="display:flex;align-items:center;gap:10px;margin:6px 0;">';
+  html+='<div style="font-size:13px;font-weight:700;color:var(--text);">🔎 건별 대조 <span style="font-size:11px;color:var(--text2);font-weight:400;">(일치 '+R.matchedRows.length+' · 차이 '+R.pairs.length+' · 누락 '+R.csvMissing.length+' · 내만 '+R.myExtra.length+')</span></div>';
+  html+='<div style="margin-left:auto;display:flex;gap:4px;">';
+  html+='<button onclick="recSetView(false)" style="padding:4px 10px;border-radius:6px;border:1px solid '+(!_recViewAll?'var(--accent)':'var(--border)')+';background:'+(!_recViewAll?'rgba(56,189,248,.15)':'var(--bg3)')+';color:'+(!_recViewAll?'var(--accent)':'var(--text2)')+';font-size:11.5px;font-weight:700;cursor:pointer;">차이만</button>';
+  html+='<button onclick="recSetView(true)" style="padding:4px 10px;border-radius:6px;border:1px solid '+(_recViewAll?'var(--accent)':'var(--border)')+';background:'+(_recViewAll?'rgba(56,189,248,.15)':'var(--bg3)')+';color:'+(_recViewAll?'var(--accent)':'var(--text2)')+';font-size:11.5px;font-weight:700;cursor:pointer;">전체 보기 ('+rows.length+')</button>';
+  html+='</div></div>';
+  html+='<div style="overflow-x:auto;max-height:420px;overflow-y:auto;margin-bottom:14px;"><table class="data-table" style="font-size:11px;min-width:920px;"><thead>'
+      +'<tr><th rowspan="2">날짜</th><th rowspan="2">차량번호</th>'
+      +'<th colspan="3" style="text-align:center;border-bottom:1px solid var(--border);color:var(--accent);">내 데이터 (t)</th>'
+      +'<th colspan="3" style="text-align:center;border-bottom:1px solid var(--border);">업체 CSV (t)</th>'
+      +'<th rowspan="2" style="text-align:right;">순중량<br>차이(t)</th><th rowspan="2">상태</th><th rowspan="2">조치</th></tr>'
+      +'<tr><th style="text-align:right;">공차</th><th style="text-align:right;">총중량</th><th style="text-align:right;">순중량</th>'
+      +'<th style="text-align:right;">공차</th><th style="text-align:right;">총중량</th><th style="text-align:right;">순중량</th></tr></thead><tbody>';
+  function f3(v){ return (v!=null && v>0) ? v.toFixed(3) : '<span style="color:var(--text3);">—</span>'; }
+  function fNet(v,hot){ return v!=null ? '<span style="'+(hot?'color:var(--red);font-weight:700;':'')+'">'+v.toFixed(3)+'</span>' : '<span style="color:var(--text3);">—</span>'; }
+  if(!shown.length) html+='<tr><td colspan="11" style="text-align:center;color:var(--text2);padding:14px;">'+(_recViewAll?'데이터 없음':'차이 건이 없습니다 — 모두 일치 ✅')+'</td></tr>';
+  shown.forEach(function(r){
+    var act='';
+    if(r.st==='diff') act='<button onclick="recReplaceOne('+r.idx+')" style="padding:3px 9px;border-radius:6px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-size:11px;cursor:pointer;white-space:nowrap;">🔁 업체값 교체</button>';
+    else if(r.st==='missing') act='<button onclick="recAddOne('+r.idx+')" style="padding:3px 9px;border-radius:6px;border:1px solid rgba(34,197,94,.5);background:transparent;color:#34d399;font-size:11px;cursor:pointer;white-space:nowrap;">➕ DB 추가</button>';
+    var bg=r.st==='diff'?'rgba(239,68,68,.05)':r.st==='missing'?'rgba(245,158,11,.05)':r.st==='extra'?'rgba(245,158,11,.04)':'';
+    var hotNet = r.st==='diff';
+    var hotG = hotNet && r.myG>0 && r.csvG>0 && Math.abs(r.myG-r.csvG)>=EPS;
+    var hotTa = hotNet && r.myTa>0 && r.csvTa>0 && Math.abs(r.myTa-r.csvTa)>=EPS;
+    html+='<tr style="'+(bg?'background:'+bg+';':'')+'">'
+      +'<td style="white-space:nowrap;">'+r.date+'</td>'
+      +'<td style="font-size:10px;">'+(r.veh||'-')+'</td>'
+      +'<td style="text-align:right;">'+fNet(r.myTa>0?r.myTa:null, hotTa)+'</td>'
+      +'<td style="text-align:right;">'+fNet(r.myG>0?r.myG:null, hotG)+'</td>'
+      +'<td style="text-align:right;font-weight:600;">'+fNet(r.my, hotNet)+'</td>'
+      +'<td style="text-align:right;">'+f3(r.csvTa)+'</td>'
+      +'<td style="text-align:right;">'+f3(r.csvG)+'</td>'
+      +'<td style="text-align:right;font-weight:600;">'+fNet(r.csv, hotNet)+'</td>'
+      +'<td style="text-align:right;">'+(r.diff!=null?tD(r.diff):'—')+'</td>'
+      +'<td style="white-space:nowrap;">'+stLabel[r.st]+'</td>'
+      +'<td>'+act+'</td></tr>';
+  });
+  html+='</tbody></table></div>';
+  if(R.pairs.some(function(p){return !p.vehMatch;})) html+='<div style="font-size:11px;color:var(--text2);margin:-8px 0 12px;">⚠ 표시는 같은 날짜에서 차량번호가 달라 짝지은 건(차량번호 오인식 가능성)입니다.</div>';
+
+  // ── 일자별 대조 (요약) ──
+  var diffDays=R.dayRows.filter(function(r){return !(r.cntDiff===0&&Math.abs(r.tDiff)<EPS);});
+  html+='<div style="font-size:13px;font-weight:700;color:var(--text);margin:6px 0;">📅 일자별 대조 <span style="font-size:11px;color:var(--text2);font-weight:400;">(차이 '+diffDays.length+'일 / 총 '+R.dayRows.length+'일)</span></div>';
+  html+='<div style="overflow-x:auto;max-height:280px;overflow-y:auto;"><table class="data-table" style="font-size:12px;"><thead><tr><th>날짜</th><th style="text-align:right;">내 건수</th><th style="text-align:right;">CSV 건수</th><th style="text-align:right;">내 톤</th><th style="text-align:right;">CSV 톤</th><th style="text-align:right;">톤 차이</th></tr></thead><tbody>';
+  R.dayRows.forEach(function(r){
+    var bad=!(r.cntDiff===0&&Math.abs(r.tDiff)<EPS);
+    html+='<tr style="'+(bad?'background:rgba(239,68,68,.05);':'')+'"><td style="white-space:nowrap;">'+r.d+'</td><td style="text-align:right;">'+r.myCnt+'</td><td style="text-align:right;">'+r.csvCnt+'</td><td style="text-align:right;">'+r.myT.toFixed(3)+'</td><td style="text-align:right;">'+r.csvT.toFixed(3)+'</td><td style="text-align:right;">'+tD(r.tDiff)+'</td></tr>';
+  });
+  html+='</tbody></table></div>';
+  el.innerHTML=html;
+  var tot=R.pairs.length+R.csvMissing.length+R.myExtra.length;
+  toast((tot>0||!ok)?'yellow':'green','대조 완료',(tot>0)?('중량차이 '+R.pairs.length+'건 · 누락 '+R.csvMissing.length+'건 · 내만 '+R.myExtra.length+'건'):'모든 항목 일치 ✅');
 }
 </script>
 
