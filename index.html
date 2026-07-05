@@ -1719,7 +1719,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
      TAB: API 현황
 ══════════════════════════════════════════════════════ -->
 <div id="tab-api-status" class="tab-panel">
-  <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-settings" data-member="carrier" onclick="switchSubTab('settings','carrier')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🚛 운송업체</button><button class="subbtn-settings" data-member="api-status" onclick="switchSubTab('settings','api-status')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🔑 API 현황</button></div>
+  <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-settings" data-member="carrier" onclick="switchSubTab('settings','carrier')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🚛 운송업체</button><button class="subbtn-settings" data-member="api-status" onclick="switchSubTab('settings','api-status')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🔑 API 현황</button><button class="subbtn-settings" data-member="manual" onclick="switchSubTab('settings','manual')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📘 매뉴얼</button></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
     <!-- Vision API 현황 -->
     <div class="card">
@@ -5827,7 +5827,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 </div>
 <!-- 운송업체 탭 -->
 <div id="tab-carrier" class="tab-panel">
-  <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-settings" data-member="carrier" onclick="switchSubTab('settings','carrier')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🚛 운송업체</button><button class="subbtn-settings" data-member="api-status" onclick="switchSubTab('settings','api-status')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🔑 API 현황</button></div>
+  <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-settings" data-member="carrier" onclick="switchSubTab('settings','carrier')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🚛 운송업체</button><button class="subbtn-settings" data-member="api-status" onclick="switchSubTab('settings','api-status')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🔑 API 현황</button><button class="subbtn-settings" data-member="manual" onclick="switchSubTab('settings','manual')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📘 매뉴얼</button></div>
   <div class="card">
     <div class="section-header">
       <div class="section-title">🚙 운송업체 차량관리</div>
@@ -5923,6 +5923,34 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     <div class="btn-row" style="margin-top:18px;justify-content:flex-end;">
       <button onclick="closeCarrierModal()" class="btn btn-secondary">취소</button>
       <button onclick="saveCarrierRow()" class="btn btn-success">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     TAB: 설정/기타 - 매뉴얼 다운로드
+══════════════════════════════════════════════════════ -->
+<div id="tab-manual" class="tab-panel">
+  <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-settings" data-member="carrier" onclick="switchSubTab('settings','carrier')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🚛 운송업체</button><button class="subbtn-settings" data-member="api-status" onclick="switchSubTab('settings','api-status')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🔑 API 현황</button><button class="subbtn-settings" data-member="manual" onclick="switchSubTab('settings','manual')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📘 매뉴얼</button></div>
+
+  <div class="card">
+    <div class="section-header" style="margin-bottom:14px;">
+      <div class="section-title">📘 사용자 매뉴얼</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;background:var(--bg3);border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+      <div style="font-size:32px;line-height:1;">📄</div>
+      <div style="flex:1;min-width:200px;">
+        <div style="font-weight:700;font-size:14px;color:var(--text);">연료관리시스템 사용자 매뉴얼</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px;">PPT(원본) 또는 PDF로 다운로드해서 확인할 수 있습니다. · 총 25페이지</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <a class="btn btn-secondary" style="font-size:12px;text-decoration:none;" href="연료관리시스템_사용자매뉴얼_KDHC_v3.pptx" download>⬇️ PPT 다운로드</a>
+        <a class="btn btn-primary" style="font-size:12px;text-decoration:none;" href="연료관리시스템_사용자매뉴얼_KDHC_v3.pdf" download>⬇️ PDF 다운로드</a>
+        <a class="btn btn-secondary" style="font-size:12px;text-decoration:none;" href="연료관리시스템_사용자매뉴얼_KDHC_v3.pdf" target="_blank">🔍 새 창에서 보기</a>
+      </div>
+    </div>
+    <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+      <iframe src="연료관리시스템_사용자매뉴얼_KDHC_v3.pdf" style="width:100%;height:640px;border:none;display:block;background:var(--bg3);" title="사용자 매뉴얼 미리보기"></iframe>
     </div>
   </div>
 </div>
