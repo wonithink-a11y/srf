@@ -9,6 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="SRF관리">
   <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="icon" type="image/png" href="icon-192.png">
   <link rel="manifest" href="manifest.json">
   <title>고형연료 수급 관리 시스템</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -51,11 +52,49 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <!-- Tesseract.js 제거 → Google Cloud Vision API로 대체 -->
 <style>
+  /* ════════════════════════════════════════
+     APPLE 디자인 테마 시스템 (Light 기본 / Dark 토글)
+     - 모든 컴포넌트가 CSS 변수 기반 → 테마 전환만으로 전체 반영
+  ════════════════════════════════════════ */
   :root {
-    --bg: #0f172a; --bg2: #1e293b; --bg3: #334155;
-    --accent: #38bdf8; --accent2: #0ea5e9; --green: #22c55e;
-    --yellow: #f59e0b; --red: #ef4444; --text: #e2e8f0;
-    --text2: #cbd5e1; --border: #334155;
+    /* ── LIGHT (Apple 화이트 도미넌트) — 기본 ── */
+    --bg: #f5f5f7;        /* 페이지 캔버스 (parchment) */
+    --bg2: #ffffff;       /* 카드 서피스 */
+    --bg3: #f0f0f2;       /* 보조 서피스 */
+    --accent: #E6002D;    /* KDHC Red (브랜드 전용색상) */
+    --accent2: #F2701A;   /* KDHC Orange (브랜드 보조색상) */
+    --green: #1a9e4b; --yellow: #c47f0a; --red: #d93a30;
+    --text: #1d1d1f;      /* Near-black ink */
+    --text2: #6e6e73;     /* Muted */
+    --border: #e0e0e0;    /* Hairline */
+    /* 디자인 토큰 */
+    --radius: 18px; --radius-sm: 11px; --radius-pill: 980px;
+    --shadow-card: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.05);
+    --shadow-pop: 0 12px 40px rgba(0,0,0,.14);
+    --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', 'Malgun Gothic', sans-serif;
+    /* 라이트 전용 보정값 (하드코딩 다크 색 대체) */
+    --track: #e8e8ed;     /* bar/track 배경 */
+    --track-border: #d2d2d7;
+    --row-line: #f0f0f0;  /* 테이블 행 구분선 */
+    --hover-tint: rgba(0,0,0,.03);
+    --np-line: rgba(0,0,0,.05);
+    --header-grad: linear-gradient(180deg, rgba(255,255,255,.92), rgba(245,245,247,.86));
+    --subtab-on-text: #ffffff;
+  }
+  [data-theme="dark"] {
+    /* ── DARK (Apple 다크, 기존 네이비와 조화) ── */
+    --bg: #0f172a; --bg2: #1a2334; --bg3: #2a3546;
+    --accent: #FF4136;    /* KDHC Red (다크 표면용, 밝게 보정) */
+    --accent2: #FF9F43;   /* KDHC Orange (다크 표면용) */
+    --green: #30d158; --yellow: #ff9f0a; --red: #ff453a;
+    --text: #eaf0f7; --text2: #9fb0c4; --border: #2c3a4e;
+    --shadow-card: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    --shadow-pop: 0 16px 48px rgba(0,0,0,.55);
+    --track: #16202f; --track-border: #3a4a60;
+    --row-line: #1e293b; --hover-tint: rgba(255,255,255,.04);
+    --np-line: rgba(255,255,255,.05);
+    --header-grad: linear-gradient(180deg, rgba(19,28,46,.92), rgba(15,23,42,.86));
+    --subtab-on-text: #0b1220;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; font-size: 14px; min-height: 100vh; }
@@ -66,9 +105,32 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     padding: 14px 28px;
     display: flex; align-items: center; justify-content: space-between;
   }
-  header h1 { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: .5px; }
+  header h1 { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: .5px; display: flex; align-items: center; gap: 10px; white-space: nowrap; }
   header h1 span { color: var(--text2); font-weight: 400; font-size: 13px; margin-left: 10px; }
-  .header-right { display: flex; align-items: center; gap: 12px; }
+  .header-left { display: flex; align-items: center; gap: 16px; min-width: 0; }
+  .brand-logo { height: 28px; width: auto; display: block; flex-shrink: 0; }
+  .brand-logo-dark { display: none; }
+  [data-theme="dark"] .brand-logo-light { display: none; }
+  [data-theme="dark"] .brand-logo-dark { display: block; }
+  .header-titles { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; }
+  .badge-ver {
+    color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: 0;
+    background: rgba(230,0,45,.13); padding: 2px 9px; border-radius: var(--radius-pill); flex-shrink: 0;
+  }
+  .header-subtitle {
+    margin: 0; font-size: 11.5px; color: var(--text2); font-weight: 400;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .1px;
+  }
+  .header-right {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg2); border: 1px solid var(--border);
+    padding: 7px 12px; border-radius: var(--radius); box-shadow: var(--shadow-card);
+  }
+  #brandWatermark {
+    position: fixed; right: -60px; bottom: -60px; width: 480px; height: 480px;
+    background: url('kdhc_symbol.png') no-repeat center / contain;
+    opacity: .05; pointer-events: none; z-index: 0;
+  }
   #clock { color: var(--text2); font-size: 13px; }
   .notif-btn {
     position: relative; background: var(--bg3); border: none; color: var(--text);
@@ -361,11 +423,15 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   /* ── 폰 최적화 추가 (2026-06-26) ── */
   @media (max-width: 768px) {
     html, body { overflow-x: hidden; max-width: 100vw; }
-    header { flex-wrap: wrap; gap: 6px; padding: 10px 10px calc(10px + env(safe-area-inset-bottom,0px)); }
-    header h1 { font-size: 15px; line-height: 1.25; flex: 1 1 100%; }
+    header { flex-wrap: wrap; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom,0px)); }
+    .header-left { width: 100%; gap: 10px; }
+    .brand-logo { height: 20px; }
+    header h1 { font-size: 14.5px; line-height: 1.25; gap: 6px; }
     header h1 span { font-size: 10px; }
-    .header-right { flex-wrap: wrap; gap: 6px; width: 100%; justify-content: flex-start; }
-    #clock { font-size: 11px; width: 100%; margin-bottom: 2px; }
+    .header-subtitle { display: none; }
+    .badge-ver { font-size: 10px; padding: 2px 7px; }
+    .header-right { flex-wrap: wrap; gap: 6px; width: 100%; justify-content: flex-start; border-radius: 12px; padding: 6px 8px; }
+    #clock { font-size: 11px; width: 100%; margin-bottom: 2px; order: -1; }
     .notif-btn { font-size: 12px; padding: 8px 11px; white-space: nowrap; border-radius: 8px; flex: 0 0 auto; }
     /* 최근 입고 표: 칸 찌그러짐 방지 → 가로 스크롤 */
     #recentTable { min-width: 470px; }
@@ -431,11 +497,163 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     .sched-stack input, .sched-stack select, .sched-stack .form-input { width: 100% !important; box-sizing: border-box; }
   }
   </style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style id="apple-design-layer">
+  /* ════════════════════════════════════════════════════════════
+     APPLE DESIGN LAYER — 생동감·정제된 UI (Light/Dark 공용)
+     기존 스타일 뒤에 로드되어 컴포넌트를 리파인 (cascade override)
+  ════════════════════════════════════════════════════════════ */
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  body {
+    font-family: var(--font-ui);
+    letter-spacing: -0.01em;
+    transition: background .35s ease, color .35s ease;
+  }
+  ::selection { background: rgba(0,102,204,.18); }
+
+  /* ── HEADER : 프로스티드 글래스 + 헤어라인 ── */
+  header {
+    background: var(--header-grad) !important;
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid var(--border) !important;
+    position: sticky; top: 0; z-index: 500;
+  }
+  header h1 { color: var(--text) !important; font-weight: 600; letter-spacing: -0.02em; }
+  header h1 span { color: var(--text2); }
+
+  /* ── 상단 유틸 버튼 (notif-btn) : 부드러운 캡슐 ── */
+  .notif-btn {
+    border-radius: var(--radius-pill); padding: 8px 14px; font-weight: 500;
+    border: 1px solid var(--border); background: var(--bg2);
+    box-shadow: 0 1px 1px rgba(0,0,0,.03);
+    transition: transform .12s ease, filter .15s ease, background .15s ease;
+  }
+  .notif-btn:hover { filter: brightness(1.04); }
+  .notif-btn:active { transform: scale(0.95); }
+
+  /* ── TABS : 세그먼트 느낌, 언더라인 유지 ── */
+  .tabs { background: var(--bg2); border-bottom: 1px solid var(--border); }
+  .tab-btn { font-weight: 500; letter-spacing: -0.01em; border-radius: 8px 8px 0 0; }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+  /* ── CARDS / KPI : 큰 라운드 + 은은한 엘리베이션 ── */
+  .card, .kpi {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow-card);
+    transition: transform .2s ease, box-shadow .2s ease, background .35s ease, border-color .35s ease;
+  }
+  .kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow-pop); }
+  .kpi-value { letter-spacing: -0.03em; }
+  .card-title { color: var(--text2); }
+
+  /* ── BUTTONS : Apple pill ── */
+  .btn {
+    border-radius: var(--radius-pill); font-weight: 500; letter-spacing: -0.01em;
+    box-shadow: none;
+    transition: transform .12s ease, filter .15s ease, background .15s ease;
+  }
+  .btn:active { transform: scale(0.96); }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent2); }
+  .btn-secondary { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { filter: brightness(0.97); background: var(--bg3); }
+
+  /* ── 하드코딩 다크 색 → 테마 변수로 (라이트에서 깨짐 방지) ── */
+  .silo-bar-wrap { background: var(--track) !important; border: 1px solid var(--track-border) !important; }
+  .silo-card { background: var(--bg3); border: 1px solid var(--border); border-radius: 14px; }
+  .data-table td { border-bottom: 1px solid var(--row-line); }
+  .data-table th { background: var(--bg3); }
+  .data-table tr:hover td { background: var(--hover-tint); }
+  .progress-bar-wrap { background: var(--track); }
+  .np-item { border-bottom: 1px solid var(--np-line); }
+  .np-item:hover { background: var(--hover-tint); }
+  .cal-month { background: var(--bg3); border: 1px solid var(--border); border-radius: 14px; }
+  .cal-month-header { background: var(--bg2); color: var(--accent); border-bottom: 1px solid var(--border); }
+  .upload-zone { background: var(--bg3); }
+  .upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent); background: var(--bg3); filter: brightness(0.99); }
+
+  /* ── INPUTS : 정제된 라운드 ── */
+  .ocr-field input, .ocr-field select,
+  .input-row input, .input-row select,
+  .form-input, .form-select {
+    border-radius: 10px; background: var(--bg2); border: 1px solid var(--border); color: var(--text);
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .ocr-field input:focus, .ocr-field select:focus,
+  .input-row input:focus, .input-row select:focus,
+  .form-input:focus, .form-select:focus {
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,102,204,.12);
+  }
+
+  /* ── 대시보드 서브탭 ── */
+  .dash-subtab { border-radius: var(--radius-pill); background: var(--bg3); border: 1px solid var(--border); }
+  .dash-subtab.active { background: var(--accent); color: var(--subtab-on-text); border-color: var(--accent); }
+
+  /* ── 스크롤바 ── */
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+
+  /* ── 테마 토글 버튼 ── */
+  .theme-toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--bg2); border: 1px solid var(--border); color: var(--text);
+    border-radius: var(--radius-pill); padding: 7px 13px; cursor: pointer;
+    font-size: 13px; font-weight: 500; font-family: var(--font-ui);
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+    transition: transform .12s ease, filter .15s ease;
+  }
+  .theme-toggle:hover { filter: brightness(1.05); }
+  .theme-toggle:active { transform: scale(0.94); }
+  .theme-toggle .tt-icon { font-size: 15px; line-height: 1; }
+</style>
+<script>
+  /* 테마 초기화 — 본문 렌더 전에 실행하여 깜빡임(FOUC) 방지.
+     저장값이 없으면 라이트(Apple 기본). 시스템 다크 선호는 반영하지 않고 라이트 기본 유지. */
+  (function(){
+    try {
+      var saved = localStorage.getItem('fm_theme');
+      if (saved === 'dark') document.documentElement.setAttribute('data-theme','dark');
+      else document.documentElement.removeAttribute('data-theme'); /* light */
+    } catch(e) {}
+  })();
+  function toggleTheme(){
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var next = isDark ? 'light' : 'dark';
+    if (next === 'dark') document.documentElement.setAttribute('data-theme','dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { localStorage.setItem('fm_theme', next); } catch(e){}
+    updateThemeToggleUI();
+  }
+  function updateThemeToggleUI(){
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var btn = document.getElementById('themeToggleBtn');
+    if (!btn) return;
+    /* 라이트일 때 → 다크로 전환 유도(달), 다크일 때 → 라이트로 전환 유도(해) */
+    btn.querySelector('.tt-icon').textContent = isDark ? '☀️' : '🌙';
+    btn.querySelector('.tt-label').textContent = isDark ? '라이트' : '다크';
+    btn.setAttribute('aria-label', isDark ? '라이트 모드로 전환' : '다크 모드로 전환');
+  }
+  document.addEventListener('DOMContentLoaded', updateThemeToggleUI);
+</script>
 </head>
 <body>
+<div id="brandWatermark" aria-hidden="true"></div>
 <header>
-  <h1>⚡ 고형연료 수급 관리 시스템 <span>SRF Fuel Management Dashboard</span><span style="color:var(--accent);font-size:12px;margin-left:8px;background:rgba(56,189,248,.15);padding:2px 8px;border-radius:10px;">ver.8</span></h1>
+  <div class="header-left">
+    <img src="kdhc_logo_header_light.png" alt="한국지역난방공사 KDHC" class="brand-logo brand-logo-light">
+    <img src="kdhc_logo_header_dark.png" alt="한국지역난방공사 KDHC" class="brand-logo brand-logo-dark">
+    <div class="header-titles">
+      <h1>고형연료 수급 관리 시스템<span class="badge-ver">ver.8</span></h1>
+      <p class="header-subtitle">SRF Fuel Management Dashboard</p>
+    </div>
+  </div>
   <div class="header-right">
+    <button id="themeToggleBtn" class="theme-toggle" onclick="toggleTheme()" aria-label="다크 모드로 전환" title="라이트/다크 전환">
+      <span class="tt-icon">🌙</span><span class="tt-label">다크</span>
+    </button>
     <div id="clock">2026. 06. 05. 오후 01:03:05</div>
     <button class="notif-btn" onclick="exportLocalStorage()" style="background:rgba(34,197,94,.2);color:#22c55e;">💾 데이터 내보내기</button>
     <button class="notif-btn" onclick="document.getElementById('importLsFile').click()" style="background:rgba(56,189,248,.2);color:#38bdf8;">📂 데이터 불러오기</button>
