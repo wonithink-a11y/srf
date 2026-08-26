@@ -1134,6 +1134,14 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
             </div>
           </div>
         </div>
+        <!-- 일자별 재고 비교 (엑셀 AE~AI열 대조) -->
+        <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <span style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;">📅 일자별 재고 비교 (엑셀 대조)</span>
+            <button class="btn btn-secondary" id="dailyStockCompareToggleBtn" style="font-size:11px;padding:4px 10px;" onclick="toggleDailyStockCompare()">펼치기</button>
+          </div>
+          <div id="dailyStockCompareBox" style="display:none;"></div>
+        </div>
       </div>
       <!-- 실시간 알림 -->
       <div class="card">
@@ -6253,6 +6261,8 @@ let db = [];  // main database
 window._getRecordsDb = () => db;  // Firebase 클로저 안에서 접근용 (let은 window.db 불가)
 let _ocrCsvParsed  = [];  // OCR CSV 파싱 결과
 let _xlsxRawRecords = []; // XLSX 파싱 결과
+let _xlsxFcRecords = []; // XLSX 크레인(AX~BK) 파싱 결과 → 연료사용량 계산 탭 저장 이력 동기화용
+let _xlsxStockRecords = {}; // XLSX 재고(AE~AI) 파싱 결과 → 일자별 재고 비교표(엑셀 대조)용
 // ──BEGIN_RAW_DB──
 // ── 2026년 실제 입고 데이터 (엑셀 ★★★2026_연료 입고내역.xlsx 기준) ──
 // 형식: [입고일시, 차량번호, 총중량(t), 공차중량(t), 게이트]
@@ -6765,10 +6775,12 @@ const LS = {
   fcHistory:    `_fcHistory_${APP_VER}`,
   schedSettings:'_schedSettings_v4', // 기존 호환
   siloStock:    `_siloStock_${APP_VER}`,
+  xlsxStock:    `_xlsxStockByDate_${APP_VER}`,
 };
 
 const _usageData = {}; // date(YYYY-MM-DD) → 사용량(t) from 연료관리 AD열
 const _usageDataBySilo = {}; // date → {GJ, JN, NJ, SC} 지자체별 사용량(t)
+const _xlsxStockByDate = {}; // date → {S1,S2,S3,S4,total} 엑셀 AE~AI열(저장조별 재고량) — 일자별 재고 비교용
 
 // ── 마감구간(2026-01-01~2026-04-29) AD열 일별 사용량 베이크 (data_shift_AD 기준) ──
 //   localStorage에 이 기간 일별값이 비거나 어긋나도, 로드 시 이 값으로 강제 동기화해
@@ -6795,6 +6807,18 @@ function saveUsageDataToStorage() {
     localStorage.setItem(LS.usageData, JSON.stringify(_usageData));
     localStorage.setItem(LS.usageBySilo, JSON.stringify(_usageDataBySilo));
   } catch(e) { console.warn('사용량 저장 실패:', e); }
+}
+function saveXlsxStockToStorage() {
+  try { localStorage.setItem(LS.xlsxStock, JSON.stringify(_xlsxStockByDate)); }
+  catch(e) { console.warn('엑셀 일자별 재고 저장 실패:', e); }
+}
+function loadXlsxStockFromStorage() {
+  try {
+    const raw = localStorage.getItem(LS.xlsxStock);
+    if (!raw) return;
+    Object.assign(_xlsxStockByDate, JSON.parse(raw));
+    console.log(`[localStorage] 엑셀 일자별 재고 복원: ${Object.keys(_xlsxStockByDate).length}일`);
+  } catch(e) { console.warn('엑셀 일자별 재고 복원 실패:', e); }
 }
 function loadUsageDataFromStorage() {
   // 구버전 키(_v1) 마이그레이션: 새 키에 데이터 없으면 구버전에서 읽어서 이전
@@ -6967,6 +6991,7 @@ function saveDriveConfig() {
 }
 
 loadUsageDataFromStorage();
+loadXlsxStockFromStorage(); // 엑셀 AE~AI열(일자별 재고) 복원 — 일자별 재고 비교용
 applyBakedHistUsage(); // 마감구간(1/1~4/29) 사용량을 AD열 베이크값으로 강제 동기화
 // loadFuelCalcHistoryFromStorage(); // _fcHistory 선언 이후 호출됨 (아래 initApp에서 처리)
 
@@ -10655,6 +10680,133 @@ function saveCurrentStock() {
   else toast('green', '현재고 업데이트 완료', '모든 저장조 재고량이 수정되었습니다.');
 }
 // ══════════════════════════════════════════
+// 일자별 재고 비교 (엑셀 AE~AI열 대조)
+//  — 기준월(SILO_STOCK_BY_MONTH 마지막 키) 이후, 일자별로 "기준값+누적입고-누적사용"을
+//    순차 계산해 그날그날의 저장조별 재고를 복원하고, 엑셀 가져오기 때 저장해둔
+//    _xlsxStockByDate(AE~AI열)와 대조해 어느 날짜가 어긋났는지 보여준다.
+// ══════════════════════════════════════════
+let dailyStockCompareOpen = false;
+function toggleDailyStockCompare() {
+  dailyStockCompareOpen = !dailyStockCompareOpen;
+  const box = document.getElementById('dailyStockCompareBox');
+  if (box) box.style.display = dailyStockCompareOpen ? 'block' : 'none';
+  const btn = document.getElementById('dailyStockCompareToggleBtn');
+  if (btn) btn.textContent = dailyStockCompareOpen ? '접기' : '펼치기';
+  if (dailyStockCompareOpen) renderDailyStockCompare();
+}
+function _dsAddDay(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function computeDailyStockSeries(endDate) {
+  const months = Object.keys(SILO_STOCK_BY_MONTH).sort();
+  if (!months.length) return {};
+  const lastMonth = months[months.length - 1];
+  const baseline  = SILO_STOCK_BY_MONTH[lastMonth];
+  const [bY, bM]  = lastMonth.split('-').map(Number);
+  const monthLastDay  = lastMonth + '-' + String(new Date(bY, bM, 0).getDate()).padStart(2, '0');
+  const actualPartial = (typeof MONTHLY_ACTUAL !== 'undefined' && MONTHLY_ACTUAL[lastMonth]?.partialTo);
+  const baselineEndDate = actualPartial || monthLastDay;
+
+  const siloKeyMap = { GJ: 'S1', JN: 'S2', SC: 'S3', NJ: 'S4' };
+  const cur = { S1: baseline.S1 || 0, S2: baseline.S2 || 0, S3: baseline.S3 || 0, S4: baseline.S4 || 0 };
+
+  // 날짜별 저장조별 입고 집계 (기준일 이후)
+  const inflowByDate = {};
+  db.forEach(r => {
+    const d = (r.datetime || '').slice(0, 10);
+    if (d <= baselineEndDate) return;
+    if (!inflowByDate[d]) inflowByDate[d] = { S1: 0, S2: 0, S3: 0, S4: 0 };
+    if (inflowByDate[d][r.silo] !== undefined) inflowByDate[d][r.silo] += r.net || 0;
+  });
+
+  const series = {};
+  series[baselineEndDate] = { S1: cur.S1, S2: cur.S2, S3: cur.S3, S4: cur.S4 };
+  let ds = baselineEndDate;
+  while (ds < endDate) {
+    ds = _dsAddDay(ds, 1);
+    const inflow = inflowByDate[ds] || { S1: 0, S2: 0, S3: 0, S4: 0 };
+    const usageBySilo = _usageDataBySilo[ds];
+    if (usageBySilo) {
+      Object.entries(siloKeyMap).forEach(([key, sid]) => {
+        cur[sid] = cur[sid] + (inflow[sid] || 0) - (usageBySilo[key] || 0);
+      });
+    } else {
+      const totalUsage = _usageData[ds] || 0;
+      const totalBefore = cur.S1 + cur.S2 + cur.S3 + cur.S4;
+      Object.keys(cur).forEach(sid => {
+        const share = totalBefore > 0 ? (totalUsage * cur[sid] / totalBefore) : 0;
+        cur[sid] = cur[sid] + (inflow[sid] || 0) - share;
+      });
+    }
+    Object.keys(cur).forEach(sid => { cur[sid] = Math.round(cur[sid] * 100) / 100; });
+    series[ds] = { S1: cur.S1, S2: cur.S2, S3: cur.S3, S4: cur.S4 };
+  }
+  return series;
+}
+function renderDailyStockCompare() {
+  const box = document.getElementById('dailyStockCompareBox');
+  if (!box) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const excelDates = Object.keys(_xlsxStockByDate || {});
+  const dbDates = db.map(r => (r.datetime || '').slice(0, 10)).filter(Boolean);
+  const endDate = [...excelDates, ...dbDates, today].sort().pop() || today;
+  const series = computeDailyStockSeries(endDate);
+  const dates = Object.keys(series).sort();
+  if (!dates.length) { box.innerHTML = '<div style="color:var(--text2);font-size:12px;">표시할 데이터가 없습니다.</div>'; return; }
+
+  const byMonth = {};
+  dates.forEach(d => { const m = d.slice(0, 7); (byMonth[m] = byMonth[m] || []).push(d); });
+
+  const silosOrder = [['S1', '광주'], ['S2', '전남'], ['S4', '나주'], ['S3', '순천']];
+  const THRESH = 0.1; // 톤 — 이 이상 차이나면 불일치로 표시
+
+  let html = '';
+  Object.keys(byMonth).sort().forEach(m => {
+    const days = byMonth[m];
+    let mismatchCount = 0, excelCount = 0;
+    const rows = days.map(d => {
+      const app = series[d];
+      const ex = _xlsxStockByDate[d];
+      let rowMismatch = false;
+      const cells = silosOrder.map(([sid]) => {
+        const a = app[sid];
+        if (!ex) return `<td style="text-align:right;padding:3px 6px;">${fmtNum(a)}</td>`;
+        const e = ex[sid];
+        const diff = Math.round((a - e) * 100) / 100;
+        const bad = Math.abs(diff) > THRESH;
+        if (bad) rowMismatch = true;
+        return `<td style="text-align:right;padding:3px 6px;${bad ? 'color:var(--red);font-weight:700;' : ''}">${fmtNum(a)}<br><span style="color:var(--text2);font-size:10px;font-weight:400;">엑셀 ${fmtNum(e)}${bad ? ` (${diff > 0 ? '+' : ''}${diff})` : ''}</span></td>`;
+      }).join('');
+      if (ex) { excelCount++; if (rowMismatch) mismatchCount++; }
+      return `<tr${rowMismatch ? ' style="background:rgba(239,68,68,.10);"' : ''}><td style="padding:3px 6px;white-space:nowrap;">${d}</td>${cells}</tr>`;
+    }).join('');
+
+    const summary = excelCount > 0
+      ? (mismatchCount > 0
+          ? `<span style="color:var(--red);">불일치 ${mismatchCount}일</span> / 대조 ${excelCount}일`
+          : `<span style="color:var(--green);">전체 일치</span> (대조 ${excelCount}일)`)
+      : `<span style="color:var(--text2);font-weight:400;">엑셀 대조 데이터 없음 — 최신 엑셀을 "가져오기" 해주세요</span>`;
+
+    html += `
+    <div style="margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px;">${m} — ${summary}</div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:11px;">
+          <thead><tr style="color:var(--text2);border-bottom:1px solid var(--border);text-align:right;">
+            <th style="text-align:left;padding:3px 6px;">날짜</th>
+            <th style="padding:3px 6px;">광주</th><th style="padding:3px 6px;">전남</th>
+            <th style="padding:3px 6px;">나주</th><th style="padding:3px 6px;">순천</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  });
+  box.innerHTML = html;
+}
+// ══════════════════════════════════════════
 // 자동 체크 (60초마다 재고 경보)
 // ══════════════════════════════════════════
 // 알람 발령 기록 (오늘 날짜 기준 오전/오후 각 1회만 울림)
@@ -13140,6 +13292,8 @@ function parseXlsxFile(file) {
       // 파일명에서 연도 추출 (예: 2026_연료입고내역.xlsx → 2026), 없으면 현재 연도
       const fnYear = parseInt((file.name || '').match(/20\d{2}/)?.[0] || new Date().getFullYear());
       _xlsxRawRecords = [];
+      _xlsxFcRecords = [];
+      _xlsxStockRecords = {};
       _xlsxSkipped = 0;
       let sheetCount = 0;
       monthSheets.forEach(sheetName => {
@@ -13231,6 +13385,25 @@ function parseXlsxFile(file) {
             if (gj+jn+nj+sc > 0) {
               _usageDataBySilo[dateKey] = {GJ: gj, JN: jn, NJ: nj, SC: sc};
             }
+            // AX~BK: 교대별(N/S,D/S,A/S) 크레인 계량(kg) + 보정량(최종) → "연료사용량 계산" 탭 저장 이력(_fcHistory) 동기화용
+            // AX~BA=N/S, BB~BE=D/S, BF~BI=A/S (각 광주/전남/나주/순천), BJ=크레인 합계(kg), BK=보정량(최종, 톤)
+            const ns = {GJ: parseFloat(row[49])||0, JN: parseFloat(row[50])||0, NJ: parseFloat(row[51])||0, SC: parseFloat(row[52])||0};
+            const ds = {GJ: parseFloat(row[53])||0, JN: parseFloat(row[54])||0, NJ: parseFloat(row[55])||0, SC: parseFloat(row[56])||0};
+            const as_= {GJ: parseFloat(row[57])||0, JN: parseFloat(row[58])||0, NJ: parseFloat(row[59])||0, SC: parseFloat(row[60])||0};
+            const craneKg = parseFloat(row[61])||0;
+            const finalCorrX = parseFloat(row[62])||0;
+            if (craneKg > 0 || finalCorrX > 0) {
+              _xlsxFcRecords.push({date: dateKey, shifts:{NS:ns, DS:ds, AS:as_}, craneKg, finalCorr: finalCorrX});
+            }
+            // AE~AI: 저장조별 재고량(광주/전남/나주/순천/합계) → 일자별 재고 비교표(엑셀 대조)용
+            const aeVal=row[30], afVal=row[31], agVal=row[32], ahVal=row[33], aiVal=row[34];
+            const s1 = parseFloat(aeVal), s2 = parseFloat(afVal), s4 = parseFloat(agVal), s3 = parseFloat(ahVal), tot = parseFloat(aiVal);
+            if (!isNaN(s1) || !isNaN(s2) || !isNaN(s3) || !isNaN(s4)) {
+              _xlsxStockRecords[dateKey] = {
+                S1: isNaN(s1)?0:s1, S2: isNaN(s2)?0:s2, S3: isNaN(s3)?0:s3, S4: isNaN(s4)?0:s4,
+                total: isNaN(tot) ? (s1+s2+s3+s4) : tot
+              };
+            }
           }
           const usageDays = Object.values(_usageData).filter(v => v >= 1).length;
           console.log(`[연료관리] ${fnYear}년 사용량 데이터 ${Object.keys(_usageData).length}일, 가동일수 후보 ${usageDays}일`);
@@ -13245,8 +13418,9 @@ function parseXlsxFile(file) {
       const dates = _xlsxRawRecords.map(r=>r.datetime.slice(0,10)).sort();
       const usageCount = Object.keys(_usageData).length;
       const usageInfo = usageCount > 0 ? ` · 연료관리 ${usageCount}일` : '';
+      const fcInfo = _xlsxFcRecords.length > 0 ? ` · 크레인/저장이력 ${_xlsxFcRecords.length}일` : '';
       const skipInfo = _xlsxSkipped > 0 ? ` · <span style="color:var(--yellow)">⚠️ 0.5t 미만 ${_xlsxSkipped}건 제외</span>` : '';
-      statusEl.innerHTML = `✅ <strong style="color:var(--green)">${_xlsxRawRecords.length}건</strong> 추출 완료 · ${sheetCount}개 시트 · 기간: ${dates[0]} ~ ${dates[dates.length-1]}${usageInfo}${skipInfo}`;
+      statusEl.innerHTML = `✅ <strong style="color:var(--green)">${_xlsxRawRecords.length}건</strong> 추출 완료 · ${sheetCount}개 시트 · 기간: ${dates[0]} ~ ${dates[dates.length-1]}${usageInfo}${fcInfo}${skipInfo}`;
       document.getElementById('xlsxPreviewLabel').textContent = `${_xlsxRawRecords.length}건을 기존 DB와 합쳐서 가져옵니다. (중복 일자는 덮어씁니다)`;
       document.getElementById('xlsxImportPreview').style.display = 'block';
     } catch(err) {
@@ -13281,9 +13455,50 @@ function confirmXlsxImport() {
     const yrRecords = db.filter(r => r.datetime.startsWith(yr));
     saveYearDbToStorage(yr, yrRecords);
   });
-  toast('green','가져오기 완료',`${_xlsxRawRecords.length}건 DB에 적용 및 저장됨`);
+  // ── 저장 이력(_fcHistory) 동기화: 엑셀에 크레인(AX~BK) 데이터가 있는 날짜만 upsert ──
+  // (엑셀에 없는 날짜의 기존 이력/수기입력·직접입력은 건드리지 않음 — "연료사용량 계산" 탭 저장 이력이
+  //  엑셀 재import 후에도 항상 누락 없이 최신 상태를 반영하도록 함)
+  let fcSyncCount = 0;
+  if (_xlsxFcRecords.length > 0) {
+    _xlsxFcRecords.forEach(fr => {
+      const sm = {GJ:0, JN:0, NJ:0, SC:0};
+      ['NS','DS','AS'].forEach(sh => ['GJ','JN','NJ','SC'].forEach(sl => { sm[sl] += fr.shifts[sh][sl]; }));
+      const totalKg = Object.values(sm).reduce((a,b)=>a+b, 0);
+      const craneTon = fr.craneKg / 1000;
+      const manualTon = fr.finalCorr > 0 ? fr.finalCorr : craneTon;
+      const finalCorr = manualTon;
+      // 크레인 있는 날: 실제 크레인-보정량 편차 표시 / 크레인 없는 날(이론상 없음): 0
+      const diff = (craneTon > 0) ? (craneTon - manualTon) : 0;
+      let ok = null;
+      if (totalKg > 0) {
+        const distSum = parseFloat(
+          ['GJ','JN','NJ','SC'].reduce((s, sl) => s + parseFloat((manualTon * sm[sl] / totalKg).toFixed(2)), 0).toFixed(2)
+        );
+        ok = (distSum === parseFloat(manualTon.toFixed(2)));
+      }
+      const rec = { date: fr.date, shifts: fr.shifts, craneKg: fr.craneKg, craneTon,
+        manualTon, finalCorr, diff, ok, directSilo: null };
+      const idx = _fcHistory.findIndex(r => r.date === fr.date);
+      if (idx >= 0) _fcHistory.splice(idx, 1, rec); else _fcHistory.push(rec);
+      fcSyncCount++;
+    });
+    _fcHistory.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    if (typeof saveFuelCalcHistoryToStorage === 'function') saveFuelCalcHistoryToStorage();
+  }
+  // ── 일자별 재고(엑셀 AE~AI) 비교용 참조값 저장 ──
+  const stockRefCount = Object.keys(_xlsxStockRecords).length;
+  if (stockRefCount > 0) {
+    Object.assign(_xlsxStockByDate, _xlsxStockRecords);
+    saveXlsxStockToStorage();
+  }
+  if (typeof recalcStockFromBaseline === 'function') recalcStockFromBaseline();
+  if (typeof renderFuelCalcHistory === 'function') renderFuelCalcHistory();
+  if (typeof dailyStockCompareOpen !== 'undefined' && dailyStockCompareOpen && typeof renderDailyStockCompare === 'function') renderDailyStockCompare();
+  toast('green','가져오기 완료',`${_xlsxRawRecords.length}건 DB 적용${fcSyncCount ? ` · 저장 이력 ${fcSyncCount}일 동기화` : ''}${stockRefCount ? ` · 재고 대조 ${stockRefCount}일` : ''} 및 저장됨`);
   document.getElementById('xlsxImportPreview').style.display = 'none';
   _xlsxRawRecords = [];
+  _xlsxFcRecords = [];
+  _xlsxStockRecords = {};
   generateSchedule();
   renderMonthlyLedger();
   // 연료관리 탭 데이터가 로드됐으면 가동일수 자동 계산
@@ -18723,7 +18938,8 @@ function saveFuelCalc() {
                  : null;
 
   if (data.manualTon !== null) {
-    data.diff = data.craneTon - data.manualTon;
+    // 크레인 계량이 없는 날(craneTon=0)은 비교 대상이 없으므로 편차 0 처리(허위 대량 음수 편차 방지)
+    data.diff = (data.craneTon > 0) ? (data.craneTon - data.manualTon) : 0;
   }
   // OK 판단: 수기입력합 있을 때만
   // 지자체별 배분합(각 소수점2자리) == 수기입력합(소수점2자리) — 크레인 있으면 크레인비율, 없으면 직접입력값 사용
@@ -18746,7 +18962,8 @@ function saveFuelCalc() {
       );
       data.ok = (distSum2 === parseFloat(data.manualTon.toFixed(2)));
     } else {
-      data.ok = null;
+      // 크레인/직접입력 모두 없는 순수 수기입력일: 수기합계 == 보정량(최종)이면 OK
+      data.ok = (data.finalCorr !== null) ? (parseFloat(data.manualTon.toFixed(2)) === parseFloat(data.finalCorr.toFixed(2))) : null;
     }
   } else {
     data.ok = null;
@@ -18935,7 +19152,7 @@ function saveHistoryRowEdit(i) {
     r.finalCorr = _dTotal;
   }
   // diff 재계산
-  r.diff = (r.manualTon !== null) ? (r.craneTon - r.manualTon) : null;
+  r.diff = (r.manualTon !== null) ? ((r.craneTon > 0) ? (r.craneTon - r.manualTon) : 0) : null;
   // ok
   const okSel = tr.querySelector('select[data-field="ok"]');
   if (okSel) {
@@ -19187,9 +19404,30 @@ function reimportUsageFromExcel(input) {
         const gj=parseFloat(zVal)||0, jn=parseFloat(aaVal)||0,
               nj=parseFloat(abVal)||0, sc=parseFloat(acVal)||0;
         if (gj+jn+nj+sc > 0) _usageDataBySilo[dateKey] = {GJ:gj, JN:jn, NJ:nj, SC:sc};
+        // 저장조별 재고량(AE~AI, idx30~34) → 일자별 재고 비교표(엑셀 대조)용
+        const aeVal=row[30], afVal=row[31], agVal=row[32], ahVal=row[33], aiVal=row[34];
+        if (aeVal!=null || afVal!=null || agVal!=null || ahVal!=null || aiVal!=null) {
+          const _s1=parseFloat(aeVal)||0, _s2=parseFloat(afVal)||0, _s4=parseFloat(agVal)||0, _s3=parseFloat(ahVal)||0;
+          const _tot = (aiVal!=null) ? (parseFloat(aiVal)||0) : (_s1+_s2+_s3+_s4);
+          _xlsxStockByDate[dateKey] = {S1:_s1, S2:_s2, S3:_s3, S4:_s4, total:_tot};
+        }
         // ── 저장이력 자동 등록 ──
         if (!isNaN(usage) && usage > 0) {
           const hasShift = (craneKgRaw > 0);
+          const craneTonV = hasShift ? craneKgRaw/1000 : 0;
+          const manualTonV = corrTon > 0 ? corrTon : usage; // ★ 보정량최종 없으면 AD열(보정 사용량)을 수기합계/보정량에
+          // 편차: 크레인 있는 날만 실측 대비 편차 표시, 없으면 0 (허위 대량 음수 편차 방지)
+          const diffV = (craneTonV > 0) ? (craneTonV - manualTonV) : 0;
+          // 확인: 크레인 있으면 저장조 배분합==수기합계 대조, 없으면 수기합계==보정량 대조
+          let okV = null;
+          const sm = {GJ:ns_gj+ds_gj+as_gj, JN:ns_jn+ds_jn+as_jn, NJ:ns_nj+ds_nj+as_nj, SC:ns_sc+ds_sc+as_sc};
+          const totalKgV = sm.GJ+sm.JN+sm.NJ+sm.SC;
+          if (totalKgV > 0) {
+            const distSumV = parseFloat(['GJ','JN','NJ','SC'].reduce((s,sl)=> s+parseFloat((manualTonV*sm[sl]/totalKgV).toFixed(2)),0).toFixed(2));
+            okV = (distSumV === parseFloat(manualTonV.toFixed(2)));
+          } else {
+            okV = (parseFloat(manualTonV.toFixed(2)) === parseFloat((corrTon>0?corrTon:usage).toFixed(2)));
+          }
           const histData = {
             date: dateKey,
             shifts: {
@@ -19198,11 +19436,12 @@ function reimportUsageFromExcel(input) {
               AS: {GJ:as_gj, JN:as_jn, NJ:as_nj, SC:as_sc}
             },
             craneKg: craneKgRaw,
-            craneTon: hasShift ? craneKgRaw/1000 : usage,
-            manualTon: null,
+            craneTon: craneTonV,
+            manualTon: manualTonV,
             finalCorr: corrTon > 0 ? corrTon : (usage > 0 ? usage : null), // ★ 보정량최종 없으면 AD열(보정 사용량)을 보정량에
-            diff: null,
-            ok: null,  // 엑셀 임포트: 수동 검증 불필요
+            diff: diffV,
+            ok: okV,
+            directSilo: null,
             source: 'excel'
           };
           const idx = _fcHistory.findIndex(r => r.date === dateKey);
@@ -19215,6 +19454,8 @@ function reimportUsageFromExcel(input) {
       saveFuelCalcHistoryToStorage();
       renderFuelCalcHistory();
       saveUsageDataToStorage();
+      saveXlsxStockToStorage();
+      if (typeof recalcStockFromBaseline === 'function') recalcStockFromBaseline();
       renderDashboard();
       calcOpDaysFromDB();
       toast('green', '재import 완료', `사용량 ${count}일 · 이력 ${histCount}건 등록 (교대데이터 포함)`);
