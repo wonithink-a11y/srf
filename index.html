@@ -5753,6 +5753,31 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       </table>
     </div>
 
+    <!-- 저장조별 직접입력 (크레인 계량 없는 날) -->
+    <div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:18px;background:var(--bg3);">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px;">
+        🪣 저장조별 직접입력 <span style="font-weight:400;opacity:.75;">— 크레인 계량이 없는 날, N/D/A 구분 없이 저장조별 하루 총사용량을 바로 입력 (입력 시 보정량(최종)·배분량에 자동 반영)</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:12px;font-weight:700;color:#38bdf8;width:34px;">광주</span>
+          <input type="number" id="fcDirect_GJ" placeholder="0.00" step="0.01" style="width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;font-size:13px;" oninput="updateFuelCalcSummary()">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:12px;font-weight:700;color:#22c55e;width:34px;">전남</span>
+          <input type="number" id="fcDirect_JN" placeholder="0.00" step="0.01" style="width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;font-size:13px;" oninput="updateFuelCalcSummary()">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:12px;font-weight:700;color:#a78bfa;width:34px;">나주</span>
+          <input type="number" id="fcDirect_NJ" placeholder="0.00" step="0.01" style="width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;font-size:13px;" oninput="updateFuelCalcSummary()">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:12px;font-weight:700;color:#f59e0b;width:34px;">순천</span>
+          <input type="number" id="fcDirect_SC" placeholder="0.00" step="0.01" style="width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;font-size:13px;" oninput="updateFuelCalcSummary()">
+        </div>
+      </div>
+    </div>
+
     <!-- 수기작성합 / 보정량 / 편차 / 확인 -->
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px;">
       <div style="background:var(--bg3);border-radius:8px;padding:11px 12px;">
@@ -18457,9 +18482,14 @@ function loadFuelCalcHistoryFromStorage() {
     // (이력에 없는 날짜 — 예: 엑셀 재import분 — 은 건드리지 않음)
     _fcHistory.forEach(r => {
       if (!r.date) return;
+      const dSilo = r.directSilo || null;
+      const dTotal = dSilo ? ((dSilo.GJ||0)+(dSilo.JN||0)+(dSilo.NJ||0)+(dSilo.SC||0)) : 0;
       // 보정량(최종)이 비고 수기합계가 있으면 보정량을 수기합계로 채움(과거 데이터 보정)
       if ((r.finalCorr === null || r.finalCorr === undefined) && r.manualTon !== null && r.manualTon !== undefined && r.manualTon > 0) {
         r.finalCorr = r.manualTon;
+      } else if ((r.finalCorr === null || r.finalCorr === undefined) && (r.manualTon === null || r.manualTon === undefined || r.manualTon <= 0) && dTotal > 0) {
+        // 수기합계도 없고 저장조별 직접입력만 있으면 그 합계를 보정량으로 채움
+        r.finalCorr = dTotal;
       }
       // 차감 기준값 = 보정량(최종) > 수기합계 > null(보류)
       const usageTon = _fcDeductVal(r);
@@ -18474,7 +18504,18 @@ function loadFuelCalcHistoryFromStorage() {
           ['GJ','JN','NJ','SC'].forEach(sl => {
             _usageDataBySilo[r.date][sl] = parseFloat((usageTon * sm[sl] / totalKg).toFixed(2));
           });
+        } else if (dTotal > 0) {
+          // 크레인 없음 → 저장조별 직접입력 비율로 배분 (기존에 저장돼 있던 값 보존/복원)
+          _usageDataBySilo[r.date] = {};
+          ['GJ','JN','NJ','SC'].forEach(sl => {
+            _usageDataBySilo[r.date][sl] = parseFloat((usageTon * (dSilo[sl]||0) / dTotal).toFixed(2));
+          });
         }
+      } else if (dTotal > 0) {
+        _usageDataBySilo[r.date] = {};
+        ['GJ','JN','NJ','SC'].forEach(sl => {
+          _usageDataBySilo[r.date][sl] = parseFloat((usageTon * (dSilo[sl]||0) / dTotal).toFixed(2));
+        });
       }
     });
     saveFuelCalcHistoryToStorage();  // 보정량 자동 채움분 영구 저장
@@ -18545,13 +18586,25 @@ function updateFuelCalcSummary() {
   const elFC = document.getElementById('fcFinalCorrection');
   // 보정량(최종)은 지자체별 배분합이 계산된 후 업데이트 (아래 distSum 계산 후 반영)
 
+  // 저장조별 직접입력 (크레인 계량 없는 날, N/D/A 구분 없이 저장조 총사용량 직접 입력)
+  const directVals = {};
+  ['GJ','JN','NJ','SC'].forEach(sl => {
+    const el = document.getElementById(`fcDirect_${sl}`);
+    directVals[sl] = el ? (parseFloat(el.value) || 0) : 0;
+  });
+  const directTotal = Object.values(directVals).reduce((a,b)=>a+b, 0);
+  const hasDirect = directTotal > 0;
+
   // ── 지자체별 배분량 계산 ──
   const siloMap = {GJ:0, JN:0, NJ:0, SC:0};
   ['NS','DS','AS'].forEach(sh => {
     ['GJ','JN','NJ','SC'].forEach(sl => { siloMap[sl] += _fcGetVal(sh, sl); });
   });
   const totalCraneKg = Object.values(siloMap).reduce((a,b)=>a+b, 0);
-  const baseVal = manualVal !== null ? manualVal : (totalCraneKg > 0 ? totalCraneKg/1000 : null);
+  // 크레인 계량이 없고 저장조별 직접입력이 있으면 그 합계를 기준값으로 사용
+  const baseVal = manualVal !== null ? manualVal
+    : (totalCraneKg > 0 ? totalCraneKg/1000
+    : (hasDirect ? directTotal : null));
 
   let distSum = 0;
   const distVals = {};
@@ -18559,35 +18612,37 @@ function updateFuelCalcSummary() {
     const elD = document.getElementById(`fcDist_${sl}`);
     const elP = document.getElementById(`fcPct_${sl}`);
     if (!elD) return;
-    if (baseVal === null || totalCraneKg === 0) {
+    if (totalCraneKg > 0 && baseVal !== null) {
+      // 크레인 kg 비율로 배분
+      const ratio = siloMap[sl] / totalCraneKg;
+      const distTon = parseFloat((baseVal * ratio).toFixed(2));
+      distVals[sl] = distTon;
+      distSum += distTon;
+      elD.textContent = distTon.toFixed(2);
+      if (elP) elP.textContent = (ratio * 100).toFixed(2) + '%';
+    } else if (hasDirect) {
+      // 크레인 없음 → 저장조별 직접입력값을 그대로 사용
+      const distTon = parseFloat(directVals[sl].toFixed(2));
+      distVals[sl] = distTon;
+      distSum += distTon;
+      elD.textContent = distTon.toFixed(2);
+      if (elP) elP.textContent = (directTotal > 0 ? (directVals[sl] / directTotal * 100).toFixed(2) : '0.00') + '%';
+    } else {
       elD.textContent = '—'; if (elP) elP.textContent = '—%';
-      distVals[sl] = null; return;
+      distVals[sl] = null;
     }
-    const ratio = siloMap[sl] / totalCraneKg;
-    const distTon = parseFloat((baseVal * ratio).toFixed(2));
-    distVals[sl] = distTon;
-    distSum += distTon;
-    elD.textContent = distTon.toFixed(2);
-    if (elP) elP.textContent = (ratio * 100).toFixed(2) + '%';
   });
+  const distAvailable = (totalCraneKg > 0 && baseVal !== null) || hasDirect;
 
   // 합계 칸 업데이트
   const elTotal = document.getElementById('fcDist_total');
   if (elTotal) {
-    if (baseVal !== null && totalCraneKg > 0) {
-      elTotal.textContent = parseFloat(distSum.toFixed(2)).toFixed(2);
-    } else {
-      elTotal.textContent = '—';
-    }
+    elTotal.textContent = distAvailable ? parseFloat(distSum.toFixed(2)).toFixed(2) : '—';
   }
 
   // 보정량(최종) = 지자체별 배분합 (소수점 2자리)
   if (elFC) {
-    if (baseVal !== null && totalCraneKg > 0) {
-      elFC.textContent = parseFloat(distSum.toFixed(2)).toFixed(2) + ' 톤';
-    } else {
-      elFC.textContent = '—';
-    }
+    elFC.textContent = distAvailable ? (parseFloat(distSum.toFixed(2)).toFixed(2) + ' 톤') : '—';
   }
 
   // ── 편차 & 확인 ──
@@ -18596,9 +18651,10 @@ function updateFuelCalcSummary() {
   const elDiff   = document.getElementById('fcDiff');
   const elStatus = document.getElementById('fcStatus');
 
-  if (manualVal !== null && totalCraneKg > 0) {
-    // 편차: 크레인합계 - 수기입력합
-    const diff = craneTon - manualVal;
+  if (manualVal !== null && distAvailable) {
+    // 편차: (크레인 있으면 크레인합계, 없으면 배분합) - 수기입력합
+    const refTon = totalCraneKg > 0 ? craneTon : distSum;
+    const diff = refTon - manualVal;
     if (elDiff) {
       elDiff.textContent = (diff >= 0 ? '+' : '') + diff.toFixed(3) + ' 톤';
       elDiff.style.color = Math.abs(diff) < 0.001 ? 'var(--green)' : 'var(--yellow)';
@@ -18634,7 +18690,7 @@ function saveFuelCalc() {
 
   const shifts = ['NS','DS','AS'];
   const silos  = ['GJ','JN','NJ','SC'];
-  const data = { date: dateVal, shifts: {}, craneKg: 0, craneTon: 0, manualTon: null, finalCorr: null, diff: null, ok: null };
+  const data = { date: dateVal, shifts: {}, craneKg: 0, craneTon: 0, manualTon: null, finalCorr: null, diff: null, ok: null, directSilo: null };
 
   shifts.forEach(sh => {
     data.shifts[sh] = {};
@@ -18646,22 +18702,31 @@ function saveFuelCalc() {
   data.craneKg = grandKg;
   data.craneTon = grandKg / 1000;
 
+  // 저장조별 직접입력 (크레인 계량이 없는 날, N/D/A 구분 없이 저장조 총사용량 직접 입력)
+  const directSilo = {};
+  silos.forEach(sl => {
+    const el = document.getElementById(`fcDirect_${sl}`);
+    directSilo[sl] = el ? (parseFloat(el.value) || 0) : 0;
+  });
+  const directTotal = Object.values(directSilo).reduce((a,b)=>a+b, 0);
+  if (directTotal > 0) data.directSilo = directSilo;
+
   const manualEl = document.getElementById('fcManualTotal');
   data.manualTon = manualEl ? (parseFloat(manualEl.value) || null) : null;
 
   const corrInput = document.getElementById('fcManualCorrection');
   const corrVal = corrInput ? (parseFloat(corrInput.value) || null) : null;
-  // 보정량(최종) = 명시적 보정량 입력 > 수기합계 > (둘 다 없으면 null=보류)
-  // 수기합계를 저장하면 보정량(최종)이 그 값으로 채워진다(= 실제 차감 기준값).
+  // 보정량(최종) = 명시적 보정량 입력 > 수기합계 > 저장조별 직접입력 합계 > (모두 없으면 null=보류)
   data.finalCorr = (corrVal !== null && corrVal > 0) ? corrVal
                  : (data.manualTon !== null && data.manualTon > 0) ? data.manualTon
+                 : (directTotal > 0) ? directTotal
                  : null;
 
   if (data.manualTon !== null) {
     data.diff = data.craneTon - data.manualTon;
   }
   // OK 판단: 수기입력합 있을 때만
-  // 지자체별 배분합(각 소수점2자리) == 수기입력합(소수점2자리)
+  // 지자체별 배분합(각 소수점2자리) == 수기입력합(소수점2자리) — 크레인 있으면 크레인비율, 없으면 직접입력값 사용
   if (data.manualTon !== null) {
     const sm2 = {GJ:0, JN:0, NJ:0, SC:0};
     ['NS','DS','AS'].forEach(sh => ['GJ','JN','NJ','SC'].forEach(sl => { sm2[sl] += (data.shifts[sh][sl]||0); }));
@@ -18670,6 +18735,13 @@ function saveFuelCalc() {
       const distSum2 = parseFloat(
         ['GJ','JN','NJ','SC']
           .reduce((s,sl) => s + parseFloat((data.manualTon * sm2[sl] / totalKg2).toFixed(2)), 0)
+          .toFixed(2)
+      );
+      data.ok = (distSum2 === parseFloat(data.manualTon.toFixed(2)));
+    } else if (directTotal > 0) {
+      const distSum2 = parseFloat(
+        ['GJ','JN','NJ','SC']
+          .reduce((s,sl) => s + parseFloat(directSilo[sl].toFixed(2)), 0)
           .toFixed(2)
       );
       data.ok = (distSum2 === parseFloat(data.manualTon.toFixed(2)));
@@ -18690,7 +18762,8 @@ function saveFuelCalc() {
   const applied = (usageTon !== null);
   if (applied) {
     _usageData[dateVal] = usageTon;
-    // 지자체별 배분 저장 (차감값 ÷ 크레인합계 비율 × 저장조별 크레인량)
+    // 지자체별 배분 저장: 크레인 있으면 (차감값 ÷ 크레인합계 비율 × 저장조별 크레인량),
+    // 크레인 없고 직접입력 있으면 (차감값 ÷ 직접입력합계 비율 × 저장조별 직접입력량)
     const siloMap = {GJ:0, JN:0, NJ:0, SC:0};
     ['NS','DS','AS'].forEach(sh => {
       ['GJ','JN','NJ','SC'].forEach(sl => { siloMap[sl] += (data.shifts[sh][sl] || 0); });
@@ -18701,6 +18774,13 @@ function saveFuelCalc() {
       ['GJ','JN','NJ','SC'].forEach(sl => {
         _usageDataBySilo[dateVal][sl] = parseFloat((usageTon * siloMap[sl] / totalCraneKg).toFixed(2));
       });
+    } else if (directTotal > 0) {
+      _usageDataBySilo[dateVal] = {};
+      ['GJ','JN','NJ','SC'].forEach(sl => {
+        _usageDataBySilo[dateVal][sl] = parseFloat((usageTon * directSilo[sl] / directTotal).toFixed(2));
+      });
+    } else {
+      delete _usageDataBySilo[dateVal];
     }
   } else {
     // 보류: 이전에 차감됐던 값이 있으면 제거
@@ -18717,7 +18797,7 @@ function saveFuelCalc() {
   } else if (applied) {
     toast('green', '저장 완료', `${dateVal} 연료사용량 저장됨 (저장조 차감: ${usageTon.toFixed(3)}t, 수기합계 기준)`);
   } else {
-    toast('yellow', '수기합계 미입력 — 차감 보류', `${dateVal} 저장됨. 수기작성합을 입력하고 저장하면 저장조에서 차감됩니다.`);
+    toast('yellow', '수기합계 미입력 — 차감 보류', `${dateVal} 저장됨. 수기작성합 또는 저장조별 직접입력을 채우고 저장하면 저장조에서 차감됩니다.`);
   }
 }
 
@@ -18751,7 +18831,7 @@ function renderFuelCalcHistory() {
         <option value="true" ${r.ok===true?'selected':''}>✅ OK</option>
         <option value="false" ${r.ok===false?'selected':''}>⚠️ 재확인</option>
       </select>`;
-      return `<tr style="background:rgba(56,189,248,.08);">
+      return `<tr data-idx="${i}" style="background:rgba(56,189,248,.08);">
         <td style="font-weight:600;font-size:11px;">${r.date}</td>
         ${shiftInputs}
         <td style="text-align:center;font-size:11px;">${r.craneTon.toFixed(3)}</td>
@@ -18773,7 +18853,7 @@ function renderFuelCalcHistory() {
     const _pending = (_fcDeductVal(r) === null);  // 보정량(최종)·수기합계 둘 다 없을 때만 보류
     const diffClr = _pending ? 'color:var(--yellow)' : (r.ok === null ? '' : (r.ok ? 'color:var(--green)' : 'color:var(--red)'));
     const statusTxt = _pending ? '⏸️ 보류' : (r.ok === null ? '—' : (r.ok === true ? '✅ OK' : '⚠️ 재확인'));
-    return `<tr>
+    return `<tr data-idx="${i}">
       <td style="font-weight:600;">${r.date}</td>
       ${cells}
       <td style="text-align:center;font-weight:700;color:#f472b6;background:rgba(244,114,182,.12);">${r.craneTon.toFixed(3)}</td>
@@ -18798,9 +18878,9 @@ function editHistoryRow(i) {
   const lbl = document.getElementById('fcEditDateLabel');
   if (lbl) lbl.textContent = (_fcHistory[i] && _fcHistory[i].date) ? _fcHistory[i].date : '';
   if (bar) bar.style.display = 'flex';
-  // 편집행 스크롤
-  const rows = tbody.querySelectorAll('tr');
-  if (rows[i]) rows[i].scrollIntoView({behavior:'smooth', block:'center'});
+  // 편집행 스크롤 (data-idx로 정확히 조회 — 숨김행이 있으면 DOM 순서가 배열 인덱스와 달라짐)
+  const editRow = tbody.querySelector(`tr[data-idx="${i}"]`);
+  if (editRow) editRow.scrollIntoView({behavior:'smooth', block:'center'});
 }
 
 function _hideFcEditBar() {
@@ -18825,8 +18905,11 @@ function cancelHistoryRowEdit() {
 
 function saveHistoryRowEdit(i) {
   const tbody = document.getElementById('fcHistoryBody');
-  const tr = tbody.querySelectorAll('tr')[i]; // 렌더된 행은 _fcHistory와 1:1 → i번째 행이 편집행
+  // ★ 버그수정(2026-08-26): 사용량 미입력(보류) 행은 화면에서 숨겨지므로, DOM 순서와 배열 인덱스가 어긋날 수 있음.
+  //   querySelectorAll('tr')[i] 로 찾으면 엉뚱한 행을 읽어와 수기합계/보정량이 사라지는 버그가 있었음 → data-idx로 정확히 조회.
+  const tr = tbody.querySelector(`tr[data-idx="${i}"]`);
   const r = _fcHistory[i];
+  if (!tr || !r) { console.warn('[saveHistoryRowEdit] 행을 찾을 수 없음:', i); return; }
   // 교대별 kg
   tr.querySelectorAll('input[data-sh]').forEach(inp => {
     const sh = inp.dataset.sh, sl = inp.dataset.sl;
@@ -18843,8 +18926,13 @@ function saveHistoryRowEdit(i) {
   const fcInp = tr.querySelector('input[data-field="finalCorr"]');
   r.finalCorr = fcInp && fcInp.value !== '' ? (parseFloat(fcInp.value) || null) : null;
   // 보정량(최종)이 비어 있고 수기합계가 있으면 보정량을 수기합계로 자동 채움
+  // (수기합계도 없고 저장조별 직접입력이 저장돼 있으면 그 합계로 채움)
+  const _dSilo = r.directSilo || null;
+  const _dTotal = _dSilo ? ((_dSilo.GJ||0)+(_dSilo.JN||0)+(_dSilo.NJ||0)+(_dSilo.SC||0)) : 0;
   if ((r.finalCorr === null || r.finalCorr === undefined) && r.manualTon !== null && r.manualTon > 0) {
     r.finalCorr = r.manualTon;
+  } else if ((r.finalCorr === null || r.finalCorr === undefined) && (r.manualTon === null || r.manualTon === undefined || r.manualTon <= 0) && _dTotal > 0) {
+    r.finalCorr = _dTotal;
   }
   // diff 재계산
   r.diff = (r.manualTon !== null) ? (r.craneTon - r.manualTon) : null;
@@ -18867,6 +18955,12 @@ function saveHistoryRowEdit(i) {
       _usageDataBySilo[r.date] = {};
       ['GJ','JN','NJ','SC'].forEach(sl => {
         _usageDataBySilo[r.date][sl] = parseFloat((usageTon * siloMap[sl] / totalCraneKg).toFixed(2));
+      });
+    } else if (_dTotal > 0) {
+      // 크레인 없음 → 기존 저장조별 직접입력값 비율로 배분 (편집 시 임의 삭제 방지)
+      _usageDataBySilo[r.date] = {};
+      ['GJ','JN','NJ','SC'].forEach(sl => {
+        _usageDataBySilo[r.date][sl] = parseFloat((usageTon * (_dSilo[sl]||0) / _dTotal).toFixed(2));
       });
     } else {
       delete _usageDataBySilo[r.date];
@@ -18920,6 +19014,10 @@ function resetFuelCalc() {
   if (manualEl) manualEl.value = '';
   const corrEl = document.getElementById('fcManualCorrection');
   if (corrEl) corrEl.value = '';
+  ['GJ','JN','NJ','SC'].forEach(sl => {
+    const el = document.getElementById(`fcDirect_${sl}`);
+    if (el) el.value = '';
+  });
   updateFuelCalcSummary();
 }
 
