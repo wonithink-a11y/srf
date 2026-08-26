@@ -653,8 +653,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     <img src="kdhc_logo_header_light.png" alt="한국지역난방공사 KDHC" class="brand-logo brand-logo-light">
     <img src="kdhc_logo_header_dark.png" alt="한국지역난방공사 KDHC" class="brand-logo brand-logo-dark">
     <div class="header-titles">
-      <h1>고형연료 수급 관리 시스템<span class="badge-ver">ver.8</span></h1>
-      <p class="header-subtitle">SRF Fuel Management Dashboard</p>
+      <h1>고형연료 수급 관리 시스템<span class="badge-ver">ver.9</span></h1>
+      <p class="header-subtitle">SRF Fuel Management System</p>
     </div>
   </div>
   <div class="header-right">
@@ -20768,7 +20768,7 @@ function closeAnnNoteModal() {
       const PC_KEY_MAP = {
         [LS.siloStock]:      '_siloStock_v5',       // _siloStock_v1 → _siloStock_v5
         [LS.usageData]:      '_usageData_v5',        // _usageData_v1 → _usageData_v5
-        [LS.usageDataBySilo]:'_usageDataBySilo_v5',  // _usageDataBySilo_v1 → _usageDataBySilo_v5
+        [LS.usageBySilo]:'_usageDataBySilo_v5',  // _usageDataBySilo_v1 → _usageDataBySilo_v5
         '_fcHistory_v1':     '_fcHistory_v1',         // 동일
         '_schedSettings_v4': '_schedSettings_v5',     // _schedSettings_v4 → _schedSettings_v5
       };
@@ -20991,7 +20991,9 @@ function closeAnnNoteModal() {
       const remoteRecs = Array.isArray(data.records) ? data.records : [];
       const globalDb = window._getRecordsDb ? window._getRecordsDb() : null;
       if (!globalDb) { updateSrfLiveStatus(); return; }
-      const closedThrough = (typeof getSyncClosedThrough === 'function') ? getSyncClosedThrough() : (remoteClosedThrough || '0000-00');
+      const localClosedThrough = (typeof getSyncClosedThrough === 'function') ? getSyncClosedThrough() : (remoteClosedThrough || '0000-00');
+      // local이 remote보다 마감기준이 앞서있으면(미반영 상태) remote 기준으로 낮춰서 오픈구간 중복합산 방지
+      const closedThrough = (remoteClosedThrough && remoteClosedThrough < localClosedThrough) ? remoteClosedThrough : localClosedThrough;
       // 마감 전(오픈) 구간의 로컬 레코드는 원격 스냅샷으로 교체 (추가/수정/삭제 모두 반영)
       const closedLocal = globalDb.filter(r => (r.datetime || '').slice(0, 7) <= closedThrough);
       let maxId = closedLocal.reduce((m, r) => Math.max(m, r.id || 0), 0);
