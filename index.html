@@ -134,9 +134,10 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     padding: 7px 12px; border-radius: var(--radius); box-shadow: var(--shadow-card);
   }
   #brandWatermark {
-    position: fixed; right: -60px; bottom: -60px; width: 480px; height: 480px;
+    position: fixed; left: 50%; bottom: 0; width: 480px; height: 480px;
+    transform: translateX(-50%);
     background: url('kdhc_symbol.png') no-repeat center / contain;
-    opacity: .05; pointer-events: none; z-index: 0;
+    opacity: .14; pointer-events: none; z-index: 0;
   }
   #clock { color: var(--text2); font-size: 13px; }
   .notif-btn {
