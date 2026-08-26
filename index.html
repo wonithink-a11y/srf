@@ -9684,7 +9684,7 @@ function saveManualHistoryEntry() {
   resetHmWeightFields();
   renderHistory();
   renderDashboard();
-  if (typeof srfLivePush === 'function') srfLivePush(true);
+  // (수동 업로드 전환 2026-08-26) 입고 CRUD 직후 자동 Firebase 업로드 제거 — '☁️ PC → Firebase 업로드' 버튼을 눌러야만 반영됨
 }
 function clearUploads() {
   uploadedFiles=[]; ocrResults={}; selectedFileIdx=null;
@@ -11252,7 +11252,7 @@ function applyBulkEdit() {
   else showDayAllDetail(_modalDay);
   renderHistory();
   renderDashboard();
-  if (typeof srfLivePush === 'function') srfLivePush(true);
+  // (수동 업로드 전환 2026-08-26) 입고 CRUD 직후 자동 Firebase 업로드 제거 — '☁️ PC → Firebase 업로드' 버튼을 눌러야만 반영됨
 }
 
 // ── 입고 건별 저장조/출처 수정 ──
@@ -11304,7 +11304,7 @@ function saveHistEdit(id, day, siloId) {
   else showDayAllDetail(day);
   renderHistory();
   renderDashboard();
-  if (typeof srfLivePush === 'function') srfLivePush(true);
+  // (수동 업로드 전환 2026-08-26) 입고 CRUD 직후 자동 Firebase 업로드 제거 — '☁️ PC → Firebase 업로드' 버튼을 눌러야만 반영됨
 }
 // ── 입고 건별 삭제 ──
 function deleteHistRow(id, day, siloId) {
@@ -11349,7 +11349,7 @@ function deleteHistRow(id, day, siloId) {
   else showDayAllDetail(day);
   renderHistory();
   renderDashboard();
-  if (typeof srfLivePush === 'function') srfLivePush(true);
+  // (수동 업로드 전환 2026-08-26) 입고 CRUD 직후 자동 Firebase 업로드 제거 — '☁️ PC → Firebase 업로드' 버튼을 눌러야만 반영됨
 }
 function closeHistoryModal() {
   document.getElementById('historyModal').style.display = 'none';
@@ -11740,7 +11740,7 @@ function importCsvData() {
   toast('green', 'CSV 가져오기 완료', msg);
   renderHistory();
   renderDashboard();
-  if (typeof srfLivePush === 'function') srfLivePush(true);
+  // (수동 업로드 전환 2026-08-26) 입고 CRUD 직후 자동 Firebase 업로드 제거 — '☁️ PC → Firebase 업로드' 버튼을 눌러야만 반영됨
 }
 // ── '기준/비교 정정' 버튼: 업로드한 CSV와 비교해, 기존 저장 데이터의 기준/비교가 뒤바뀐 건만 정정 ──
 //   · 저장된 기준 == CSV 기준  → 방향 정상, 그대로 둠
@@ -12018,7 +12018,7 @@ function importOcrCsv() {
   toast('green', '계근데이터 등록 완료', msg);
   renderDashboard();
   if (typeof renderHistory === 'function') renderHistory();
-  if (typeof srfLivePush === 'function') srfLivePush(true);
+  // (수동 업로드 전환 2026-08-26) 입고 CRUD 직후 자동 Firebase 업로드 제거 — '☁️ PC → Firebase 업로드' 버튼을 눌러야만 반영됨
 }
 
 function clearOcrCsv() {
@@ -20743,9 +20743,42 @@ function closeAnnNoteModal() {
     p.style.display = p.style.display === 'none' ? 'block' : 'none';
   };
 
+  // ── 업로드 보호 (실수/무단 클릭 방지용 — 서버 없는 정적 파일이라 완전한 보안은 아님, 개발자도구로 우회 가능) ──
+  const SRF_UPLOAD_PIN = '2488'; // 업로드 PIN — 필요시 이 값만 바꾸면 됨
+  function _srfCheckUploadPin() {
+    const pin = prompt('Firebase 업로드 PIN을 입력하세요:');
+    if (pin === null) return false; // 취소
+    if (pin !== SRF_UPLOAD_PIN) { alert('PIN이 올바르지 않습니다. 업로드가 취소되었습니다.'); return false; }
+    return true;
+  }
+  function _srfBuildUploadSummary() {
+    let stockLine = '재고 정보 없음';
+    try {
+      const stock = JSON.parse(localStorage.getItem(LS.siloStock) || '{}');
+      const names = {S1:'광주', S2:'전남', S3:'순천', S4:'나주'};
+      const parts = Object.keys(stock).map(k => `${names[k]||k} ${(+stock[k]||0).toFixed(2)}t`);
+      const total = Object.values(stock).reduce((a,b)=>a+(+b||0), 0);
+      stockLine = parts.join(' · ') + ` (합계 ${total.toFixed(2)}t)`;
+    } catch(e) {}
+    let rawCountLine = '(입고 기록 확인 불가)';
+    try {
+      const rawdbKeys = Object.keys(localStorage).filter(k => /^_rawdb_\d{4}$/.test(k));
+      rawCountLine = rawdbKeys.map(k => {
+        const arr = JSON.parse(localStorage.getItem(k) || '[]');
+        return `${k.replace('_rawdb_','')}년 ${arr.length}건`;
+      }).join(' · ') || '(없음)';
+    } catch(e) {}
+    return `지금 이 PC의 데이터를 Firebase로 업로드합니다.\n\n입고 기록: ${rawCountLine}\n저장조 재고: ${stockLine}\n\n계속하시겠습니까?`;
+  }
+  function _srfConfirmUpload() {
+    if (!_srfCheckUploadPin()) return false;
+    return confirm(_srfBuildUploadSummary());
+  }
+
   // ── PC → Firebase ──
   window.srfPush = async function() {
     if (!db) { setResult('Firebase 연결 안됨', false); return; }
+    if (!_srfConfirmUpload()) { setResult('업로드 취소됨 (PIN/확인 안됨)', false); return; }
     const btn = document.getElementById('srf-btn-push');
     btn.disabled = true; btn.textContent = '⏳ 업로드 중...';
     setResult('업로드 중...', true);
@@ -21026,6 +21059,7 @@ function closeAnnNoteModal() {
   // ── 월마감 종료: 마감 대상 월을 연간 백업에 영구 보관하고, 자동 동기화 구간(rawdb_live)에서 제외 ──
   window.srfCloseMonth = async function() {
     if (!db) { setResult('Firebase 연결 안됨', false); return; }
+    if (!_srfCheckUploadPin()) { setResult('마감 처리 취소됨 (PIN 확인 안됨)', false); return; }
     if (typeof getSyncClosedThrough !== 'function') return;
     const globalDb = window._getRecordsDb ? window._getRecordsDb() : [];
     const closedThrough = getSyncClosedThrough();
