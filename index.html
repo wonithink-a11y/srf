@@ -3146,13 +3146,13 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       <!-- 재고 유형 선택 -->
       <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
         <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;">
-          <input type="checkbox" id="rpt-chk-jijache" checked onchange="updateRptStockMode()"
+          <input type="checkbox" id="rpt-chk-jijache" onchange="updateRptStockMode()"
             style="accent-color:var(--accent);width:14px;height:14px;">
           <span style="color:var(--accent);font-weight:600;">지자체별</span>
           <span style="color:var(--text2);font-size:10px;">(광주/나주/순천)</span>
         </label>
         <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;">
-          <input type="checkbox" id="rpt-chk-silo" onchange="updateRptStockMode()"
+          <input type="checkbox" id="rpt-chk-silo" checked onchange="updateRptStockMode()"
             style="accent-color:var(--accent);width:14px;height:14px;">
           <span style="color:var(--accent);font-weight:600;">저장조별</span>
           <span style="color:var(--text2);font-size:10px;">(광주/전남/나주/순천 ST)</span>
@@ -6866,6 +6866,7 @@ function saveUsageDataToStorage() {
     localStorage.setItem(LS.usageData, JSON.stringify(_usageData));
     localStorage.setItem(LS.usageBySilo, JSON.stringify(_usageDataBySilo));
   } catch(e) { console.warn('사용량 저장 실패:', e); }
+  if (typeof window._srfAutoPush === 'function') window._srfAutoPush('사용량');
 }
 function saveXlsxStockToStorage() {
   try { localStorage.setItem(LS.xlsxStock, JSON.stringify(_xlsxStockByDate)); }
@@ -9667,6 +9668,7 @@ function applyOverrideDb() {
 }
 function saveRecord(data) {
   db.push({ id:db.length+1, ...data });
+  if (typeof window._srfAutoPush === 'function') window._srfAutoPush('입고량');
 }
 function updateSiloStock(records) {
   records.forEach(r=>{
@@ -21187,9 +21189,11 @@ function closeAnnNoteModal() {
   // ── 업로드 보호 (실수/무단 클릭 방지용 — 서버 없는 정적 파일이라 완전한 보안은 아님, 개발자도구로 우회 가능) ──
   const SRF_UPLOAD_PIN = '2488'; // 업로드 PIN — 필요시 이 값만 바꾸면 됨
   function _srfCheckUploadPin() {
+    if (sessionStorage.getItem('_srfPinOk') === '1') return true; // 이 브라우저 탭을 여는 동안은 재입력 생략
     const pin = prompt('Firebase 업로드 PIN을 입력하세요:');
     if (pin === null) return false; // 취소
     if (pin !== SRF_UPLOAD_PIN) { alert('PIN이 올바르지 않습니다. 업로드가 취소되었습니다.'); return false; }
+    sessionStorage.setItem('_srfPinOk', '1');
     return true;
   }
   function _srfBuildUploadSummary() {
@@ -21216,10 +21220,22 @@ function closeAnnNoteModal() {
     return confirm(_srfBuildUploadSummary());
   }
 
+  // ── 자동 업로드 (보고문 생성 / 사용량 입력 / 입고량 작성 완료 시 조용히 호출) ──
+  // PIN·확인창 없음: 버튼 클릭이 아니라 코드가 직접 트리거하는 것이라 "실수 클릭 방지"가 적용될 대상이 아님.
+  // 여러 번 연달아 호출돼도 디바운스(2.5초 무입력)로 한 번만 업로드해서 과도한 쓰기를 방지.
+  let _srfAutoPushTimer = null;
+  window._srfAutoPush = function(reason) {
+    if (!db) return; // Firebase 연결 전이면 무시 (연결되면 다음 트리거 때 자동으로 다시 시도됨)
+    clearTimeout(_srfAutoPushTimer);
+    _srfAutoPushTimer = setTimeout(function() {
+      window.srfPush(true).catch(function(e) { console.warn('[자동업로드:' + reason + '] 실패:', e); });
+    }, 2500);
+  };
+
   // ── PC → Firebase ──
-  window.srfPush = async function() {
+  window.srfPush = async function(silent) {
     if (!db) { setResult('Firebase 연결 안됨', false); return; }
-    if (!_srfConfirmUpload()) { setResult('업로드 취소됨 (PIN/확인 안됨)', false); return; }
+    if (!silent && !_srfConfirmUpload()) { setResult('업로드 취소됨 (PIN/확인 안됨)', false); return; }
     const btn = document.getElementById('srf-btn-push');
     btn.disabled = true; btn.textContent = '⏳ 업로드 중...';
     setResult('업로드 중...', true);
@@ -21412,7 +21428,8 @@ function closeAnnNoteModal() {
       });
 
       const now = new Date().toLocaleTimeString('ko-KR');
-      setResult(`✅ 가져오기 완료 (${now})\n${preview.join(' · ')}\nF5로 새로고침하세요`, true);
+      setResult(`✅ 가져오기 완료 (${now})\n${preview.join(' · ')}\n곧 자동으로 새로고침됩니다...`, true);
+      setTimeout(function(){ location.reload(); }, 1200); // 불러온 데이터로 화면 자동 갱신
     } catch(e) {
       setResult('❌ 가져오기 실패: ' + e.message, false);
     } finally {
@@ -22150,14 +22167,16 @@ function generateReport() {
   const showJijache = document.getElementById('rpt-chk-jijache')?.checked;
   const showSilo    = document.getElementById('rpt-chk-silo')?.checked;
 
-  // 저장조별 재고
+  // 저장조별 재고 — 광주ST 단독 표기, 전남ST는 전남/순천/나주 합산 + 괄호 세부내역
   const total = s1+s2+s4+s3;
   const siloLines = [];
-  if (s1!==0) siloLines.push(`  광주 ST : ${String(Math.round(s1)).padStart(6)}톤`);
-  if (s2!==0) siloLines.push(`  전남 ST : ${String(Math.round(s2)).padStart(6)}톤`);
-  if (s4!==0) siloLines.push(`  나주 ST : ${String(Math.round(s4)).padStart(6)}톤`);
-  if (s3!==0) siloLines.push(`  순천 ST : ${String(Math.round(s3)).padStart(6)}톤`);
-  siloLines.push(`  전체    : ${String(Math.round(total)).padStart(6)}톤`);
+  if (s1!==0) siloLines.push(`  광주ST : ${String(Math.round(s1)).padStart(6)}톤`);
+  const jnGroup = s2+s4+s3;
+  if (jnGroup!==0) {
+    siloLines.push(`  전남ST : ${String(Math.round(jnGroup)).padStart(6)}톤`);
+    siloLines.push(` (전남 ${Math.round(s2)}/순천 ${Math.round(s3)}/나주 ${Math.round(s4)})`);
+  }
+  siloLines.push(`  전체   : ${String(Math.round(total)).padStart(6)}톤`);
 
   // 지자체별 재고 (임시보관 반영) — 대시보드와 동일 계산(calcOwnershipDetail) 우선 사용
   let gjStock = 0, njStock = 0, scStock = 0;
@@ -22237,6 +22256,7 @@ function generateReport() {
   document.getElementById('rpt-text').textContent = text.trim();
   document.getElementById('rpt-output').style.display = 'block';
   document.getElementById('rpt-output').scrollIntoView({ behavior:'smooth', block:'nearest' });
+  if (typeof window._srfAutoPush === 'function') window._srfAutoPush('보고문');
 }
 
 function copyReport() {
