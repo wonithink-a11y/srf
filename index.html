@@ -9832,7 +9832,8 @@ function saveManualHistoryEntry() {
   resetHmWeightFields();
   renderHistory();
   renderDashboard();
-  // (수동 업로드 전환 2026-08-26) 입고 CRUD 직후 자동 Firebase 업로드 제거 — '☁️ PC → Firebase 업로드' 버튼을 눌러야만 반영됨
+  // (2026-09-03) 수기입력 저장 시 자동 Firebase 업로드
+  if (typeof window._srfAutoPush === 'function') window._srfAutoPush('수기입력');
 }
 function clearUploads() {
   uploadedFiles=[]; ocrResults={}; selectedFileIdx=null;
@@ -11528,7 +11529,8 @@ function applyBulkEdit() {
   else showDayAllDetail(_modalDay);
   renderHistory();
   renderDashboard();
-  // (수동 업로드 전환 2026-08-26) 입고 CRUD 직후 자동 Firebase 업로드 제거 — '☁️ PC → Firebase 업로드' 버튼을 눌러야만 반영됨
+  // (2026-09-03) 일괄변경 저장 시 자동 Firebase 업로드
+  if (typeof window._srfAutoPush === 'function') window._srfAutoPush('일괄변경');
 }
 
 // ── 입고 건별 저장조/출처 수정 ──
@@ -11580,7 +11582,8 @@ function saveHistEdit(id, day, siloId) {
   else showDayAllDetail(day);
   renderHistory();
   renderDashboard();
-  // (수동 업로드 전환 2026-08-26) 입고 CRUD 직후 자동 Firebase 업로드 제거 — '☁️ PC → Firebase 업로드' 버튼을 눌러야만 반영됨
+  // (2026-09-03) 이력 수정 저장 시 자동 Firebase 업로드
+  if (typeof window._srfAutoPush === 'function') window._srfAutoPush('이력수정');
 }
 // ── 입고 건별 삭제 ──
 function deleteHistRow(id, day, siloId) {
@@ -11625,7 +11628,8 @@ function deleteHistRow(id, day, siloId) {
   else showDayAllDetail(day);
   renderHistory();
   renderDashboard();
-  // (수동 업로드 전환 2026-08-26) 입고 CRUD 직후 자동 Firebase 업로드 제거 — '☁️ PC → Firebase 업로드' 버튼을 눌러야만 반영됨
+  // (2026-09-03) 이력 삭제 시 자동 Firebase 업로드
+  if (typeof window._srfAutoPush === 'function') window._srfAutoPush('이력삭제');
 }
 function closeHistoryModal() {
   document.getElementById('historyModal').style.display = 'none';
@@ -12016,7 +12020,8 @@ function importCsvData() {
   toast('green', 'CSV 가져오기 완료', msg);
   renderHistory();
   renderDashboard();
-  // (수동 업로드 전환 2026-08-26) 입고 CRUD 직후 자동 Firebase 업로드 제거 — '☁️ PC → Firebase 업로드' 버튼을 눌러야만 반영됨
+  // (2026-09-03) CSV 붙여넣기/가져오기로 추가된 건이 있으면 자동 Firebase 업로드 (기존 CRUD는 수동 유지)
+  if (added > 0 && typeof window._srfAutoPush === 'function') window._srfAutoPush('CSV가져오기');
 }
 // ── '기준/비교 정정' 버튼: 업로드한 CSV와 비교해, 기존 저장 데이터의 기준/비교가 뒤바뀐 건만 정정 ──
 //   · 저장된 기준 == CSV 기준  → 방향 정상, 그대로 둠
@@ -12294,7 +12299,8 @@ function importOcrCsv() {
   toast('green', '계근데이터 등록 완료', msg);
   renderDashboard();
   if (typeof renderHistory === 'function') renderHistory();
-  // (수동 업로드 전환 2026-08-26) 입고 CRUD 직후 자동 Firebase 업로드 제거 — '☁️ PC → Firebase 업로드' 버튼을 눌러야만 반영됨
+  // (2026-09-03) OCR 일괄가져오기로 추가된 건이 있으면 자동 Firebase 업로드
+  if (added > 0 && typeof window._srfAutoPush === 'function') window._srfAutoPush('OCR가져오기');
 }
 
 function clearOcrCsv() {
