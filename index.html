@@ -21952,7 +21952,7 @@ function autoLoadInbound() {
       if (v.bySilo) {
         const siloDetail = Object.entries(v.bySilo)
           .filter(([,t]) => t>0)
-          .map(([k,t]) => `${Math.round(t)}톤:${SILO_INFO[k]?.name||k}`).join(', ');
+          .map(([k,t]) => `${(SILO_INFO[k]?.name||k).replace(' ST','ST')}: ${Math.round(t)}톤`).join(', ');
         return `${fmtDateKo(d)} ${Math.round(tot)}톤 (${siloDetail})`;
       }
       return `${fmtDateKo(d)} ${Math.round(tot)}톤`;
@@ -22154,7 +22154,7 @@ function generateReport() {
       if (v.bySilo) {
         const detail = Object.entries(v.bySilo)
           .filter(([,t]) => t > 0)
-          .map(([k,t]) => `${Math.round(t)}톤:${SILO_INFO[k]?.name||k}`).join(', ');
+          .map(([k,t]) => `${(SILO_INFO[k]?.name||k).replace(' ST','ST')}: ${Math.round(t)}톤`).join(', ');
         return `- ${fmtDateKo(d)} ${Math.round(tot)}톤 (${detail})`;
       }
       return `- ${fmtDateKo(d)} ${Math.round(tot)}톤`;
