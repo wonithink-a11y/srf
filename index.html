@@ -21466,10 +21466,19 @@ function closeAnnNoteModal() {
       const liveRecs = getLiveWindowRecords();
       const payload = JSON.parse(JSON.stringify(liveRecs)); // undefined 등 정리
       const closedThrough = getSyncClosedThrough();
+      // ── 2026-09-15: 사용량(_usageData/_usageDataBySilo/_fcHistory)도 함께 업로드 ──
+      // 기존엔 입고기록(records)만 rawdb_live로 자동동기화되고, 사용량은 수동 '전체가져오기'
+      // 버튼을 눌러야만 반영돼서 "사용량 입력해도 다른 사람/다음 접속 시 반영 안 됨" 문제가 있었음.
+      const usagePayload = (typeof _usageData !== 'undefined') ? JSON.parse(JSON.stringify(_usageData)) : {};
+      const usageBySiloPayload = (typeof _usageDataBySilo !== 'undefined') ? JSON.parse(JSON.stringify(_usageDataBySilo)) : {};
+      const fcHistoryPayload = (typeof _fcHistory !== 'undefined') ? JSON.parse(JSON.stringify(_fcHistory)) : [];
       await db.collection(FB_COL).doc('rawdb_live').set({
         records: payload,
         count: payload.length,
         closedThrough: closedThrough,
+        usage: usagePayload,
+        usageBySilo: usageBySiloPayload,
+        fcHistory: fcHistoryPayload,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
       updateSrfLiveStatus(`${payload.length}건 업로드됨`);
@@ -21489,6 +21498,41 @@ function closeAnnNoteModal() {
       const doc = await db.collection(FB_COL).doc('rawdb_live').get();
       if (!doc.exists) { updateSrfLiveStatus(); return; }
       const data = doc.data();
+
+      // ── 2026-09-15: 사용량(_usageData/_usageDataBySilo/_fcHistory) 자동 병합 ──
+      // 날짜별로 원격 값이 있으면 그 값으로 갱신하고, 로컬에만 있는 날짜(아직 업로드 안 됐거나
+      // 원격에 없는 데이터)는 보존(삭제하지 않음). localStorage에도 즉시 반영해 새로고침 없이도 유지됨.
+      // (saveUsageDataToStorage()를 직접 부르면 _srfAutoPush가 다시 걸려 불필요한 재업로드 루프가
+      //  생기므로, 여기서는 localStorage.setItem만 직접 호출)
+      try {
+        let usageChanged = false;
+        if (data.usage && typeof data.usage === 'object' && typeof _usageData !== 'undefined') {
+          Object.entries(data.usage).forEach(([d, v]) => {
+            if (_usageData[d] !== v) { _usageData[d] = v; usageChanged = true; }
+          });
+        }
+        if (data.usageBySilo && typeof data.usageBySilo === 'object' && typeof _usageDataBySilo !== 'undefined') {
+          Object.entries(data.usageBySilo).forEach(([d, v]) => { _usageDataBySilo[d] = v; });
+        }
+        if (Array.isArray(data.fcHistory) && typeof _fcHistory !== 'undefined') {
+          data.fcHistory.forEach(rec => {
+            if (!rec || !rec.date) return;
+            const idx = _fcHistory.findIndex(r => r.date === rec.date);
+            if (idx >= 0) {
+              if (JSON.stringify(_fcHistory[idx]) !== JSON.stringify(rec)) { _fcHistory.splice(idx, 1, rec); usageChanged = true; }
+            } else { _fcHistory.push(rec); usageChanged = true; }
+          });
+        }
+        if (usageChanged && typeof LS !== 'undefined') {
+          try {
+            localStorage.setItem(LS.usageData, JSON.stringify(_usageData));
+            localStorage.setItem(LS.usageBySilo, JSON.stringify(_usageDataBySilo));
+            localStorage.setItem(LS.fcHistory, JSON.stringify(_fcHistory));
+          } catch(e) { console.warn('[srfLivePull] 사용량 localStorage 저장 실패:', e); }
+          if (typeof renderFuelCalcHistory === 'function') renderFuelCalcHistory();
+        }
+      } catch(e) { console.warn('[srfLivePull] 사용량 병합 실패:', e); }
+
       const remoteClosedThrough = data.closedThrough || null;
       if (remoteClosedThrough && typeof getSyncClosedThrough === 'function') {
         const localClosed = getSyncClosedThrough();
