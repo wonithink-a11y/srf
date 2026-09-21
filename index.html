@@ -22186,7 +22186,7 @@ function generateReport() {
   } else if (jjEntries.length === 1) {
     totalInStr = `${Math.round(totalIn)}톤(${jjEntries[0]})`;
   } else {
-    const detail = jjEntries.map(k => `${Math.round(jjSum[k])}톤:${k}`).join(', ');
+    const detail = jjEntries.map(k => `${k}:${Math.round(jjSum[k])}톤`).join(', ');
     totalInStr = `${Math.round(totalIn)}톤 (${detail})`;
   }
 
@@ -22204,7 +22204,7 @@ function generateReport() {
         const nm = SILO_NM[ordered[0][0]] || ordered[0][0];
         return `${fmtDateKo(d)} : ${Math.round(dayTot)}톤(${nm})`;
       }
-      const detail = ordered.map(([k,t]) => `${Math.round(t)}톤:${SILO_NM[k]||k}`).join(', ');
+      const detail = ordered.map(([k,t]) => `${SILO_NM[k]||k}:${Math.round(t)}톤`).join(', ');
       return `${fmtDateKo(d)} : ${Math.round(dayTot)}톤 (${detail})`;
     }).join('\n');
   }
