@@ -7644,6 +7644,16 @@ function renderOpDays() {
     if (val)    val.textContent    = '—';
     if (sub)    sub.textContent    = '';
   }
+  // 재고 탭 미니 요약 동기화
+  try {
+    const mS = document.getElementById('opMiniStreak'), mA = document.getElementById('opMiniAct'), mY = document.getElementById('opMiniYear');
+    const sv = document.getElementById('kpi-opstreak-val'), sl = document.getElementById('kpi-opstreak-label');
+    if (mS && sv) mS.textContent = sv.textContent;
+    if (mA && actVal) mA.textContent = actVal.textContent;
+    if (mY) mY.textContent = '(' + new Date().getFullYear() + '년)';
+    const mb = document.getElementById('opMiniStreakBox');
+    if (mb && sl) mb.title = '연속가동일수 ' + sl.textContent;
+  } catch (e) {}
 }
 
 function toggleOpDaysEdit() {
@@ -21787,6 +21797,18 @@ function closeAnnNoteModal() {
     if(kpiOpdate)  pSched.appendChild(kpiOpdate);     //              + 예상 가동/정지
     if(flowDiv)    pFlow.appendChild(flowDiv);        // 입고·사용량 탭
     if(recentCard) pFlow.appendChild(recentCard);     //              + 최근 입고현황
+    // 재고 탭 최상단: 연속가동일수 · 가동일수 미니 요약(가로 2칸) — 값은 renderOpDays()가 갱신
+    var miniBox='display:flex;flex:1 1 0;min-width:0;justify-content:space-between;align-items:baseline;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:6px 10px;';
+    var miniLbl='font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+    var miniVal='font-size:18px;font-weight:700;white-space:nowrap;';
+    var miniStrip=document.createElement('div'); miniStrip.id='opMiniStrip';
+    miniStrip.style.cssText='display:flex;gap:8px;margin-bottom:8px;';
+    miniStrip.innerHTML='<div id="opMiniStreakBox" style="'+miniBox+'"><span style="'+miniLbl+'">연속가동일수</span>'
+      +'<span style="'+miniVal+'color:var(--accent);"><span id="opMiniStreak">—</span><span style="font-size:12px;font-weight:400;color:var(--text2);margin-left:2px;">일</span></span></div>'
+      +'<div style="'+miniBox+'"><span style="'+miniLbl+'">가동일수<span id="opMiniYear">(2026년)</span></span>'
+      +'<span style="'+miniVal+'color:var(--green);"><span id="opMiniAct">—</span><span style="font-size:12px;font-weight:400;color:var(--text2);margin-left:2px;">일</span></span></div>';
+    pStock.appendChild(miniStrip);
+    try{ if(typeof renderOpDays==='function') renderOpDays(); }catch(e){}
     if(kpiTotal)   pStock.appendChild(kpiTotal);      // 재고 탭: 전체재고(위)
     if(siloCard)   pStock.appendChild(siloCard);      //          저장조별 현재고(아래)
     if(alertCard)  pStock.appendChild(alertCard);     //          + 알림
