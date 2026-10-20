@@ -7614,7 +7614,7 @@ function renderOpStreak() {
   v.textContent = r.days;
   if (r.start) {
     const [y, m, dd] = r.start.split('-').map(Number);
-    l.textContent = '(기동: ' + String(y).slice(2) + '년' + m + '월' + dd + '일)';
+    l.textContent = '(기동: ' + y + '년 ' + m + '월 ' + dd + '일)';
   } else {
     l.textContent = '(정지 중)';
   }
