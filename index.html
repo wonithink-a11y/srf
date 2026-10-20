@@ -818,9 +818,17 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
           </div>
           <!-- 표시 모드 -->
           <div id="opDaysDisplay">
+            <!-- 연속가동일수 박스 -->
+            <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg3);border-radius:7px;padding:11px 12px;margin-bottom:3px;">
+              <span style="font-size:18px;color:var(--text2);">연속가동일수<span id="kpi-opstreak-label" style="font-size:12px;margin-left:4px;">(기동: —)</span></span>
+              <div style="display:flex;align-items:baseline;gap:4px;">
+                <span id="kpi-opstreak-val" style="font-size:26px;font-weight:700;color:var(--accent);">—</span>
+                <span style="font-size:15px;color:var(--text2);">일</span>
+              </div>
+            </div>
             <!-- 가동일수 박스 -->
             <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg3);border-radius:7px;padding:11px 12px;margin-bottom:3px;">
-              <span style="font-size:18px;color:var(--text2);">가동일수</span>
+              <span style="font-size:18px;color:var(--text2);">가동일수<span id="kpi-opdays-actual-label">(2026년)</span></span>
               <div style="display:flex;align-items:baseline;gap:4px;">
                 <span id="kpi-opdays-actual-val" style="font-size:26px;font-weight:700;color:var(--green);">97</span>
                 <span style="font-size:15px;color:var(--text2);">일</span>
@@ -828,7 +836,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
             </div>
             <!-- 예측 가동일수 박스 -->
             <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg3);border-radius:7px;padding:11px 12px;margin-bottom:3px;">
-              <span style="font-size:18px;color:var(--text2);">예측 가동일수</span>
+              <span style="font-size:18px;color:var(--text2);">예측가동일수<span id="kpi-opdays-pred-label">(2026년)</span></span>
               <div style="display:flex;align-items:baseline;gap:4px;">
                 <span id="kpi-opdays-val" style="font-size:26px;font-weight:700;color:var(--yellow);">270</span>
                 <span style="font-size:15px;color:var(--text2);">일</span>
@@ -7562,7 +7570,58 @@ function applyScheduleSettingsToDOM() {
 
 
 
+// ── 연속가동일수: 오늘부터 거꾸로 가동일(사용량≥임계값)이 끊기기 전까지 센다 ──
+//   - 오늘: 사용량 확정(≥1t) 또는 스케쥴상 가동 중(잠정)이면 가동일
+//   - 마지막 사용량 입력일 이후(미입력 구간): 스케쥴 status==='on' 이면 가동일(잠정)
+//   - 그 외 사용량 미입력일은 정지일로 간주
+function calcOpStreak() {
+  const today = localDateStr(new Date());
+  const usageKeys = Object.keys(_usageData).filter(k => k <= today).sort();
+  const lastUsage = usageKeys.length ? usageKeys[usageKeys.length - 1] : null;
+  const todayProv = !!(_opDaysBreakdown && _opDaysBreakdown.todayProvisional);
+  function isOn(ds) {
+    const u = _usageData[ds];
+    if (u != null && u >= OP_DAY_MIN_USAGE) return true;
+    if (ds === today) return todayProv;
+    if (u == null && (!lastUsage || ds > lastUsage)) {
+      const info = (typeof _schedDayMap !== 'undefined') ? _schedDayMap[ds] : null;
+      return !!info && info.status === 'on';
+    }
+    return false;
+  }
+  const d = new Date();
+  let days = 0, start = null;
+  for (let i = 0; i < 800; i++) {
+    const ds = localDateStr(d);
+    if (!isOn(ds)) break;
+    days++; start = ds;
+    d.setDate(d.getDate() - 1);
+  }
+  return { days: days, start: start };
+}
+
+function renderOpStreak() {
+  const v = document.getElementById('kpi-opstreak-val');
+  const l = document.getElementById('kpi-opstreak-label');
+  const yl = new Date().getFullYear();
+  const a = document.getElementById('kpi-opdays-actual-label');
+  const p = document.getElementById('kpi-opdays-pred-label');
+  if (a) a.textContent = '(' + yl + '년)';
+  if (p) p.textContent = '(' + yl + '년)';
+  if (!v || !l) return;
+  let r;
+  try { r = calcOpStreak(); } catch (e) { r = { days: 0, start: null }; }
+  v.textContent = r.days;
+  if (r.start) {
+    const [y, m, dd] = r.start.split('-').map(Number);
+    l.textContent = '(기동: ' + String(y).slice(2) + '년' + m + '월' + dd + '일)';
+  } else {
+    l.textContent = '(정지 중)';
+  }
+}
+
 function renderOpDays() {
+  try { renderOpStreak(); } catch (e) {}
   const val    = document.getElementById('kpi-opdays-val');
   const actVal = document.getElementById('kpi-opdays-actual-val');
   const sub    = document.getElementById('kpi-opdays-sub');
