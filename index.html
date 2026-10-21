@@ -818,6 +818,16 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
           </div>
           <!-- 표시 모드 -->
           <div id="opDaysDisplay">
+            <!-- 설비 정지/기동 버튼 (연속가동일수 리셋 방어) -->
+            <div id="stopCtrlCard" style="background:var(--bg3);border-radius:7px;padding:10px 12px;margin-bottom:3px;">
+              <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+                <span id="stopCtrlStatus" style="font-size:15px;color:var(--text);">—</span>
+                <span style="flex:1;"></span>
+                <input type="date" id="stopCtrlDate" style="padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg2,var(--bg3));color:var(--text);font-size:13px;">
+                <button id="stopCtrlBtn" class="btn btn-secondary" onclick="toggleUnitStop()">⏹ 설비 정지</button>
+              </div>
+              <div id="stopCtrlHist" style="font-size:11px;color:var(--text2);margin-top:6px;line-height:1.6;"></div>
+            </div>
             <!-- 연속가동일수 박스 -->
             <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg3);border-radius:7px;padding:11px 12px;margin-bottom:3px;">
               <span style="font-size:18px;color:var(--text2);">연속가동일수<span id="kpi-opstreak-label" style="font-size:12px;margin-left:4px;">(기동: —)</span></span>
@@ -6196,6 +6206,9 @@ const _maintPeriods = [
   { id:1, start:'2026-05-06', end:'2026-06-21', note:'정기보수' },
 ]; // [{id, start, end, note}]
 let _maintIdCounter = 2;
+// ── 설비 정지/기동 기록 (연속가동일수 방어용, 2026-10-21) ──
+//   [{id, start, end|null, upd, del?}] · end=null → 정지 진행 중 · del=true → 삭제 표시(동기화용)
+const _stopLog = [];
 // ── 날짜별 기동/정지 기준 오버라이드 ──
 const _thresholdOverrides = [
   { id:1, start:'2026-06-01', end:'2026-08-31', startThr:2800, stopThr:500 },
@@ -7455,6 +7468,7 @@ function saveScheduleSettings() {
       suspIdCounter:      _suspIdCounter,
       maintPeriods:       JSON.parse(JSON.stringify(_maintPeriods)),
       maintIdCounter:     _maintIdCounter,
+      stopLog:            JSON.parse(JSON.stringify(_stopLog)),
       thresholdOverrides: JSON.parse(JSON.stringify(_thresholdOverrides)),
       thrOverrideIdCounter: _thrOverrideIdCounter,
       planDaily: {
@@ -7487,6 +7501,7 @@ function loadScheduleSettings() {
     if (s.suspIdCounter)      _suspIdCounter = s.suspIdCounter;
     if (s.maintPeriods)       { _maintPeriods.length = 0;       s.maintPeriods.forEach(x=>_maintPeriods.push(x)); }
     if (s.maintIdCounter)     _maintIdCounter = s.maintIdCounter;
+    if (Array.isArray(s.stopLog)) { _stopLog.length = 0; s.stopLog.forEach(x=>_stopLog.push(x)); }
     if (s.thresholdOverrides) { _thresholdOverrides.length = 0; s.thresholdOverrides.forEach(x=>_thresholdOverrides.push(x)); }
     if (s.thrOverrideIdCounter) _thrOverrideIdCounter = s.thrOverrideIdCounter;
     if (s.defaultStartHour !== undefined) _defaultStartHour = s.defaultStartHour;
@@ -7570,34 +7585,106 @@ function applyScheduleSettingsToDOM() {
 
 
 
-// ── 연속가동일수: 오늘부터 거꾸로 가동일(사용량≥임계값)이 끊기기 전까지 센다 ──
-//   - 오늘: 사용량 확정(≥1t) 또는 스케쥴상 가동 중(잠정)이면 가동일
-//   - 마지막 사용량 입력일 이후(미입력 구간): 스케쥴 status==='on' 이면 가동일(잠정)
-//   - 그 외 사용량 미입력일은 정지일로 간주
+// ── 연속가동일수: 오늘부터 거꾸로 가동일이 끊기기 전까지 센다 ──
+//   · 사용량이 입력된 날: 사용량(≥임계값)으로 확정
+//   · 정지 기록(정지 버튼) 또는 점검기간: 정지일
+//   · 마지막 사용량 입력일 이후 미입력 구간(주말·휴일 일괄입력 전): 정지 기록이 없으면
+//     마지막 확정 상태(가동)를 이어받음 → 입력이 늦어도 1일로 리셋되지 않음
+//   · 마지막 사용량 이전의 빈 날짜는 기존대로 정지일
+function stopActive() { return _stopLog.filter(function(p){ return !p.del; }); }
+function isUnitStopped() { return stopActive().some(function(p){ return !p.end; }); }
+function inStopLog(ds) { return stopActive().some(function(p){ return ds >= p.start && (!p.end || ds <= p.end); }); }
+function mergeStopLog(remote) {
+  if (!Array.isArray(remote)) return false;
+  var changed = false;
+  remote.forEach(function(r){
+    if (!r || !r.id) return;
+    var i = _stopLog.findIndex(function(x){ return x.id === r.id; });
+    if (i < 0) { _stopLog.push(r); changed = true; }
+    else if ((r.upd || 0) > (_stopLog[i].upd || 0)) { _stopLog[i] = r; changed = true; }
+  });
+  return changed;
+}
 function calcOpStreak() {
   const today = localDateStr(new Date());
   const usageKeys = Object.keys(_usageData).filter(k => k <= today).sort();
   const lastUsage = usageKeys.length ? usageKeys[usageKeys.length - 1] : null;
   const todayProv = !!(_opDaysBreakdown && _opDaysBreakdown.todayProvisional);
+  const lastOn = lastUsage != null && _usageData[lastUsage] >= OP_DAY_MIN_USAGE;
+  const stops = stopActive();
   function isOn(ds) {
     const u = _usageData[ds];
-    if (u != null && u >= OP_DAY_MIN_USAGE) return true;
-    if (ds === today) return todayProv;
-    if (u == null && (!lastUsage || ds > lastUsage)) {
-      const info = (typeof _schedDayMap !== 'undefined') ? _schedDayMap[ds] : null;
-      return !!info && info.status === 'on';
+    if (u != null && ds <= today) return u >= OP_DAY_MIN_USAGE;       // 입력된 날: 사용량으로 확정
+    if (inStopLog(ds)) return false;                                  // 정지 버튼 기록
+    if (_maintPeriods.some(function(p){ return ds >= p.start && ds <= p.end; })) return false; // 점검기간
+    if (!lastUsage || ds > lastUsage) {                               // 미입력(미확정) 구간
+      const restarted = stops.some(function(p){ return p.end && (!lastUsage || p.end >= lastUsage) && p.end < ds; });
+      return lastOn || restarted || (ds === today && todayProv);
     }
     return false;
   }
   const d = new Date();
-  let days = 0, start = null;
+  let days = 0, start = null, unconfirmed = 0;
   for (let i = 0; i < 800; i++) {
     const ds = localDateStr(d);
     if (!isOn(ds)) break;
     days++; start = ds;
+    if (ds < today && _usageData[ds] == null) unconfirmed++;
     d.setDate(d.getDate() - 1);
   }
-  return { days: days, start: start };
+  return { days: days, start: start, unconfirmed: unconfirmed };
+}
+
+function toggleUnitStop() {
+  const el = document.getElementById('stopCtrlDate');
+  const ds = (el && el.value) || localDateStr(new Date());
+  const open = stopActive().filter(function(p){ return !p.end; })[0];
+  if (open) {                                   // 기동: 기동일 전날까지가 정지
+    if (ds <= open.start) { toast('yellow', '날짜 확인', '기동일은 정지 시작일(' + open.start + ') 이후여야 합니다.'); return; }
+    const prev = new Date(ds + 'T00:00:00'); prev.setDate(prev.getDate() - 1);
+    open.end = localDateStr(prev); open.upd = Date.now();
+    toast('green', '설비 기동 기록', ds + '부터 가동');
+  } else {                                      // 정지
+    _stopLog.push({ id: 's' + Date.now(), start: ds, end: null, upd: Date.now() });
+    toast('yellow', '설비 정지 기록', ds + '부터 정지 (연속가동일수 중단)');
+  }
+  afterStopChange();
+}
+function deleteStopEntry(id) {
+  const p = _stopLog.find(function(x){ return x.id === id; });
+  if (!p) return;
+  p.del = true; p.upd = Date.now();
+  afterStopChange();
+}
+function afterStopChange() {
+  try { saveScheduleSettings(); } catch (e) {}
+  try { renderOpDays(); } catch (e) {}
+  try { renderStopCtrl(); } catch (e) {}
+  if (typeof window._srfAutoPushUsageFast === 'function') window._srfAutoPushUsageFast();
+}
+function renderStopCtrl() {
+  const st = document.getElementById('stopCtrlStatus');
+  if (!st) return;
+  const btn = document.getElementById('stopCtrlBtn');
+  const dt = document.getElementById('stopCtrlDate');
+  const hist = document.getElementById('stopCtrlHist');
+  const open = stopActive().filter(function(p){ return !p.end; })[0];
+  let r; try { r = calcOpStreak(); } catch (e) { r = { days: 0, unconfirmed: 0 }; }
+  if (open) {
+    st.innerHTML = '🔴 <b>정지 중</b> (' + open.start + '~)';
+    btn.textContent = '▶ 설비 기동'; btn.className = 'btn btn-primary';
+  } else {
+    st.innerHTML = '🟢 <b>가동 중</b> · 연속 ' + r.days + '일' + (r.unconfirmed ? ' <span style="color:var(--yellow);">(미확정 ' + r.unconfirmed + '일)</span>' : '');
+    btn.textContent = '⏹ 설비 정지'; btn.className = 'btn btn-secondary';
+  }
+  if (dt && !dt.value) dt.value = localDateStr(new Date());
+  const list = stopActive().slice().sort(function(a, b){ return a.start < b.start ? 1 : -1; }).slice(0, 5);
+  hist.innerHTML = list.length
+    ? '정지 기록: ' + list.map(function(p){
+        return p.start + ' ~ ' + (p.end || '진행 중') +
+          ' <a href="#" style="color:var(--red);" onclick="deleteStopEntry(\'' + p.id + '\');return false;">삭제</a>';
+      }).join(' · ')
+    : '정지 기록 없음 — 사용량 미입력일은 가동으로 간주됩니다. 정지·기동 날짜를 선택해 버튼을 누르세요.';
 }
 
 function renderOpStreak() {
@@ -7614,7 +7701,7 @@ function renderOpStreak() {
   v.textContent = r.days;
   if (r.start) {
     const [y, m, dd] = r.start.split('-').map(Number);
-    l.textContent = '(기동: ' + y + '년 ' + m + '월 ' + dd + '일)';
+    l.textContent = '(기동: ' + y + '년 ' + m + '월 ' + dd + '일' + (r.unconfirmed ? ' · 미확정 ' + r.unconfirmed + '일' : '') + ')';
   } else {
     l.textContent = '(정지 중)';
   }
@@ -7622,6 +7709,7 @@ function renderOpStreak() {
 
 function renderOpDays() {
   try { renderOpStreak(); } catch (e) {}
+  try { renderStopCtrl(); } catch (e) {}
   const val    = document.getElementById('kpi-opdays-val');
   const actVal = document.getElementById('kpi-opdays-actual-val');
   const sub    = document.getElementById('kpi-opdays-sub');
@@ -21575,6 +21663,7 @@ function closeAnnNoteModal() {
         usage: usagePayload,
         usageBySilo: usageBySiloPayload,
         fcHistory: fcHistoryPayload,
+        stopLog: JSON.parse(JSON.stringify(_stopLog)),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
       updateSrfLiveStatus(`${payload.length}건 업로드됨`);
@@ -21628,6 +21717,14 @@ function closeAnnNoteModal() {
           if (typeof renderFuelCalcHistory === 'function') renderFuelCalcHistory();
         }
       } catch(e) { console.warn('[srfLivePull] 사용량 병합 실패:', e); }
+
+      // ── 2026-10-21: 설비 정지/기동 기록 병합 (id 기준, upd 최신 우선) ──
+      try {
+        if (Array.isArray(data.stopLog) && mergeStopLog(data.stopLog)) {
+          saveScheduleSettings();
+          if (typeof renderOpDays === 'function') renderOpDays();
+        }
+      } catch(e) { console.warn('[srfLivePull] 정지기록 병합 실패:', e); }
 
       const remoteClosedThrough = data.closedThrough || null;
       if (remoteClosedThrough && typeof getSyncClosedThrough === 'function') {
