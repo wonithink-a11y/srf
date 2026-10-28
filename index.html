@@ -8,7 +8,41 @@
   <script id="srf-lock">
   (function(){
     try{
-      var H='c9b48ac8c25674c9908247b45e383cd17a04be6702d453d1e537cf4391add64c', SALT='srf-kdhc-lock:', KEY='_srfLockOk_v1';
+      var LOCK_ENABLED=false; // ★ 기본값(새 기기/설정 없음): true=잠금, false=해제(공모전 심사용). 앱 설정/기타에서 기기별로 덮어쓸 수 있음
+      var H='c9b48ac8c25674c9908247b45e383cd17a04be6702d453d1e537cf4391add64c', SALT='srf-kdhc-lock:', KEY='_srfLockOk_v1', PREF='_srfLockPref';
+      function pref(){ try{ return localStorage.getItem(PREF); }catch(e){ return null; } }
+      var LOCK_AFTER=new Date('2026-12-01T00:00:00+09:00'); // ★ 이 시각부터 자동 잠금 (임시 해제 기간: ~2026-11-30)
+      var ACK='_srfLockNoticeAck_v1';
+      function isOn(){ var p=pref(); return p==='on' ? true : (p==='off' ? false : (LOCK_ENABLED || Date.now()>=LOCK_AFTER.getTime())); }
+      function sha(v){ return crypto.subtle.digest('SHA-256', new TextEncoder().encode(SALT+v)).then(function(b){ return Array.prototype.map.call(new Uint8Array(b),function(x){return ('0'+x.toString(16)).slice(-2);}).join(''); }); }
+      window.srfLock={
+        isOn:isOn,
+        enable:function(){ try{ localStorage.setItem(PREF,'on'); localStorage.setItem(KEY,H); }catch(e){} }, // 현재 기기는 인증 완료 상태로 유지
+        disable:function(pw){ return sha(pw).then(function(h){ if(h!==H) return false; try{ localStorage.setItem(PREF,'off'); }catch(e){} return true; }); }
+      };
+      if(!isOn()){
+        // 임시 해제 기간(수동 설정 없음)에 처음 접속한 사용자에게 안내 + 접속 버튼
+        var seen=false; try{ seen=!!localStorage.getItem(ACK); }catch(e){}
+        if(pref()===null && !seen){
+          var d0=document.documentElement, ov0=d0.style.overflow;
+          var nb=document.createElement('div');
+          nb.setAttribute('style','position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147483647;background:#0d1117;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans KR","Malgun Gothic",sans-serif;');
+          nb.innerHTML='<img src="kdhc_symbol.png" alt="" style="position:absolute;right:-60px;bottom:-40px;width:260px;opacity:.07;pointer-events:none;">'+
+            '<div style="position:relative;width:min(340px,88vw);text-align:center;color:#e6edf3;">'+
+            '<img src="kdhc_logo_header_dark.png" alt="한국지역난방공사 KDHC" style="width:200px;max-width:80%;margin-bottom:30px;">'+
+            '<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="#58a6ff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto 10px;"><rect x="4" y="10.5" width="16" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 7.6-1.7"/><circle cx="12" cy="15.5" r="1.2" fill="#58a6ff" stroke="none"/></svg>'+
+            '<div style="font-size:18px;font-weight:700;margin-bottom:10px;">고형연료 수급 관리 시스템</div>'+
+            '<div style="display:inline-block;font-size:13px;font-weight:700;color:#58a6ff;border:1px solid #58a6ff;border-radius:999px;padding:3px 12px;margin-bottom:12px;">임시 잠금 해제 중</div>'+
+            '<div style="font-size:13px;font-weight:700;margin-bottom:24px;">2026.11.30까지</div>'+
+            '<button type="button" id="srf-notice-go" style="width:100%;padding:12px;font-size:15px;font-weight:700;border:0;border-radius:10px;background:#0A84FF;color:#fff;cursor:pointer;">접속하기</button></div>';
+          d0.appendChild(nb); d0.style.overflow='hidden';
+          nb.querySelector('#srf-notice-go').addEventListener('click',function(){
+            try{ localStorage.setItem(ACK,'1'); }catch(e){}
+            d0.style.overflow=ov0; if(nb.parentNode) nb.parentNode.removeChild(nb);
+          });
+        }
+        return;
+      }
       try{ if(localStorage.getItem(KEY)===H) return; }catch(e){}
       if(!(window.crypto && crypto.subtle && window.TextEncoder)) return; // 미지원 환경은 잠금 생략
       var de=document.documentElement, prevOv=de.style.overflow;
@@ -6114,6 +6148,25 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 ══════════════════════════════════════════════════════ -->
 <div id="tab-manual" class="tab-panel">
   <div class="subbar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;"><button class="subbtn-settings" data-member="carrier" onclick="switchSubTab('settings','carrier')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🚛 운송업체</button><button class="subbtn-settings" data-member="api-status" onclick="switchSubTab('settings','api-status')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">🔑 API 현황</button><button class="subbtn-settings" data-member="manual" onclick="switchSubTab('settings','manual')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📘 매뉴얼</button><button class="subbtn-settings" data-member="excel-import" onclick="switchSubTab('settings','excel-import')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">📥 수기 엑셀 가져오기</button></div>
+
+  <div class="card" id="srfLockCard">
+    <div class="section-header" style="margin-bottom:10px;"><div class="section-title">🔒 첫 실행 비밀번호 잠금</div></div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <div id="srfLockState" style="font-size:13px;color:var(--text2);flex:1;min-width:200px;"></div>
+      <button type="button" id="srfLockBtn" class="btn btn-primary" style="font-size:12px;" onclick="srfLockToggle()"></button>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-top:8px;">※ 이 기기에서만 적용됩니다. 해제 시 비밀번호 확인이 필요합니다.</div>
+  </div>
+  <script>
+  function srfLockRender(){ var on=window.srfLock&&window.srfLock.isOn(); var st=document.getElementById('srfLockState'),b=document.getElementById('srfLockBtn'); if(!st||!b) return;
+    if(!window.srfLock){ st.textContent='잠금 기능을 사용할 수 없는 환경입니다.'; b.style.display='none'; return; }
+    st.innerHTML=on?'현재 <b>켜짐</b> — 처음 접속 시 비밀번호를 묻습니다.':'현재 <b>꺼짐</b> — 비밀번호 없이 열립니다. (별도 설정이 없으면 2026-12-01부터 자동 잠금)'; b.textContent=on?'🔓 잠금 끄기':'🔒 잠금 켜기'; }
+  function srfLockToggle(){ var L=window.srfLock; if(!L) return;
+    if(L.isOn()){ var pw=prompt('잠금을 끄려면 비밀번호를 입력하세요'); if(pw===null) return;
+      L.disable(pw).then(function(ok){ alert(ok?'잠금이 꺼졌습니다.':'비밀번호가 올바르지 않습니다.'); srfLockRender(); }); }
+    else{ L.enable(); alert('이 기기의 잠금이 켜졌습니다. (지금은 인증된 상태라 바로 사용 가능)'); srfLockRender(); } }
+  srfLockRender();
+  </script>
 
   <div class="card">
     <div class="section-header" style="margin-bottom:14px;">
